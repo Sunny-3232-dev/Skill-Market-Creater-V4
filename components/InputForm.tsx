@@ -95,30 +95,28 @@ const InputForm: React.FC<InputFormProps> = ({ onSubmit }) => {
       </div>
 
       <form onSubmit={handleSubmit} className="flex-grow flex flex-col space-y-4 md:space-y-6">
-        <div className="relative group flex-grow">
-          <div className="absolute -inset-0.5 bg-gradient-to-r from-orange-200 to-rose-200 rounded-2xl md:rounded-3xl opacity-20 group-hover:opacity-40 transition duration-500 blur"></div>
-          <div className="relative h-full">
-            <textarea
-              value={rawText}
-              onChange={(e) => setRawText(e.target.value)}
-              className="w-full h-full min-h-[180px] md:min-h-[250px] p-5 md:p-8 border-0 bg-white/70 backdrop-blur-sm rounded-[1.5rem] md:rounded-[2rem] focus:ring-0 shadow-sm text-stone-700 placeholder:text-stone-300 text-base md:text-lg leading-relaxed resize-none outline-none transition-all"
-              placeholder="ここに自由に書き込んでください。
+        <div className="relative flex-grow">
+          <textarea
+            value={rawText}
+            onChange={(e) => setRawText(e.target.value)}
+            className="w-full h-full min-h-[180px] md:min-h-[250px] p-5 md:p-8 bg-white border border-stone-100 rounded-[1.5rem] md:rounded-[2rem] shadow-soft text-stone-700 placeholder:text-stone-300 text-base md:text-lg leading-relaxed resize-none outline-none focus:border-rose-200 focus:ring-2 focus:ring-rose-100 transition-all"
+            placeholder="ここに自由に書き込んでください。
 ・好きなこと、得意なこと
 ・これまでの仕事や人生の経験
 
 箇条書きやメモのコピーでも構いません。AIが魅力的なサービス案に変換します。"
-            />
-          </div>
+          />
         </div>
 
         <div className="space-y-3">
           <button
             type="submit"
-            className="w-full bg-gradient-to-r from-orange-400 via-rose-500 to-purple-600 hover:from-orange-500 hover:via-rose-600 hover:to-purple-700 text-white font-bold text-base md:text-lg py-4 md:py-5 px-8 rounded-xl md:rounded-2xl transition-all shadow-xl shadow-rose-200 hover:shadow-rose-300 hover:-translate-y-0.5 flex items-center justify-center gap-3 group overflow-hidden relative"
+            className="w-full bg-gradient-to-r from-orange-400 via-rose-500 to-purple-600 hover:from-orange-500 hover:via-rose-600 hover:to-purple-700 text-white font-bold text-base md:text-lg py-4 md:py-5 px-8 rounded-xl md:rounded-2xl transition-all duration-300 ease-smooth shadow-xl shadow-rose-200 hover:shadow-rose-300 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.99] flex items-center justify-center gap-3 group overflow-hidden relative"
           >
+            <span aria-hidden className="absolute inset-x-0 top-0 h-1/2 bg-gradient-to-b from-white/20 to-transparent pointer-events-none rounded-t-xl md:rounded-t-2xl"></span>
             <span className="relative z-10">アイデアを生成する</span>
-            <span className="relative z-10 group-hover:translate-x-1 transition-transform">→</span>
-            <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300 rounded-2xl"></div>
+            <span className="relative z-10 group-hover:translate-x-1 transition-transform duration-300 ease-smooth">→</span>
+            <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-smooth rounded-2xl"></div>
           </button>
           
         </div>

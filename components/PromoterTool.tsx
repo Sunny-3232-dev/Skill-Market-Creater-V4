@@ -149,9 +149,10 @@ const PromoterTool: React.FC<PromoterToolProps> = ({ ensureKeySet, onHandleApiEr
 
                     <button
                         type="submit"
-                        className="w-full bg-gradient-to-r from-orange-400 to-rose-500 text-white font-bold py-4 rounded-xl shadow-lg shadow-orange-200 hover:shadow-orange-300 transition-all active:scale-95 flex items-center justify-center gap-2"
+                        className="relative overflow-hidden w-full bg-gradient-to-r from-orange-400 to-rose-500 hover:from-orange-500 hover:to-rose-600 text-white font-bold py-4 rounded-xl shadow-lg shadow-orange-200 hover:shadow-orange-300 transition-all duration-300 ease-smooth hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.99] flex items-center justify-center gap-2 group"
                     >
-                        <span>📣</span> つぶやきを20本生成する
+                        <span aria-hidden className="absolute inset-x-0 top-0 h-1/2 bg-gradient-to-b from-white/20 to-transparent pointer-events-none rounded-t-xl"></span>
+                        <span className="relative z-10"><span className="mr-1">📣</span> つぶやきを20本生成する</span>
                     </button>
                 </form>
             </div>

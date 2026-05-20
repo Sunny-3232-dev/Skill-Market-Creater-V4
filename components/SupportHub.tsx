@@ -1,9 +1,9 @@
 
 import React, { useState, useMemo, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
-import { generatePromotion, generateSurveyPatterns } from '../services/geminiService';
+import { generatePromotion, generateSurveyPatterns, getSlideDocPrompt } from '../services/geminiService';
 import { extractWords } from '../utils/textProcessing';
-import { SurveyPattern } from '../types';
-import { MegaphoneIcon, ClipboardListIcon } from './icons';
+import { SurveyPattern, ThumbnailPromptVersion } from '../types';
+import { MegaphoneIcon, ClipboardListIcon, PresentationIcon } from './icons';
 import LoadingOverlay from './LoadingOverlay';
 
 interface SupportHubProps {
@@ -12,7 +12,58 @@ interface SupportHubProps {
 }
 
 // --- Menu type definitions ---
-type MenuId = 'promoter' | 'survey';
+type MenuId = 'promoter' | 'survey' | 'slidedoc';
+
+// --- Slide Doc tone variants ---
+const SLIDE_DOC_VERSIONS: Array<{
+  id: ThumbnailPromptVersion;
+  label: string;
+  description: string;
+  badgeClass: string;
+}> = [
+  {
+    id: 'my_style',
+    label: 'マイスタイル(参照モード)',
+    description: 'リソースに添付した参考画像のトンマナを踏襲。既存のサムネイルと統一感を出したい方に。',
+    badgeClass: 'bg-purple-50 text-purple-500 border-purple-200',
+  },
+  {
+    id: 'standard',
+    label: '標準',
+    description: 'プロフェッショナルで信頼感のあるビジネスデザイン。落ち着いた上質な印象。',
+    badgeClass: 'bg-slate-50 text-slate-600 border-slate-200',
+  },
+  {
+    id: 'simple',
+    label: 'シンプル',
+    description: '丸みのあるやさしい印象のミニマルデザイン。清潔感と信頼感を両立。',
+    badgeClass: 'bg-blue-50 text-blue-500 border-blue-200',
+  },
+  {
+    id: 'watercolor',
+    label: '水彩画',
+    description: '手書き風・柔らかなタッチ。親しみやすく温かみのある印象。',
+    badgeClass: 'bg-pink-50 text-pink-500 border-pink-200',
+  },
+  {
+    id: 'pop',
+    label: 'ポップ&フレンドリー',
+    description: '鮮やかな多色使いとポップアート感。楽しくワクワクする初心者歓迎の印象。',
+    badgeClass: 'bg-orange-50 text-orange-500 border-orange-200',
+  },
+  {
+    id: 'youtube',
+    label: 'YouTube風',
+    description: '人気YouTuberのサムネイル調。派手・インパクト重視で思わずクリックしたくなる印象。',
+    badgeClass: 'bg-red-50 text-red-500 border-red-200',
+  },
+  {
+    id: 'pivot',
+    label: 'PIVOT風',
+    description: 'ビジネスインタビュー番組のトンマナ。深緑ベースで知的・上質な印象。',
+    badgeClass: 'bg-emerald-50 text-emerald-600 border-emerald-200',
+  },
+];
 
 // --- Reusable sub-components (from existing tools) ---
 
@@ -216,6 +267,9 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError 
   const [selectedPattern, setSelectedPattern] = useState<SurveyPattern | null>(null);
   const [showCode, setShowCode] = useState(false);
 
+  // Slide Doc copy feedback
+  const [copiedSlideDocVersion, setCopiedSlideDocVersion] = useState<ThumbnailPromptVersion | null>(null);
+
   // Survey PatternCard ヘッダー高さ同期
   const surveyHeaderRefs = useRef<(HTMLDivElement | null)[]>([]);
   const syncSurveyHeaders = useCallback(() => {
@@ -244,13 +298,14 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError 
 
   // Scroll to results when they appear (container内のみスクロール)
   useEffect(() => {
-    if ((posts.length > 0 || patterns.length > 0) && resultRef.current && containerRef.current) {
+    const hasAny = posts.length > 0 || patterns.length > 0 || activeMenu === 'slidedoc';
+    if (hasAny && resultRef.current && containerRef.current) {
       const container = containerRef.current;
       const target = resultRef.current;
       const targetTop = target.offsetTop - container.offsetTop;
       container.scrollTo({ top: targetTop, behavior: 'smooth' });
     }
-  }, [posts, patterns]);
+  }, [posts, patterns, activeMenu]);
 
   const handleRunPromoter = async () => {
     if (!hasInput) return;
@@ -298,6 +353,24 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError 
       setIsLoading(false);
       setLoadingMenu(null);
     }
+  };
+
+  const handleRunSlideDoc = () => {
+    if (!hasInput) return;
+    setPosts([]);
+    setPatterns([]);
+    setSelectedPattern(null);
+    setShowCode(false);
+    setCopiedSlideDocVersion(null);
+    setActiveMenu('slidedoc');
+  };
+
+  const handleCopySlideDocPrompt = (version: ThumbnailPromptVersion) => {
+    const prompt = getSlideDocPrompt(serviceBody, version);
+    navigator.clipboard.writeText(prompt).then(() => {
+      setCopiedSlideDocVersion(version);
+      setTimeout(() => setCopiedSlideDocVersion(null), 2000);
+    });
   };
 
   const handleGenerateCode = () => {
@@ -358,9 +431,19 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError 
         </div>
       ),
     },
+    {
+      id: 'slidedoc' as MenuId,
+      title: 'サービス資料を作る',
+      description: 'NotebookLM用のスライド作成プロンプトを生成（トンマナ5種から選択可）',
+      icon: <PresentationIcon />,
+      themeColor: 'green',
+      badge: 'Slides',
+      onRun: handleRunSlideDoc,
+      extraInput: null,
+    },
   ];
 
-  const hasResults = posts.length > 0 || patterns.length > 0;
+  const hasResults = posts.length > 0 || patterns.length > 0 || activeMenu === 'slidedoc';
 
   return (
     <div ref={containerRef} className="h-full flex flex-col overflow-y-auto custom-scrollbar">
@@ -392,9 +475,10 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError 
 
         {/* Menu List */}
         <div className="mb-8">
-          <div className="flex items-center gap-3 mb-4 px-1">
+          <div className="flex items-center gap-2.5 mb-4 px-1">
             <span className="text-[10px] font-bold text-stone-400 uppercase tracking-[0.2em]">メニュー一覧</span>
-            <div className="h-px bg-stone-200 flex-grow"></div>
+            <span className="w-1 h-1 rounded-full bg-stone-300"></span>
+            <div className="h-px bg-gradient-to-r from-stone-200 to-transparent flex-grow"></div>
           </div>
 
           <div className="bg-white border border-stone-100 ring-1 ring-black/[0.04] rounded-2xl overflow-hidden shadow-sm">
@@ -451,9 +535,10 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError 
         {/* Results Area */}
         {hasResults && (
           <div ref={resultRef} className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <div className="flex items-center gap-3 mb-4 px-1">
+            <div className="flex items-center gap-2.5 mb-4 px-1">
               <span className="text-[10px] font-bold text-stone-400 uppercase tracking-[0.2em]">結果</span>
-              <div className="h-px bg-stone-200 flex-grow"></div>
+              <span className="w-1 h-1 rounded-full bg-stone-300"></span>
+              <div className="h-px bg-gradient-to-r from-stone-200 to-transparent flex-grow"></div>
             </div>
 
             {/* Promoter Results */}
@@ -469,6 +554,89 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError 
                   {posts.map((post, idx) => (
                     <TweetCard key={idx} text={post} index={idx} />
                   ))}
+                </div>
+              </div>
+            )}
+
+            {/* Slide Doc Results */}
+            {activeMenu === 'slidedoc' && (
+              <div>
+                <div className="mb-6">
+                  <h3 className="text-xl font-bold text-stone-800">スライド資料プロンプト (5パターン)</h3>
+                  <p className="text-xs text-stone-500 mt-1">お好みのトンマナをコピーし、NotebookLM のスライド作成カスタマイズ欄に貼り付けてください。</p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start mb-8">
+                  {SLIDE_DOC_VERSIONS.map(({ id, label, description, badgeClass }) => {
+                    const isCopied = copiedSlideDocVersion === id;
+                    const isMyStyle = id === 'my_style';
+                    return (
+                      <div
+                        key={id}
+                        className={`bg-white border border-stone-100 rounded-2xl p-5 shadow-soft hover:shadow-card-hover transition-all duration-300 ease-smooth ${
+                          isMyStyle ? 'md:col-span-2' : ''
+                        }`}
+                      >
+                        <div className="flex items-center justify-between gap-3 mb-2">
+                          <div className="flex items-center gap-2 flex-wrap min-w-0">
+                            <span className={`shrink-0 text-[10px] font-bold tracking-widest uppercase px-2 py-0.5 rounded border ${badgeClass}`}>{id}</span>
+                            <h4 className="text-sm font-bold text-stone-700">{label}</h4>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleCopySlideDocPrompt(id)}
+                            className={`text-xs font-bold px-4 py-1.5 rounded-full border transition-all shrink-0 ${
+                              isCopied
+                                ? 'bg-green-100 text-green-700 border-green-200'
+                                : 'bg-stone-800 text-white hover:bg-stone-700 shadow-sm border-transparent'
+                            }`}
+                          >
+                            {isCopied ? '✅ コピー済' : '📋 コピー'}
+                          </button>
+                        </div>
+                        <p className="text-xs text-stone-500 leading-relaxed">{description}</p>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Usage guide */}
+                <div className="bg-purple-50/70 border border-purple-200 rounded-2xl p-5 mb-12">
+                  <h4 className="text-sm font-bold text-purple-900 mb-3 flex items-center gap-2">
+                    <span>📘</span> スライド生成から画像化までの手順
+                  </h4>
+                  <ol className="text-xs text-purple-800 space-y-2 list-decimal list-inside leading-relaxed mb-4">
+                    <li>「NotebookLM を開く」ボタンから新規ノートブックを作成</li>
+                    <li>「ソース」にサービス詳細文章を追加(必要に応じてキャラアイコン画像も添付)</li>
+                    <li>「スタジオ」→「スライド作成」→ カスタマイズ欄にコピーしたプロンプトを貼り付け</li>
+                    <li>生成を実行してスライドを確認し、<span className="font-bold">PDF形式でダウンロード</span></li>
+                    <li>「I Love PDF を開く」ボタンから PDF→JPG のページに移動し、ダウンロードした PDF をアップロード</li>
+                    <li>「ページを抽出」→ 変換を実行 → 各スライドを JPG 化した ZIP ファイルがダウンロードされます(解凍すると 1 枚ずつの画像になります)</li>
+                    <li>このあとは、<span className="font-bold">スキルマーケットのサービス画像に追加</span>しましょう 🎉</li>
+                  </ol>
+                  <div className="flex gap-2 flex-wrap">
+                    <a
+                      href="https://notebooklm.google.com/new"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        // PWAに吸われず、必ずブラウザの新しいタブで開く
+                        window.open('https://notebooklm.google.com/new', '_blank', 'noopener,noreferrer');
+                      }}
+                      className="inline-flex items-center gap-1.5 text-xs font-bold text-purple-700 hover:text-purple-900 bg-white border border-purple-200 px-4 py-2 rounded-full shadow-sm hover:shadow transition-all"
+                    >
+                      <span>📘</span> NotebookLM を開く
+                    </a>
+                    <a
+                      href="https://www.ilovepdf.com/ja/pdf_to_jpg"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 text-xs font-bold text-purple-700 hover:text-purple-900 bg-white border border-purple-200 px-4 py-2 rounded-full shadow-sm hover:shadow transition-all"
+                    >
+                      <span>🖼️</span> I Love PDF を開く
+                    </a>
+                  </div>
                 </div>
               </div>
             )}
@@ -511,14 +679,15 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError 
           </div>
         )}
 
-        {/* Knowledge Base */}
+        {/* 学長マガジンチャット */}
         <div className="mb-8">
-          <div className="flex items-center gap-3 mb-4 px-1">
-            <span className="text-[10px] font-bold text-stone-400 uppercase tracking-[0.2em]">ノウハウ記事</span>
-            <div className="h-px bg-stone-200 flex-grow"></div>
+          <div className="flex items-center gap-2.5 mb-4 px-1">
+            <span className="text-[10px] font-bold text-stone-400 uppercase tracking-[0.2em]">学長マガジンチャット</span>
+            <span className="w-1 h-1 rounded-full bg-stone-300"></span>
+            <div className="h-px bg-gradient-to-r from-stone-200 to-transparent flex-grow"></div>
           </div>
 
-          <div className="bg-white border border-stone-100 ring-1 ring-black/[0.04] rounded-2xl overflow-hidden shadow-sm">
+          <div className="bg-white border border-stone-100 ring-1 ring-black/[0.04] rounded-2xl overflow-hidden shadow-soft">
             {[
               {
                 title: '🦁▼稼ぎ方実践講座「価格の決め方」',
@@ -534,6 +703,48 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError 
                 category: '宣伝',
                 url: 'https://libecity.com/room_list?room_id=President-Tweet&comment_id=ifrXKHuX4QbUTwkPSG7Y',
               },
+            ].map((article, index, arr) => (
+              <a
+                key={index}
+                href={article.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={`group flex items-start gap-4 px-5 py-4 transition-colors hover:bg-stone-50 ${
+                  index !== arr.length - 1 ? 'border-b border-stone-100' : ''
+                }`}
+              >
+                <span className="shrink-0 mt-0.5 text-stone-300 text-sm">📄</span>
+                <div className="flex-grow min-w-0">
+                  <div className="flex items-center gap-2">
+                    <h4 className="text-sm font-bold text-stone-700 group-hover:text-stone-900 transition-colors leading-snug">{article.title}</h4>
+                    <span className={`shrink-0 text-[9px] font-bold tracking-wider px-1.5 py-0.5 rounded border ${
+                      ({ '価格': 'bg-amber-50 text-amber-500 border-amber-200',
+                         '宣伝': 'bg-orange-50 text-orange-500 border-orange-200',
+                         '改善': 'bg-green-50 text-green-500 border-green-200',
+                         'プロフィール': 'bg-blue-50 text-blue-500 border-blue-200',
+                         'デザイン': 'bg-purple-50 text-purple-500 border-purple-200',
+                      } as Record<string, string>)[article.category] || 'bg-stone-50 text-stone-400 border-stone-200'
+                    }`}>{article.category}</span>
+                  </div>
+                  <p className="text-xs text-stone-500 mt-1 truncate">{article.description}</p>
+                  <p className="text-[10px] text-stone-300 mt-1">by {article.author}</p>
+                </div>
+                <span className="shrink-0 mt-1 text-stone-300 group-hover:text-purple-400 transition-colors text-xs">↗</span>
+              </a>
+            ))}
+          </div>
+        </div>
+
+        {/* ノウハウ記事 */}
+        <div className="mb-8">
+          <div className="flex items-center gap-2.5 mb-4 px-1">
+            <span className="text-[10px] font-bold text-stone-400 uppercase tracking-[0.2em]">ノウハウ記事</span>
+            <span className="w-1 h-1 rounded-full bg-stone-300"></span>
+            <div className="h-px bg-gradient-to-r from-stone-200 to-transparent flex-grow"></div>
+          </div>
+
+          <div className="bg-white border border-stone-100 ring-1 ring-black/[0.04] rounded-2xl overflow-hidden shadow-soft">
+            {[
               {
                 title: '【無料で使える！】スキルマーケットOnline構造診断ツール',
                 description: '既に出している商品を「今後も出し続けるか、中身を見直すか」を判定してくれる診断ツール',

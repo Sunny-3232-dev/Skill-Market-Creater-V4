@@ -5,13 +5,16 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Skill Market Creator Pro</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
       tailwind.config = {
         theme: {
           extend: {
             fontFamily: {
-              sans: ['"Helvetica Neue"', 'Arial', '"Hiragino Kaku Gothic ProN"', '"Hiragino Sans"', 'Meiryo', 'sans-serif'],
+              sans: ['Inter', '"Helvetica Neue"', 'Arial', '"Hiragino Kaku Gothic ProN"', '"Hiragino Sans"', 'Meiryo', 'sans-serif'],
             },
             colors: {
               primary: {
@@ -20,7 +23,16 @@
                 500: '#f43f5e',
                 600: '#e11d48',
               }
-            }
+            },
+            boxShadow: {
+              'soft': '0 1px 2px rgba(15, 23, 42, 0.04), 0 0 0 1px rgba(15, 23, 42, 0.03)',
+              'card': '0 4px 16px -4px rgba(15, 23, 42, 0.06)',
+              'card-hover': '0 12px 32px -12px rgba(15, 23, 42, 0.14)',
+              'float': '0 20px 40px -12px rgba(15, 23, 42, 0.08)',
+            },
+            transitionTimingFunction: {
+              'smooth': 'cubic-bezier(0.22, 1, 0.36, 1)',
+            },
           }
         }
       }
@@ -45,6 +57,18 @@
       radial-gradient(at 0% 0%, hsla(253,16%,7%,0) 0, hsla(253,16%,7%,0) 50%),
       radial-gradient(at 50% 0%, hsla(22,100%,77%,0.1) 0, hsla(22,100%,77%,0) 50%),
       radial-gradient(at 100% 0%, hsla(339,100%,55%,0.1) 0, hsla(339,100%,55%,0) 50%);
+    /* 日本語の詰め組み・ラテン文字のアンチエイリアス */
+    font-feature-settings: "palt" 1, "pkna" 1;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* キーボード操作時のフォーカス表示 */
+  :focus-visible {
+    outline: 2px solid rgb(244 63 94 / 0.5);
+    outline-offset: 3px;
+    border-radius: 8px;
   }
 
   /* カスタムスクロールバー */

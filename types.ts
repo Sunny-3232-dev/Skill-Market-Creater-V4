@@ -50,5 +50,5 @@ export interface SurveyPattern {
 }
 
 // Thumbnail Prompt Version
-// my_style追加
-export type ThumbnailPromptVersion = 'standard' | 'simple' | 'watercolor' | 'pop' | 'my_style';
+// my_style / youtube / pivot 追加
+export type ThumbnailPromptVersion = 'standard' | 'simple' | 'watercolor' | 'pop' | 'my_style' | 'youtube' | 'pivot';

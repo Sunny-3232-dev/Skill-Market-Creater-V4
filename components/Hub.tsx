@@ -58,8 +58,8 @@ const ToolCard: React.FC<{
   const styles = themeStyles[themeColor];
 
   const containerClasses = featured
-    ? 'flex-col md:flex-row items-start md:items-center p-6 md:p-8 gap-6 md:gap-8 rounded-[2rem] bg-white border border-stone-100 ring-1 ring-black/[0.04] shadow-[0_20px_40px_-12px_rgba(0,0,0,0.1)]'
-    : 'flex-row items-start gap-5 p-5 md:p-6 rounded-[1.5rem] bg-white border border-stone-100 ring-1 ring-black/[0.04] shadow-sm hover:shadow-[0_10px_30px_-10px_rgba(0,0,0,0.08)] h-full';
+    ? 'flex-col md:flex-row items-start md:items-center p-6 md:p-8 gap-6 md:gap-8 rounded-[2rem] bg-white border border-stone-100 ring-1 ring-black/[0.04] shadow-float hover:shadow-card-hover'
+    : 'flex-row items-start gap-5 p-5 md:p-6 rounded-[1.5rem] bg-white border border-stone-100 ring-1 ring-black/[0.04] shadow-soft hover:shadow-card-hover h-full';
 
   const CtaButton = featured ? (
     <div className={`flex items-center gap-2 px-7 py-3 rounded-full font-bold text-xs md:text-sm transition-all active:scale-95 ${styles.btnPrimary} w-full md:w-auto justify-center md:justify-start whitespace-nowrap`}>
@@ -76,8 +76,8 @@ const ToolCard: React.FC<{
   return (
     <button
       onClick={onClick}
-      className={`group relative flex text-left w-full overflow-hidden transition-all duration-300 ease-out
-        hover:scale-[1.005]
+      className={`group relative flex text-left w-full overflow-hidden transition-all duration-300 ease-smooth
+        hover:scale-[1.005] hover:-translate-y-0.5
         ${containerClasses}`}
     >
       <div className={`absolute -right-10 -bottom-10 opacity-[0.03] transform group-hover:scale-105 transition-transform duration-1000 pointer-events-none grayscale ${featured ? 'scale-125' : 'scale-110'}`}>
@@ -153,9 +153,10 @@ const Hub: React.FC<HubProps> = ({ onSelectTool }) => {
         </div>
 
         {/* Section Divider */}
-        <div className="flex items-center gap-3 py-2 mt-2 px-1">
+        <div className="flex items-center gap-2.5 py-2 mt-2 px-1">
             <span className="text-[10px] font-bold text-stone-400 uppercase tracking-[0.2em]">Support Tools</span>
-            <div className="h-px bg-stone-200 flex-grow"></div>
+            <span className="w-1 h-1 rounded-full bg-stone-300"></span>
+            <div className="h-px bg-gradient-to-r from-stone-200 to-transparent flex-grow"></div>
         </div>
 
         {/* Support Tools (Single Card) */}

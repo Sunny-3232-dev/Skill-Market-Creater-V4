@@ -56,10 +56,10 @@ const IdeaList: React.FC<IdeaListProps> = ({ ideas, onSelect, onDelete, onBack }
               tabIndex={0}
               onClick={() => onSelect(idea)}
               onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onSelect(idea); }}
-              className={`cursor-pointer text-left p-7 rounded-[2rem] transition-all duration-300 group flex flex-col h-full relative overflow-hidden border border-white
-                ${isGenerated 
-                  ? 'bg-green-50/80 ring-1 ring-green-400/30' 
-                  : 'bg-white/60 hover:bg-white hover:shadow-xl hover:shadow-stone-200/40 hover:-translate-y-1'
+              className={`cursor-pointer text-left p-7 rounded-[2rem] transition-all duration-300 ease-smooth group flex flex-col h-full relative overflow-hidden
+                ${isGenerated
+                  ? 'bg-green-50/90 border border-green-200 ring-1 ring-green-400/20 shadow-soft hover:shadow-card-hover hover:-translate-y-0.5'
+                  : 'bg-white border border-stone-100 shadow-soft hover:shadow-card-hover hover:-translate-y-0.5'
                 }
               `}
             >

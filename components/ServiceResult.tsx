@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { getThumbnailPrompt } from '../services/geminiService';
-import { SkillIdea } from '../types';
+import { SkillIdea, ThumbnailPromptVersion } from '../types';
 
 interface ServiceResultProps {
   idea: SkillIdea;
@@ -14,9 +14,53 @@ interface ServiceResultProps {
   onBack: () => void;
 }
 
+const PRICE_HEADER = '💰価格の目安';
+const STANDARD_LABEL = '■ 標準価格';
+const MONITOR_LABEL = '■ モニター価格';
+
+const splitDetailByPrice = (detail: string) => {
+  const priceIdx = detail.indexOf(PRICE_HEADER);
+  if (priceIdx === -1) {
+    return { before: detail, priceRaw: '', after: '' };
+  }
+  const afterIdx = detail.indexOf('🔚', priceIdx + PRICE_HEADER.length);
+  const endPos = afterIdx === -1 ? detail.length : afterIdx;
+  return {
+    before: detail.substring(0, priceIdx).trimEnd(),
+    priceRaw: detail.substring(priceIdx, endPos).trim(),
+    after: afterIdx === -1 ? '' : detail.substring(afterIdx).trimStart(),
+  };
+};
+
+const parsePriceBlock = (priceRaw: string) => {
+  if (!priceRaw) {
+    return { hasMonitor: false, standard: '', monitor: '' };
+  }
+  const body = priceRaw.replace(PRICE_HEADER, '').trim();
+  const stdIdx = body.indexOf(STANDARD_LABEL);
+  const monIdx = body.indexOf(MONITOR_LABEL);
+
+  if (stdIdx === -1 && monIdx === -1) {
+    return { hasMonitor: false, standard: body, monitor: '' };
+  }
+
+  let standard = '';
+  if (stdIdx !== -1) {
+    const end = (monIdx !== -1 && monIdx > stdIdx) ? monIdx : body.length;
+    standard = body.substring(stdIdx + STANDARD_LABEL.length, end).trim();
+  }
+  let monitor = '';
+  if (monIdx !== -1) {
+    const end = (stdIdx !== -1 && stdIdx > monIdx) ? stdIdx : body.length;
+    monitor = body.substring(monIdx + MONITOR_LABEL.length, end).trim();
+  }
+
+  return { hasMonitor: !!monitor, standard, monitor };
+};
+
 const parseServiceContent = (text: string) => {
   const normalized = text.replace(/\r\n/g, '\n');
-  
+
   const getValue = (key: string) => {
     const regex = new RegExp(`^${key}[:：]\\s*(.*)$`, 'm');
     const match = normalized.match(regex);
@@ -66,7 +110,19 @@ const parseServiceContent = (text: string) => {
     template = normalized.substring(templateIdx + templateMarker.length).trim();
   }
 
-  return { title, catchphrase, category, subCategory, detail, policy, skills, template };
+  const priceSplit = splitDetailByPrice(detail);
+  const priceParts = parsePriceBlock(priceSplit.priceRaw);
+
+  return {
+    title, catchphrase, category, subCategory,
+    detail, policy, skills, template,
+    priceBefore: priceSplit.before,
+    priceAfter: priceSplit.after,
+    priceRaw: priceSplit.priceRaw,
+    priceStandard: priceParts.standard,
+    priceMonitor: priceParts.monitor,
+    hasMonitorPrice: priceParts.hasMonitor,
+  };
 };
 
 const CopySection: React.FC<{ title: string; content: string; icon: string }> = ({ title, content, icon }) => {
@@ -79,12 +135,12 @@ const CopySection: React.FC<{ title: string; content: string; icon: string }> = 
   };
   if (!content) return null;
   return (
-    <div className="bg-white border border-stone-200 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all group">
+    <div className="bg-white border border-stone-100 rounded-2xl p-5 shadow-soft hover:shadow-card-hover transition-all duration-300 ease-smooth group">
       <div className="flex justify-between items-center mb-3">
         <h4 className="font-bold text-stone-700 flex items-center gap-2 text-sm">
           <span className="text-lg">{icon}</span> {title}
         </h4>
-        <button type="button" onClick={handleCopy} className={`text-xs font-bold px-3 py-1.5 rounded-full border transition-all ${copied ? 'bg-green-100 text-green-700 border-green-200' : 'bg-stone-50 text-stone-500 border-stone-200 hover:bg-stone-100'}`}>
+        <button type="button" onClick={handleCopy} className={`text-xs font-bold px-3 py-1.5 rounded-full border transition-all duration-200 ease-smooth ${copied ? 'bg-green-100 text-green-700 border-green-200' : 'bg-stone-50 text-stone-500 border-stone-200 hover:bg-stone-100'}`}>
           {copied ? '✅ コピー済' : '📋 コピー'}
         </button>
       </div>
@@ -93,16 +149,78 @@ const CopySection: React.FC<{ title: string; content: string; icon: string }> = 
   );
 };
 
+type PriceMode = 'standard' | 'monitor';
+type LimitCount = 1 | 3 | 5;
+type LimitPeriodId = 'thisMonth' | 'nextMonth';
+
+const getMonthEndOptions = () => {
+  const today = new Date();
+  const thisMonth = today.getMonth() + 1;
+  const nextMonth = (today.getMonth() + 1) % 12 + 1;
+  return [
+    { id: 'thisMonth' as LimitPeriodId, label: `${thisMonth}月末まで` },
+    { id: 'nextMonth' as LimitPeriodId, label: `${nextMonth}月末まで` },
+  ];
+};
+
 const ServiceResult: React.FC<ServiceResultProps> = ({
   idea, content, thumbnailUrl, onGenerateImage, isHighQuality, setIsHighQuality, onReset, onBack
 }) => {
   const [isAllCopied, setIsAllCopied] = useState(false);
-  // my_style追加
-  const [expandedPrompt, setExpandedPrompt] = useState<'standard' | 'simple' | 'watercolor' | 'pop' | 'my_style' | null>(null);
-  const [copiedVersion, setCopiedVersion] = useState<'standard' | 'simple' | 'watercolor' | 'pop' | 'my_style' | null>(null);
+  const [isDetailCopied, setIsDetailCopied] = useState(false);
+  // my_style / youtube / pivot 追加
+  const [expandedPrompt, setExpandedPrompt] = useState<ThumbnailPromptVersion | null>(null);
+  const [copiedVersion, setCopiedVersion] = useState<ThumbnailPromptVersion | null>(null);
   const [showTip, setShowTip] = useState(false);
 
+  // Price mode state
+  const [priceMode, setPriceMode] = useState<PriceMode>('standard');
+  const [limitCount, setLimitCount] = useState<LimitCount | null>(null);
+  const [limitPeriod, setLimitPeriod] = useState<LimitPeriodId | null>(null);
+
   const parsed = useMemo(() => parseServiceContent(content), [content]);
+  const monthEndOptions = useMemo(() => getMonthEndOptions(), []);
+
+  // 選択を反映した💰価格の目安ブロックの本文を構築
+  const currentPriceBlock = useMemo(() => {
+    if (!parsed.hasMonitorPrice) {
+      // 旧データ: AI原文をそのまま表示
+      return parsed.priceRaw;
+    }
+    if (priceMode === 'standard') {
+      return `${PRICE_HEADER}\n${parsed.priceStandard}`;
+    }
+    // モニターモードでは標準価格も必ず併記し、サービスの本来の価値を買い手に伝える
+    const conditions: string[] = [];
+    if (limitCount !== null) conditions.push(`先着${limitCount}名様限定`);
+    if (limitPeriod !== null) {
+      const opt = monthEndOptions.find(o => o.id === limitPeriod);
+      if (opt) conditions.push(opt.label);
+    }
+    const monitorSuffix = conditions.length > 0 ? `（${conditions.join('・')}）` : '';
+    return `${PRICE_HEADER}\n${STANDARD_LABEL}\n${parsed.priceStandard}\n\n${MONITOR_LABEL}${monitorSuffix}\n${parsed.priceMonitor}`;
+  }, [parsed, priceMode, limitCount, limitPeriod, monthEndOptions]);
+
+  // サービス詳細カードのコピー用テキスト(選択反映版)
+  const rebuiltDetail = useMemo(() => {
+    if (!parsed.hasMonitorPrice) return parsed.detail;
+    const parts = [parsed.priceBefore, currentPriceBlock, parsed.priceAfter].filter(Boolean);
+    return parts.join('\n\n').trim();
+  }, [parsed, currentPriceBlock]);
+
+  // 全文コピー用テキスト(選択反映版)
+  const rebuiltContent = useMemo(() => {
+    if (!parsed.hasMonitorPrice) return content;
+    const priceIdx = content.indexOf(PRICE_HEADER);
+    if (priceIdx === -1) return content;
+    const endMarkers = ['🔚', '⚠️', '🎯', '📝'];
+    let endIdx = content.length;
+    for (const marker of endMarkers) {
+      const idx = content.indexOf(marker, priceIdx + PRICE_HEADER.length);
+      if (idx !== -1 && idx < endIdx) endIdx = idx;
+    }
+    return content.substring(0, priceIdx) + currentPriceBlock + '\n\n' + content.substring(endIdx);
+  }, [content, parsed.hasMonitorPrice, currentPriceBlock]);
 
   const promptCtx = useMemo(() => ({ ...idea, generatedContent: content }), [idea, content]);
   const standardPrompt = useMemo(() => getThumbnailPrompt(promptCtx, true, 'standard'), [promptCtx]);
@@ -111,17 +229,35 @@ const ServiceResult: React.FC<ServiceResultProps> = ({
   const popPrompt = useMemo(() => getThumbnailPrompt(promptCtx, true, 'pop'), [promptCtx]);
   // my_style追加
   const referenceBasedPrompt = useMemo(() => getThumbnailPrompt(promptCtx, true, 'my_style'), [promptCtx]);
+  // youtube / pivot 追加
+  const youtubePrompt = useMemo(() => getThumbnailPrompt(promptCtx, true, 'youtube'), [promptCtx]);
+  const pivotPrompt = useMemo(() => getThumbnailPrompt(promptCtx, true, 'pivot'), [promptCtx]);
 
   const handleCopyAll = () => {
-    navigator.clipboard.writeText(content).then(() => {
+    navigator.clipboard.writeText(rebuiltContent).then(() => {
       setIsAllCopied(true);
       setTimeout(() => setIsAllCopied(false), 2000);
     });
   };
 
-  // my_style追加
-  const handleCopyPrompt = (version: 'standard' | 'simple' | 'watercolor' | 'pop' | 'my_style') => {
-    const promptMap = { standard: standardPrompt, simple: simplePrompt, watercolor: watercolorPrompt, pop: popPrompt, my_style: referenceBasedPrompt };
+  const handleCopyDetail = () => {
+    navigator.clipboard.writeText(rebuiltDetail).then(() => {
+      setIsDetailCopied(true);
+      setTimeout(() => setIsDetailCopied(false), 2000);
+    });
+  };
+
+  // my_style / youtube / pivot 追加
+  const handleCopyPrompt = (version: ThumbnailPromptVersion) => {
+    const promptMap: Record<ThumbnailPromptVersion, string> = {
+      standard: standardPrompt,
+      simple: simplePrompt,
+      watercolor: watercolorPrompt,
+      pop: popPrompt,
+      my_style: referenceBasedPrompt,
+      youtube: youtubePrompt,
+      pivot: pivotPrompt,
+    };
     navigator.clipboard.writeText(promptMap[version]).then(() => {
       setCopiedVersion(version);
       setTimeout(() => setCopiedVersion(null), 2000);
@@ -162,8 +298,6 @@ const ServiceResult: React.FC<ServiceResultProps> = ({
       <div className="space-y-12">
         {/* Next Steps Guide */}
         <div className="bg-gradient-to-br from-orange-50 to-orange-100/50 border border-orange-200 rounded-[3rem] p-10 shadow-sm relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-64 h-64 bg-white/30 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none"></div>
-          
           <div className="relative z-10">
             <h4 className="text-orange-900 font-black text-2xl mb-8 flex items-center gap-3">
               <span className="bg-white p-2.5 rounded-2xl shadow-sm text-2xl">✨</span> 
@@ -282,7 +416,7 @@ const ServiceResult: React.FC<ServiceResultProps> = ({
 
             {/* Content Cards */}
             <div className="space-y-6">
-              <div className="bg-white border border-stone-200 rounded-2xl p-6 shadow-sm">
+              <div className="bg-white border border-stone-100 rounded-2xl p-6 shadow-soft hover:shadow-card-hover transition-shadow duration-300 ease-smooth">
                 <h4 className="font-bold text-stone-700 flex items-center gap-2 text-sm mb-4"><span className="text-lg">📂</span> カテゴリ・サブカテゴリ</h4>
                 <div className="bg-stone-50/50 rounded-xl p-5 text-stone-600 text-sm border border-stone-100 flex items-center gap-3">
                   <span className="font-bold text-stone-800">{parsed.category || '未設定'}</span>
@@ -292,7 +426,125 @@ const ServiceResult: React.FC<ServiceResultProps> = ({
               </div>
               <CopySection title="タイトル" content={parsed.title} icon="🏷️" />
               <CopySection title="キャッチコピー" content={parsed.catchphrase} icon="🎣" />
-              <CopySection title="サービス詳細" content={parsed.detail} icon="📝" />
+
+              {/* サービス詳細 - 価格モードUIを埋め込んだカスタムカード */}
+              <div className="bg-white border border-stone-100 rounded-2xl p-5 shadow-soft hover:shadow-card-hover transition-all duration-300 ease-smooth group">
+                <div className="flex justify-between items-center mb-3">
+                  <h4 className="font-bold text-stone-700 flex items-center gap-2 text-sm">
+                    <span className="text-lg">📝</span> サービス詳細
+                  </h4>
+                  <button
+                    type="button"
+                    onClick={handleCopyDetail}
+                    className={`text-xs font-bold px-3 py-1.5 rounded-full border transition-all ${
+                      isDetailCopied ? 'bg-green-100 text-green-700 border-green-200' : 'bg-stone-50 text-stone-500 border-stone-200 hover:bg-stone-100'
+                    }`}
+                  >
+                    {isDetailCopied ? '✅ コピー済' : '📋 コピー'}
+                  </button>
+                </div>
+                <div className="bg-stone-50/50 rounded-xl p-4 text-stone-600 text-sm border border-stone-100/50 leading-relaxed">
+                  {parsed.hasMonitorPrice ? (
+                    <>
+                      {parsed.priceBefore && (
+                        <div className="whitespace-pre-wrap">{parsed.priceBefore}</div>
+                      )}
+
+                      {/* 価格モードカード */}
+                      <div className="my-5 bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-200 rounded-2xl p-5 shadow-inner">
+                        <div className="flex items-center gap-2 mb-4">
+                          <span className="text-base">💰</span>
+                          <h5 className="font-bold text-stone-700 text-sm">価格モード</h5>
+                          <span className="text-[10px] text-stone-400 hidden sm:inline">選ぶと下の「価格の目安」に反映されます</span>
+                        </div>
+
+                        {/* 標準 / モニター トグル */}
+                        <div className="flex gap-2 mb-4">
+                          <button
+                            type="button"
+                            onClick={() => setPriceMode('standard')}
+                            className={`flex-1 py-2.5 px-3 rounded-xl text-xs font-bold transition-all ${
+                              priceMode === 'standard'
+                                ? 'bg-stone-800 text-white shadow-md'
+                                : 'bg-white text-stone-500 border border-stone-200 hover:bg-stone-50'
+                            }`}
+                          >
+                            標準価格
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setPriceMode('monitor')}
+                            className={`flex-1 py-2.5 px-3 rounded-xl text-xs font-bold transition-all ${
+                              priceMode === 'monitor'
+                                ? 'bg-gradient-to-r from-orange-500 to-rose-500 text-white shadow-md'
+                                : 'bg-white text-stone-500 border border-stone-200 hover:bg-stone-50'
+                            }`}
+                          >
+                            モニター価格
+                          </button>
+                        </div>
+
+                        {/* モニター ON のときの追加オプション(同じボタンを再度押すと解除) */}
+                        {priceMode === 'monitor' && (
+                          <div className="space-y-4 pt-4 border-t border-amber-200/60 animate-in fade-in slide-in-from-top-2 duration-200">
+                            {/* 先着人数 */}
+                            <div>
+                              <p className="text-xs font-bold text-stone-600 mb-2">先着人数 <span className="text-stone-400 font-normal">(任意・もう一度押すと解除)</span></p>
+                              <div className="flex gap-2">
+                                {[1, 3, 5].map(n => (
+                                  <button
+                                    key={n}
+                                    type="button"
+                                    onClick={() => setLimitCount(limitCount === n ? null : (n as LimitCount))}
+                                    className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all ${
+                                      limitCount === n
+                                        ? 'bg-orange-500 text-white shadow-sm'
+                                        : 'bg-white text-stone-500 border border-stone-200 hover:bg-stone-50'
+                                    }`}
+                                  >
+                                    {n}名
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+
+                            {/* 期間 */}
+                            <div>
+                              <p className="text-xs font-bold text-stone-600 mb-2">期間 <span className="text-stone-400 font-normal">(任意・もう一度押すと解除)</span></p>
+                              <div className="flex gap-2">
+                                {monthEndOptions.map(opt => (
+                                  <button
+                                    key={opt.id}
+                                    type="button"
+                                    onClick={() => setLimitPeriod(limitPeriod === opt.id ? null : opt.id)}
+                                    className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all ${
+                                      limitPeriod === opt.id
+                                        ? 'bg-orange-500 text-white shadow-sm'
+                                        : 'bg-white text-stone-500 border border-stone-200 hover:bg-stone-50'
+                                    }`}
+                                  >
+                                    {opt.label}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* 価格の目安ブロック(選択反映) */}
+                      <div className="whitespace-pre-wrap">{currentPriceBlock}</div>
+
+                      {parsed.priceAfter && (
+                        <div className="whitespace-pre-wrap mt-3">{parsed.priceAfter}</div>
+                      )}
+                    </>
+                  ) : (
+                    <div className="whitespace-pre-wrap">{parsed.detail}</div>
+                  )}
+                </div>
+              </div>
+
               <CopySection title="キャンセル時の注意事項" content={parsed.policy} icon="⚠️" />
               <CopySection title="スキル" content={parsed.skills} icon="🎯" />
               <CopySection title="依頼テンプレート" content={parsed.template} icon="📋" />
@@ -302,27 +554,37 @@ const ServiceResult: React.FC<ServiceResultProps> = ({
                 {/* Header */}
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                   <div className="flex items-center gap-3">
-                    <div className="relative shrink-0">
-                      <div className="absolute -inset-1.5 bg-gradient-to-tr from-orange-400 via-rose-400 to-purple-400 rounded-2xl blur opacity-20"></div>
-                      <div className="relative bg-white p-2 rounded-xl border border-stone-100 shadow-sm flex items-center justify-center w-10 h-10">
-                        <span className="text-xl">🎨</span>
-                      </div>
+                    <div className="shrink-0 bg-white p-2 rounded-xl border border-stone-100 shadow-soft flex items-center justify-center w-10 h-10">
+                      <span className="text-xl">🎨</span>
                     </div>
                     <div>
                       <h5 className="text-sm font-bold text-stone-700">画像生成プロンプト</h5>
-                      <p className="text-[10px] text-orange-600 font-bold leading-tight">Geminiでは、🍌画像を作成と思考モードにする。</p>
+                      <p className="text-[10px] text-emerald-600 font-bold leading-tight">ChatGPT がおすすめ（Geminiでも OK）</p>
+                      <p className="text-[10px] text-stone-500 font-medium leading-tight mt-0.5">※Geminiの場合は「🍌画像を作成」と思考モードにする</p>
                     </div>
                   </div>
-                  <a
-                    href="https://gemini.google.com/"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center justify-center px-5 py-2 bg-white border border-orange-200 rounded-full text-xs font-bold text-orange-700 hover:bg-orange-50 transition-all shadow-sm hover:shadow active:scale-95 whitespace-nowrap"
-                  >
-                    Geminiを起動
-                  </a>
+                  <div className="flex gap-2 flex-wrap">
+                    <a
+                      href="https://chatgpt.com/"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 pl-2 pr-4 py-1.5 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-full text-xs font-bold hover:from-emerald-600 hover:to-teal-600 transition-all shadow-md hover:shadow-lg active:scale-95 whitespace-nowrap"
+                    >
+                      <span className="bg-amber-400 text-amber-900 text-[9px] font-black px-2 py-0.5 rounded-full">おすすめ</span>
+                      <span>ChatGPTを起動</span>
+                    </a>
+                    <a
+                      href="https://gemini.google.com/"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center justify-center px-5 py-2 bg-white border border-orange-200 rounded-full text-xs font-bold text-orange-700 hover:bg-orange-50 transition-all shadow-sm hover:shadow active:scale-95 whitespace-nowrap"
+                    >
+                      Geminiを起動
+                    </a>
+                  </div>
                 </div>
 
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5 items-start">
                 {/* Standard Prompt Card */}
                 <div className="bg-white border border-stone-200 rounded-2xl p-5 space-y-3">
                   <div className="flex items-start gap-4">
@@ -330,22 +592,11 @@ const ServiceResult: React.FC<ServiceResultProps> = ({
                       <h6 className="text-sm font-bold text-stone-700">標準版プロンプト</h6>
                       <p className="text-xs text-stone-500 mt-0.5">プロフェッショナルで洗練されたデザイン。信頼感と上質な印象。</p>
                     </div>
-                    <svg viewBox="0 0 600 400" className="w-[100px] shrink-0 rounded-md block border border-stone-100">
-                      <defs>
-                        <linearGradient id="stdBg" x1="0" y1="0" x2="1" y2="1">
-                          <stop offset="0%" stopColor="#1e293b"/>
-                          <stop offset="100%" stopColor="#334155"/>
-                        </linearGradient>
-                      </defs>
-                      <rect fill="url(#stdBg)" width="600" height="400" rx="12"/>
-                      <rect x="0" y="0" width="600" height="4" rx="2" fill="#3b82f6" opacity="0.7"/>
-                      <rect x="150" y="120" width="300" height="40" rx="6" fill="#fff" opacity="0.95"/>
-                      <rect x="180" y="185" width="240" height="18" rx="4" fill="#fff" opacity="0.35"/>
-                      <rect x="245" y="230" width="110" height="4" rx="2" fill="#3b82f6" opacity="0.6"/>
-                      <rect x="30" y="360" width="50" height="3" rx="1.5" fill="#475569" opacity="0.3"/>
-                      <rect x="520" y="360" width="50" height="3" rx="1.5" fill="#475569" opacity="0.3"/>
-                      <rect x="30" y="30" width="50" height="3" rx="1.5" fill="#475569" opacity="0.3"/>
-                      <rect x="520" y="30" width="50" height="3" rx="1.5" fill="#475569" opacity="0.3"/>
+                    <svg viewBox="0 0 600 400" className="w-[120px] shrink-0 rounded-md block border border-stone-100">
+                      <rect fill="#0f172a" width="600" height="400" rx="12"/>
+                      <rect x="50" y="130" width="440" height="56" rx="4" fill="#fff" opacity="0.95"/>
+                      <rect x="50" y="210" width="320" height="40" rx="4" fill="#fff" opacity="0.4"/>
+                      <rect x="50" y="300" width="90" height="6" fill="#fbbf24"/>
                     </svg>
                     <button
                       onClick={() => handleCopyPrompt('standard')}
@@ -379,18 +630,13 @@ const ServiceResult: React.FC<ServiceResultProps> = ({
                       <h6 className="text-sm font-bold text-stone-700">シンプル版プロンプト</h6>
                       <p className="text-xs text-stone-500 mt-0.5">詳細なレイアウト指示。丸みのあるビジネスデザイン。</p>
                     </div>
-                    <svg viewBox="0 0 600 400" className="w-[100px] shrink-0 rounded-md block border border-stone-100">
-                      <rect fill="#fafaf9" width="600" height="400" rx="12"/>
-                      <rect fill="none" stroke="#e7e5e4" strokeWidth="2.5" x="8" y="8" width="584" height="384" rx="8"/>
-                      <path d="M120,55 Q300,25 480,55" fill="#dbeafe" stroke="#93c5fd" strokeWidth="1.5"/>
-                      <rect x="225" y="35" width="150" height="20" rx="10" fill="#bfdbfe" opacity="0.6"/>
-                      <ellipse cx="300" cy="155" rx="170" ry="40" fill="#e0f2fe" stroke="#93c5fd" strokeWidth="1"/>
-                      <circle cx="120" cy="300" r="55" fill="#f0fdf4" stroke="#86efac" strokeWidth="1.5"/>
-                      <circle cx="120" cy="288" r="16" fill="#bbf7d0"/>
-                      <path d="M90,325 Q120,310 150,325" fill="#bbf7d0" opacity="0.5"/>
-                      <ellipse cx="420" cy="270" rx="110" ry="22" fill="#fef3c7" stroke="#fcd34d" strokeWidth="1"/>
-                      <ellipse cx="420" cy="330" rx="110" ry="22" fill="#fef3c7" stroke="#fcd34d" strokeWidth="1"/>
-                      <rect x="30" y="388" width="540" height="5" rx="2.5" fill="#e7e5e4"/>
+                    <svg viewBox="0 0 600 400" className="w-[120px] shrink-0 rounded-md block border border-stone-100">
+                      <rect fill="#fdfaf6" width="600" height="400" rx="12"/>
+                      <rect fill="none" stroke="#d6d3d1" strokeWidth="2" x="14" y="14" width="572" height="372" rx="8"/>
+                      <ellipse cx="300" cy="165" rx="190" ry="45" fill="#ede9fe"/>
+                      <circle cx="115" cy="295" r="50" fill="#fef3c7"/>
+                      <ellipse cx="420" cy="270" rx="115" ry="20" fill="#dbeafe"/>
+                      <ellipse cx="420" cy="325" rx="115" ry="20" fill="#dbeafe"/>
                     </svg>
                     <button
                       onClick={() => handleCopyPrompt('simple')}
@@ -424,23 +670,11 @@ const ServiceResult: React.FC<ServiceResultProps> = ({
                       <h6 className="text-sm font-bold text-stone-700">水彩画版プロンプト</h6>
                       <p className="text-xs text-stone-500 mt-0.5">手書き風の柔らかなタッチ。親しみやすく温かい印象。</p>
                     </div>
-                    <svg viewBox="0 0 600 400" className="w-[100px] shrink-0 rounded-md block border border-stone-100">
+                    <svg viewBox="0 0 600 400" className="w-[120px] shrink-0 rounded-md block border border-stone-100">
                       <rect fill="#fefbf6" width="600" height="400" rx="12"/>
-                      <circle cx="420" cy="100" r="100" fill="#fbcfe8" opacity="0.25"/>
-                      <circle cx="480" cy="220" r="80" fill="#c4b5fd" opacity="0.2"/>
-                      <circle cx="380" cy="280" r="70" fill="#a5f3fc" opacity="0.2"/>
-                      <circle cx="520" cy="160" r="55" fill="#fda4af" opacity="0.18"/>
-                      <circle cx="350" cy="140" r="45" fill="#bae6fd" opacity="0.18"/>
-                      <circle cx="460" cy="320" r="50" fill="#d9f99d" opacity="0.15"/>
-                      <rect x="40" y="70" width="200" height="28" rx="5" fill="#78716c" opacity="0.5"/>
-                      <rect x="40" y="120" width="170" height="14" rx="3" fill="#a8a29e" opacity="0.35"/>
-                      <rect x="40" y="148" width="185" height="14" rx="3" fill="#a8a29e" opacity="0.35"/>
-                      <rect x="40" y="176" width="150" height="14" rx="3" fill="#a8a29e" opacity="0.35"/>
-                      <rect x="40" y="204" width="165" height="14" rx="3" fill="#a8a29e" opacity="0.3"/>
-                      <circle cx="50" cy="340" r="8" fill="#f9a8d4" opacity="0.4"/>
-                      <circle cx="78" cy="355" r="6" fill="#c4b5fd" opacity="0.35"/>
-                      <circle cx="105" cy="338" r="7" fill="#a5f3fc" opacity="0.35"/>
-                      <circle cx="60" cy="370" r="5" fill="#fda4af" opacity="0.3"/>
+                      <circle cx="220" cy="200" r="120" fill="#fbcfe8" opacity="0.65"/>
+                      <circle cx="340" cy="220" r="110" fill="#c4b5fd" opacity="0.6"/>
+                      <circle cx="430" cy="180" r="95" fill="#bae6fd" opacity="0.6"/>
                     </svg>
                     <button
                       onClick={() => handleCopyPrompt('watercolor')}
@@ -474,31 +708,12 @@ const ServiceResult: React.FC<ServiceResultProps> = ({
                       <h6 className="text-sm font-bold text-stone-700">ポップ＆フレンドリー版プロンプト</h6>
                       <p className="text-xs text-stone-500 mt-0.5">鮮やかな多色使いとポップアート感。楽しくフレンドリーな印象。</p>
                     </div>
-                    <svg viewBox="0 0 600 400" className="w-[100px] shrink-0 rounded-md block border border-stone-100">
-                      <defs>
-                        <linearGradient id="popBg" x1="0" y1="0" x2="1" y2="1">
-                          <stop offset="0%" stopColor="#fef08a"/>
-                          <stop offset="50%" stopColor="#fdba74"/>
-                          <stop offset="100%" stopColor="#f9a8d4"/>
-                        </linearGradient>
-                        <pattern id="dots" x="0" y="0" width="12" height="12" patternUnits="userSpaceOnUse">
-                          <circle cx="3" cy="3" r="1.5" fill="#fff" opacity="0.35"/>
-                        </pattern>
-                      </defs>
-                      <rect fill="url(#popBg)" width="600" height="400" rx="12"/>
-                      <rect fill="url(#dots)" width="600" height="400" rx="12"/>
-                      <line x1="0" y1="400" x2="600" y2="0" stroke="#fff" strokeWidth="40" opacity="0.12"/>
-                      <rect x="30" y="50" width="220" height="36" rx="18" fill="#fff" opacity="0.9"/>
-                      <rect x="30" y="100" width="160" height="24" rx="12" fill="#fff" opacity="0.7"/>
-                      <rect x="30" y="136" width="140" height="24" rx="12" fill="#fff" opacity="0.7"/>
-                      <rect x="30" y="172" width="150" height="24" rx="12" fill="#fff" opacity="0.7"/>
-                      <rect x="340" y="60" width="120" height="140" rx="12" fill="#a78bfa" opacity="0.5" transform="rotate(-8 400 130)"/>
-                      <rect x="380" y="80" width="120" height="140" rx="12" fill="#38bdf8" opacity="0.5" transform="rotate(5 440 150)"/>
-                      <rect x="420" y="100" width="120" height="140" rx="12" fill="#34d399" opacity="0.5" transform="rotate(-3 480 170)"/>
-                      <polygon points="520,40 528,60 548,60 532,72 538,92 520,80 502,92 508,72 492,60 512,60" fill="#facc15" opacity="0.7"/>
-                      <polygon points="280,300 286,316 304,316 290,326 295,342 280,332 265,342 270,326 256,316 274,316" fill="#fb923c" opacity="0.6"/>
-                      <circle cx="50" cy="340" r="20" fill="#f472b6" opacity="0.4"/>
-                      <circle cx="550" cy="350" r="15" fill="#a78bfa" opacity="0.4"/>
+                    <svg viewBox="0 0 600 400" className="w-[120px] shrink-0 rounded-md block border border-stone-100">
+                      <rect fill="#fb923c" width="600" height="400" rx="12"/>
+                      <rect x="50" y="80" width="240" height="48" rx="24" fill="#fff"/>
+                      <rect x="50" y="150" width="180" height="32" rx="16" fill="#fff" opacity="0.85"/>
+                      <circle cx="450" cy="210" r="95" fill="#a78bfa"/>
+                      <polygon points="450,135 461,162 490,162 467,179 477,206 450,189 423,206 433,179 410,162 439,162" fill="#facc15"/>
                     </svg>
                     <button
                       onClick={() => handleCopyPrompt('pop')}
@@ -525,50 +740,109 @@ const ServiceResult: React.FC<ServiceResultProps> = ({
                   )}
                 </div>
 
-                {/* my_style追加: MyStyle Prompt Card */}
+                {/* YouTube Prompt Card */}
                 <div className="bg-white border border-stone-200 rounded-2xl p-5 space-y-3">
                   <div className="flex items-start gap-4">
                     <div className="flex-1 min-w-0">
-                      <h6 className="text-sm font-bold text-stone-700">マイスタイル</h6>
-                      <p className="text-xs text-stone-500 mt-0.5">参考にしたいサムネイル画像をGeminiに一緒に添付することで、そのデザインを踏襲した新しいサムネイルを生成できます。アイコンや文章は新しいサービス内容に自動で差し替えられます。</p>
+                      <h6 className="text-sm font-bold text-stone-700">YouTube風プロンプト</h6>
+                      <p className="text-xs text-stone-500 mt-0.5">人気YouTuberのサムネイル風。派手・インパクト重視で思わずクリックしたくなる印象。</p>
                     </div>
-                    <svg viewBox="0 0 600 400" className="w-[100px] shrink-0 rounded-md block border border-stone-100">
-                      <defs>
-                        <linearGradient id="refBg" x1="0" y1="0" x2="1" y2="1">
-                          <stop offset="0%" stopColor="#f5f3ff"/>
-                          <stop offset="100%" stopColor="#ede9fe"/>
-                        </linearGradient>
-                      </defs>
-                      <rect fill="url(#refBg)" width="600" height="400" rx="12"/>
-                      <rect x="40" y="40" width="240" height="160" rx="16" fill="#ddd6fe" opacity="0.5" strokeDasharray="8 4" stroke="#a78bfa" strokeWidth="2"/>
-                      <rect x="80" y="80" width="160" height="80" rx="8" fill="#c4b5fd" opacity="0.4"/>
-                      <text x="160" y="128" textAnchor="middle" fontSize="28" fill="#7c3aed" opacity="0.5" fontFamily="sans-serif">REF</text>
-                      <path d="M310,120 L350,120" stroke="#a78bfa" strokeWidth="3" strokeDasharray="6 3" markerEnd="url(#arrowRef)"/>
-                      <defs><marker id="arrowRef" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#a78bfa"/></marker></defs>
-                      <rect x="370" y="40" width="190" height="160" rx="16" fill="#a78bfa" opacity="0.25"/>
-                      <rect x="390" y="65" width="150" height="24" rx="6" fill="#7c3aed" opacity="0.35"/>
-                      <rect x="400" y="105" width="130" height="12" rx="4" fill="#7c3aed" opacity="0.2"/>
-                      <rect x="400" y="130" width="110" height="12" rx="4" fill="#7c3aed" opacity="0.15"/>
-                      <circle cx="300" cy="310" r="40" fill="#ddd6fe" opacity="0.4"/>
-                      <path d="M280,310 L300,290 L320,310 M300,290 L300,330" stroke="#a78bfa" strokeWidth="3" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
-                      <text x="300" y="370" textAnchor="middle" fontSize="16" fill="#8b5cf6" opacity="0.5" fontFamily="sans-serif">+ Image</text>
+                    <svg viewBox="0 0 600 400" className="w-[120px] shrink-0 rounded-md block border border-stone-100">
+                      <rect fill="#dc2626" width="600" height="400" rx="12"/>
+                      <circle cx="460" cy="220" r="130" fill="#fbbf24"/>
+                      <rect x="40" y="90" width="290" height="60" rx="4" fill="#fff"/>
+                      <rect x="40" y="170" width="230" height="60" rx="4" fill="#fbbf24"/>
+                      <polygon points="90,310 101,335 128,335 106,351 115,377 90,361 65,377 74,351 52,335 79,335" fill="#fbbf24" stroke="#0f172a" strokeWidth="3"/>
                     </svg>
-                    <div className="flex flex-col items-end gap-2 shrink-0">
-                      <button
-                        onClick={() => handleCopyPrompt('my_style')}
-                        className={`text-xs font-bold px-4 py-1.5 rounded-full border transition-all ${
-                          copiedVersion === 'my_style'
-                            ? 'bg-green-100 text-green-700 border-green-200'
-                            : 'bg-stone-800 text-white hover:bg-stone-700 shadow-sm'
-                        }`}
-                      >
-                        {copiedVersion === 'my_style' ? '✅ コピー済' : '📋 コピー'}
-                      </button>
-                      {/* my_style追加: コピー時の案内表示 */}
-                      <p className="text-[10px] text-purple-600 font-medium leading-tight text-right max-w-[160px]">
-                        コピー後、Geminiを開いて参考画像と一緒に貼り付けてください。
-                      </p>
+                    <button
+                      onClick={() => handleCopyPrompt('youtube')}
+                      className={`text-xs font-bold px-4 py-1.5 rounded-full border transition-all shrink-0 ${
+                        copiedVersion === 'youtube'
+                          ? 'bg-green-100 text-green-700 border-green-200'
+                          : 'bg-stone-800 text-white hover:bg-stone-700 shadow-sm'
+                      }`}
+                    >
+                      {copiedVersion === 'youtube' ? '✅ コピー済' : '📋 コピー'}
+                    </button>
+                  </div>
+                  <button
+                    onClick={() => setExpandedPrompt(expandedPrompt === 'youtube' ? null : 'youtube')}
+                    className="inline-flex items-center gap-1.5 text-[11px] font-bold text-stone-400 hover:text-stone-600 transition-colors"
+                  >
+                    <span className={`transition-transform duration-200 ${expandedPrompt === 'youtube' ? 'rotate-180' : ''}`}>▾</span>
+                    プロンプトを表示
+                  </button>
+                  {expandedPrompt === 'youtube' && (
+                    <pre className="text-xs font-mono text-stone-500 bg-stone-50 p-4 rounded-xl whitespace-pre-wrap leading-relaxed border border-stone-100 overflow-y-auto max-h-[200px] custom-scrollbar animate-in fade-in slide-in-from-top-2 duration-200">
+                      {youtubePrompt}
+                    </pre>
+                  )}
+                </div>
+
+                {/* PIVOT Prompt Card */}
+                <div className="bg-white border border-stone-200 rounded-2xl p-5 space-y-3">
+                  <div className="flex items-start gap-4">
+                    <div className="flex-1 min-w-0">
+                      <h6 className="text-sm font-bold text-stone-700">PIVOT風プロンプト</h6>
+                      <p className="text-xs text-stone-500 mt-0.5">ビジネスインタビュー番組のトンマナ。落ち着いた深緑ベースで知的・上質な印象。</p>
                     </div>
+                    <svg viewBox="0 0 600 400" className="w-[120px] shrink-0 rounded-md block border border-stone-100">
+                      <rect fill="#14532d" width="600" height="400" rx="12"/>
+                      <rect x="40" y="40" width="90" height="24" rx="3" fill="#fafaf9"/>
+                      <rect x="40" y="110" width="360" height="50" rx="3" fill="#fafaf9"/>
+                      <rect x="40" y="180" width="260" height="50" rx="3" fill="#fafaf9" opacity="0.75"/>
+                      <circle cx="470" cy="220" r="90" fill="#fafaf9" opacity="0.95"/>
+                    </svg>
+                    <button
+                      onClick={() => handleCopyPrompt('pivot')}
+                      className={`text-xs font-bold px-4 py-1.5 rounded-full border transition-all shrink-0 ${
+                        copiedVersion === 'pivot'
+                          ? 'bg-green-100 text-green-700 border-green-200'
+                          : 'bg-stone-800 text-white hover:bg-stone-700 shadow-sm'
+                      }`}
+                    >
+                      {copiedVersion === 'pivot' ? '✅ コピー済' : '📋 コピー'}
+                    </button>
+                  </div>
+                  <button
+                    onClick={() => setExpandedPrompt(expandedPrompt === 'pivot' ? null : 'pivot')}
+                    className="inline-flex items-center gap-1.5 text-[11px] font-bold text-stone-400 hover:text-stone-600 transition-colors"
+                  >
+                    <span className={`transition-transform duration-200 ${expandedPrompt === 'pivot' ? 'rotate-180' : ''}`}>▾</span>
+                    プロンプトを表示
+                  </button>
+                  {expandedPrompt === 'pivot' && (
+                    <pre className="text-xs font-mono text-stone-500 bg-stone-50 p-4 rounded-xl whitespace-pre-wrap leading-relaxed border border-stone-100 overflow-y-auto max-h-[200px] custom-scrollbar animate-in fade-in slide-in-from-top-2 duration-200">
+                      {pivotPrompt}
+                    </pre>
+                  )}
+                </div>
+
+                {/* MyStyle Prompt Card - full width at the bottom */}
+                <div className="md:col-span-2 bg-white border border-stone-200 rounded-2xl p-5 space-y-3">
+                  <div className="flex items-start gap-4">
+                    <div className="flex-1 min-w-0">
+                      <h6 className="text-sm font-bold text-stone-700">マイスタイル</h6>
+                      <p className="text-xs text-stone-500 mt-0.5">参考にしたいサムネイル画像を ChatGPT や Gemini に一緒に添付することで、そのデザインを踏襲した新しいサムネイルを生成できます。アイコンや文章は新しいサービス内容に自動で差し替えられます。</p>
+                      <p className="text-[10px] text-purple-600 font-medium leading-tight mt-1.5">※コピー後、ChatGPT または Gemini を開いて参考画像と一緒に貼り付けてください。</p>
+                    </div>
+                    <svg viewBox="0 0 600 400" className="w-[120px] shrink-0 rounded-md block border border-stone-100">
+                      <rect fill="#faf5ff" width="600" height="400" rx="12"/>
+                      <rect x="50" y="100" width="210" height="200" rx="14" fill="#fff" stroke="#c4b5fd" strokeWidth="2.5" strokeDasharray="10 5"/>
+                      <rect x="340" y="100" width="210" height="200" rx="14" fill="#a78bfa" opacity="0.2" stroke="#7c3aed" strokeWidth="2.5"/>
+                      <path d="M280,200 L330,200" stroke="#7c3aed" strokeWidth="5" strokeLinecap="round"/>
+                      <polygon points="323,190 345,200 323,210" fill="#7c3aed"/>
+                    </svg>
+                    <button
+                      onClick={() => handleCopyPrompt('my_style')}
+                      className={`text-xs font-bold px-4 py-1.5 rounded-full border transition-all shrink-0 ${
+                        copiedVersion === 'my_style'
+                          ? 'bg-green-100 text-green-700 border-green-200'
+                          : 'bg-stone-800 text-white hover:bg-stone-700 shadow-sm'
+                      }`}
+                    >
+                      {copiedVersion === 'my_style' ? '✅ コピー済' : '📋 コピー'}
+                    </button>
                   </div>
                   <button
                     onClick={() => setExpandedPrompt(expandedPrompt === 'my_style' ? null : 'my_style')}
@@ -582,6 +856,7 @@ const ServiceResult: React.FC<ServiceResultProps> = ({
                       {referenceBasedPrompt}
                     </pre>
                   )}
+                </div>
                 </div>
               </div>
             </div>
