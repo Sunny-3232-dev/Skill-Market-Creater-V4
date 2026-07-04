@@ -1,5 +1,6 @@
 {
-  "name": "Skill Market Creator Pro",
+  "name": "Remix: Skill Market Creator Pro",
   "description": "A comprehensive suite of AI tools for skill market sellers: Idea Creation, Promotion, and Market Research.",
-  "requestFramePermissions": []
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
