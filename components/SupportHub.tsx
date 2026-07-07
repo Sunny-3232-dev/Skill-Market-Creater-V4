@@ -148,7 +148,6 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
   // Creatorで作成済みのサービス（本文入力のワンクリック連携用）
   const [creatorServices, setCreatorServices] = useState<Array<{ id: string; title: string; content: string }>>([]);
 
-  const containerRef = useRef<HTMLDivElement>(null);
   const resultRef = useRef<HTMLDivElement>(null);
 
   const selectedPattern = useMemo(
@@ -207,12 +206,11 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
     surveyHeaderRefs.current[index] = el;
   }, []);
 
+  // ページ全体（window）がスクロールする構造のため、scrollIntoViewで結果セクションへ移動する
+  const scrollBehavior = (): ScrollBehavior =>
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth';
   const scrollToResults = useCallback(() => {
-    if (resultRef.current && containerRef.current) {
-      const container = containerRef.current;
-      const targetTop = resultRef.current.offsetTop - container.offsetTop;
-      container.scrollTo({ top: targetTop, behavior: 'smooth' });
-    }
+    resultRef.current?.scrollIntoView({ behavior: scrollBehavior(), block: 'start' });
   }, []);
 
   // ---- Creator連携 ----
@@ -322,11 +320,7 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
     if (!selectedPattern) return;
     setShowCode(true);
     setTimeout(() => {
-      const el = document.getElementById('gas-code-section');
-      if (el && containerRef.current) {
-        const container = containerRef.current;
-        container.scrollTo({ top: el.offsetTop - container.offsetTop, behavior: 'smooth' });
-      }
+      document.getElementById('gas-code-section')?.scrollIntoView({ behavior: scrollBehavior(), block: 'start' });
     }, 100);
   };
 
@@ -446,7 +440,7 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
   const usedCount = posts.filter(p => p.used).length;
 
   return (
-    <div ref={containerRef} className="h-full flex flex-col overflow-y-auto custom-scrollbar">
+    <div className="h-full flex flex-col">
       <div className="p-6 md:p-10">
 
         {/* Header */}
