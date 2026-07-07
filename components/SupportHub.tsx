@@ -1,17 +1,27 @@
-import React, { useState, useMemo, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
+import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { generatePromotion, generateSurveyPatterns, getSlideDocPrompt } from '../services/geminiService';
 import { extractWords } from '../utils/textProcessing';
-import { SurveyPattern, ThumbnailPromptVersion } from '../types';
+import { SkillIdea, SurveyPattern, SurveyQuestionDef, ThumbnailPromptVersion } from '../types';
 import { MegaphoneIcon, ClipboardListIcon, PresentationIcon } from './icons';
+import { PROMPT_PREVIEWS } from './promptPreviews';
+import { MAGAZINE_ARTICLES, KNOWHOW_ARTICLES } from '../data/articles';
 import LoadingOverlay from './LoadingOverlay';
+import TweetCard, { TweetPost } from './support/TweetCard';
+import PatternCard from './support/PatternCard';
+import CodeViewer from './support/CodeViewer';
+import QuestionEditor from './support/QuestionEditor';
+import ArticleList from './support/ArticleList';
 
 interface SupportHubProps {
   ensureKeySet: () => Promise<boolean>;
   onHandleApiError: (error: any) => void;
+  notify: (message: string, tone?: 'error' | 'info') => void;
 }
 
-// --- Menu type definitions ---
 type MenuId = 'promoter' | 'survey' | 'slidedoc';
+
+const STORAGE_KEY = 'skill_market_support_v1';
+const CREATOR_IDEAS_KEY = 'skill_market_ideas';
 
 // --- Slide Doc tone variants ---
 const SLIDE_DOC_VERSIONS: Array<{
@@ -56,77 +66,6 @@ const SLIDE_DOC_VERSIONS: Array<{
   },
 ];
 
-// --- Curated article links ---
-interface ArticleLink {
-  title: string;
-  description: string;
-  author: string;
-  category: string;
-  url: string;
-}
-
-const MAGAZINE_ARTICLES: ArticleLink[] = [
-  {
-    title: '▼稼ぎ方実践講座「価格の決め方」',
-    description: 'ビジネスをやるときに悩むことランキング上位、いくらで売るか。',
-    author: '学長マガジンチャット',
-    category: '価格',
-    url: 'https://libecity.com/room_list?room_id=President-Tweet&comment_id=nxfgYlqV2Eb3Lh2YOhPS',
-  },
-  {
-    title: '嫌われない宣伝方法の話〜上手に宣伝し〜や〜〜',
-    description: '商品やサービスは作っただけじゃ売れへん！リベッターを活用した宣伝方法',
-    author: '学長マガジンチャット',
-    category: '宣伝',
-    url: 'https://libecity.com/room_list?room_id=President-Tweet&comment_id=ifrXKHuX4QbUTwkPSG7Y',
-  },
-];
-
-const KNOWHOW_ARTICLES: ArticleLink[] = [
-  {
-    title: '【無料で使える！】スキルマーケットOnline構造診断ツール',
-    description: '既に出している商品を「今後も出し続けるか、中身を見直すか」を判定してくれる診断ツール',
-    author: 'おれんじ🍊スプシで稼ぐチャット管理人',
-    category: '改善',
-    url: 'https://library.libecity.com/articles/01KE4E7JX9ZR77663JV9JDW77T',
-  },
-  {
-    title: '【売上120%UP】スキルマーケットで自分のサービスを改善する３つのポイント',
-    description: 'サービスを出してみたけど中々売れない…そんなときに見直すべき３つのポイントと判断基準',
-    author: 'みずの＠寄り添うWebデザイナー',
-    category: '改善',
-    url: 'https://library.libecity.com/articles/01HHE5SC4C5KE81R4AT2CZB25F',
-  },
-  {
-    title: "リベシティプロフィールを『あなたらしい』文章にするコツと例文をご紹介",
-    description: 'プロフィールに何を書けばいいか迷う方へ、項目ごとの書き方をご紹介',
-    author: 'ベリー号🚢採用支援×HPライター',
-    category: 'プロフィール',
-    url: 'https://library.libecity.com/articles/01HKR0A1C9G6NMTDXKC18QVRD2',
-  },
-  {
-    title: '信頼を貯めるリベプロフィールの書き方＊考え方を解説＊',
-    description: '認知されているのに依頼が来ない…信頼につながるプロフィールの考え方',
-    author: 'ベリー号🚢採用支援×HPライター',
-    category: 'プロフィール',
-    url: 'https://library.libecity.com/articles/01K1Z2F6Z0QPR83FPG558EP2PT',
-  },
-  {
-    title: '【デザイン苦手でも大丈夫！】"見られるサムネイル"の作り方',
-    description: 'Canva初心者さん向けに、出品用サムネイルの作り方を7ステップで解説',
-    author: 'まい＠戦略企画×クリエイター',
-    category: 'デザイン',
-    url: 'https://library.libecity.com/articles/01JY8232SXV4X9QHDSG3DW15H2',
-  },
-  {
-    title: '知ってもらわないとモノは売れない【人見知りさん必見！】oviceで認知活動',
-    description: '話しかけるのが苦手ならoviceで話しかけてもらえばいい！を実践した認知活動の記録',
-    author: 'パー子＠おしゃべりなお絵描き屋さん',
-    category: '宣伝',
-    url: 'https://library.libecity.com/articles/01JB6VCAG87W05WFBGMN27EP1V',
-  },
-];
-
 const SectionLabel: React.FC<{ label: string }> = ({ label }) => (
   <div className="flex items-center gap-2.5 mb-4 px-1">
     <span className="text-[10px] font-semibold text-stone-400 uppercase tracking-[0.2em]">{label}</span>
@@ -135,312 +74,240 @@ const SectionLabel: React.FC<{ label: string }> = ({ label }) => (
   </div>
 );
 
-const ArticleList: React.FC<{ articles: ArticleLink[] }> = ({ articles }) => (
-  <div className="card overflow-hidden">
-    {articles.map((article, index) => (
-      <a
-        key={index}
-        href={article.url}
-        target="_blank"
-        rel="noopener noreferrer"
-        className={`group flex items-start gap-4 px-5 py-4 transition-colors hover:bg-stone-50 ${
-          index !== articles.length - 1 ? 'border-b border-stone-100' : ''
-        }`}
-      >
-        <div className="flex-grow min-w-0">
-          <div className="flex items-center gap-2">
-            <h4 className="text-sm font-semibold text-stone-700 group-hover:text-stone-900 transition-colors leading-snug">{article.title}</h4>
-            <span className="shrink-0 text-[10px] font-medium text-stone-400 bg-stone-100 px-2 py-0.5 rounded-full">{article.category}</span>
-          </div>
-          <p className="text-xs text-stone-500 mt-1 truncate">{article.description}</p>
-          <p className="text-[11px] text-stone-400 mt-1">by {article.author}</p>
-        </div>
-        <span className="shrink-0 mt-1 text-stone-300 group-hover:text-brand-400 transition-colors text-xs" aria-hidden>↗</span>
-      </a>
-    ))}
-  </div>
-);
+// 生成直後のつぶやきを読みやすく整形（URL行には手を入れない）
+const formatTweet = (raw: string): string =>
+  raw
+    .split('\n')
+    .map(line => (line.includes('http') ? line : line.replace(/。(?!$)/g, '。\n')))
+    .join('\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
 
-const TweetCard: React.FC<{ text: string; index: number }> = ({ text, index }) => {
-  const [copied, setCopied] = useState(false);
-  const formattedText = useMemo(() => {
-    return text.replace(/。(?!\n)/g, '。\n').trim();
-  }, [text]);
-
-  const handleCopy = () => {
-    navigator.clipboard.writeText(formattedText);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
-  const tweetUrl = `https://libecity.com/tweet/all?create=${encodeURIComponent(formattedText)}`;
-
-  return (
-    <div className="card p-5 md:p-6 w-full">
-      <div className="flex justify-between items-center mb-4 pb-3 border-b border-stone-100">
-        <span className="text-xs font-semibold text-stone-400">
-          {String(index + 1).padStart(2, '0')}
-        </span>
-        <div className="flex items-center gap-2">
-          <a href={tweetUrl} target="_blank" rel="noopener noreferrer"
-            className="btn-secondary px-4 py-2 text-xs">
-            つぶやく
-          </a>
-          <button onClick={handleCopy}
-            className={`text-xs font-semibold px-4 py-2 rounded-full transition-colors ${
-              copied ? 'bg-brand-50 text-brand-600' : 'bg-stone-900 text-white hover:bg-stone-700'
-            }`}>
-            {copied ? 'コピーしました' : 'コピー'}
-          </button>
-        </div>
-      </div>
-      <div className="w-full bg-stone-50 rounded-xl p-4 text-sm md:text-base text-stone-700 leading-relaxed whitespace-pre-wrap select-text">
-        {formattedText}
-      </div>
-    </div>
-  );
+// Creatorの生成文から標準価格の数値を抽出（例: 「■ 標準価格 … 10,000円」→ "10000"）
+const extractPriceHint = (content: string): string => {
+  const m = content.match(/■ 標準価格[\s\S]{0,200}?(\d[\d,]*)\s*円/);
+  return m ? m[1].replace(/,/g, '') : '';
 };
 
-const escapeString = (str: string): string => {
-  return str.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\n/g, "\\n").replace(/\r/g, "");
+interface PersistedState {
+  serviceBody: string;
+  serviceUrl: string;
+  priceHint: string;
+  activeMenu: MenuId | null;
+  posts: TweetPost[];
+  patterns: SurveyPattern[];
+  patternsOriginal: SurveyPattern[];
+  selectedPatternId: SurveyPattern['id'] | null;
+  showCode: boolean;
+  slideDocReady: boolean;
+}
+
+const loadPersisted = (): Partial<PersistedState> => {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch (e) {
+    console.warn('Failed to restore support state', e);
+    return {};
+  }
 };
 
-const generateGasCode = (pattern: SurveyPattern): string => {
-  const qCode = pattern.questions.map(q => {
-    const cleanTitle = escapeString(q.title);
-    const cleanHelp = q.helpText ? escapeString(q.helpText) : '';
-    const helpLine = cleanHelp ? `.setHelpText('${cleanHelp}')` : '';
-    const reqLine = q.required ? `.setRequired(true)` : `.setRequired(false)`;
-    switch (q.type) {
-      case 'TEXT':
-        return `  form.addTextItem()\n    .setTitle('${cleanTitle}')\n    ${helpLine}\n    ${reqLine};`;
-      case 'PARAGRAPH':
-        return `  form.addParagraphTextItem()\n    .setTitle('${cleanTitle}')\n    ${helpLine}\n    ${reqLine};`;
-      case 'RADIO': {
-        const opts = q.options?.map(o => `'${escapeString(o)}'`).join(', ') || '';
-        return `  form.addMultipleChoiceItem()\n    .setTitle('${cleanTitle}')\n    .setChoiceValues([${opts}])\n    ${helpLine}\n    ${reqLine};`;
-      }
-      case 'CHECKBOX': {
-        const opts = q.options?.map(o => `'${escapeString(o)}'`).join(', ') || '';
-        return `  form.addCheckboxItem()\n    .setTitle('${cleanTitle}')\n    .setChoiceValues([${opts}])\n    ${helpLine}\n    ${reqLine};`;
-      }
-    }
-  }).join('\n\n');
+const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError, notify }) => {
+  // 保存済み状態を同期的に読み込んで初期値にする（保存effectとの競合を避ける）
+  const initRef = useRef<Partial<PersistedState> | null>(null);
+  if (initRef.current === null) initRef.current = loadPersisted();
+  const init = initRef.current;
 
-  return `function createSurveyForm() {
-  // 1. フォームを作成
-  var form = FormApp.create('${escapeString(pattern.formTitle)}');
-  form.setDescription('${escapeString(pattern.formDescription)}');
-
-  // 2. 質問を追加
-${qCode}
-
-  // 3. URLをログに出力
-  Logger.log('--------------------------------------------------');
-  Logger.log('編集用URL (管理者用): ' + form.getEditUrl());
-  Logger.log('回答用URL (公開用): ' + form.getPublishedUrl());
-  Logger.log('--------------------------------------------------');
-}`;
-};
-
-const CodeViewer: React.FC<{ pattern: SurveyPattern }> = ({ pattern }) => {
-  const [copied, setCopied] = useState(false);
-  const code = useMemo(() => generateGasCode(pattern), [pattern]);
-  const handleCopy = () => {
-    navigator.clipboard.writeText(code);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-  return (
-    <div id="gas-code-section" className="mt-8 animate-in fade-in slide-in-from-bottom-4">
-      <div className="bg-stone-900 rounded-2xl p-6 md:p-8 text-white">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-          <div>
-            <h3 className="text-lg font-bold text-white">Google Apps Script (GAS)</h3>
-            <p className="text-stone-400 text-xs mt-1">以下のコードをコピーして実行すると、Googleフォームが自動生成されます。</p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <button onClick={handleCopy}
-              className={`px-5 py-2 rounded-full text-xs font-semibold transition-colors ${copied ? 'bg-brand-400/20 text-brand-200' : 'bg-white text-stone-900 hover:bg-stone-200'}`}>
-              {copied ? 'コピーしました' : 'コードをコピー'}
-            </button>
-            <a href="https://script.new" target="_blank" rel="noopener noreferrer"
-              className="bg-white/10 hover:bg-white/20 text-white border border-white/20 px-4 py-2 rounded-full text-xs font-semibold transition-colors">
-              GAS Editor を開く
-            </a>
-          </div>
-        </div>
-        <pre className="bg-black/40 p-5 rounded-xl text-xs md:text-sm font-mono overflow-x-auto text-stone-200 custom-scrollbar max-h-[400px]">
-          {code}
-        </pre>
-        <div className="mt-6 border-t border-white/10 pt-6">
-          <h4 className="font-semibold text-sm text-white mb-3">使い方</h4>
-          <ol className="text-sm text-stone-300 space-y-2 list-decimal list-inside leading-relaxed">
-            <li>右上の「GAS Editor を開く」ボタンを押してエディタを開く</li>
-            <li>エディタにある既存のコードを消して、コピーしたコードを貼り付け</li>
-            <li>上のバーにある「保存」を押し、関数「createSurveyForm」を選択して「実行」</li>
-            <li>権限の確認画面が出たら「権限を確認」→「続行」で許可する</li>
-            <li>実行完了後、下の「実行ログ」にアンケートのURLが表示されます</li>
-          </ol>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-const PatternCard: React.FC<{ pattern: SurveyPattern; isSelected: boolean; onSelect: () => void; headerRef: (el: HTMLDivElement | null) => void }> = ({ pattern, isSelected, onSelect, headerRef }) => {
-  return (
-    <div onClick={onSelect}
-      role="button"
-      tabIndex={0}
-      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onSelect(); }}
-      className={`cursor-pointer rounded-2xl p-5 border transition-all duration-200 relative h-full flex flex-col ${
-        isSelected ? 'bg-white border-brand-400 ring-2 ring-brand-100 shadow-card' : 'bg-white border-stone-200/80 hover:border-brand-200'
-      }`}>
-      <div ref={headerRef} data-role="card-header">
-        <div className="flex justify-between items-start mb-3">
-          <span className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold ${
-            isSelected ? 'bg-brand-500 text-white' : 'bg-stone-100 text-stone-500'
-          }`}>{pattern.id}</span>
-          {isSelected && <span className="text-[10px] font-semibold text-brand-600 bg-brand-50 px-2 py-1 rounded-full animate-in zoom-in">選択中</span>}
-        </div>
-        <h3 className="font-bold text-stone-900 text-base mb-1">{pattern.name}</h3>
-        <p className="text-xs text-stone-500 leading-relaxed mb-4">{pattern.description}</p>
-      </div>
-      <div className="space-y-3 pt-3 border-t border-stone-100">
-        <p className="text-[10px] font-semibold text-stone-400 uppercase tracking-wider flex justify-between items-center">
-          <span>設問</span>
-          <span className="bg-stone-100 px-2 py-0.5 rounded-full text-stone-500">{pattern.questions.length}問</span>
-        </p>
-        <ul className="text-xs text-stone-600 space-y-2">
-          {pattern.questions.map((q, i) => (
-            <li key={i} className="flex items-start gap-2">
-              <span className={`w-1.5 h-1.5 rounded-full mt-1.5 shrink-0 ${q.required ? 'bg-brand-400' : 'bg-stone-300'}`}></span>
-              <span className="leading-relaxed">{q.title}</span>
-            </li>
-          ))}
-        </ul>
-      </div>
-    </div>
-  );
-};
-
-// --- Main Component ---
-const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError }) => {
   // Shared input
-  const [serviceBody, setServiceBody] = useState('');
+  const [serviceBody, setServiceBody] = useState(init.serviceBody ?? '');
+  const [serviceUrl, setServiceUrl] = useState(init.serviceUrl ?? '');
+  const [priceHint, setPriceHint] = useState(init.priceHint ?? '');
 
-  // Tool-specific inputs
-  const [serviceUrl, setServiceUrl] = useState('');
-  const [priceHint, setPriceHint] = useState('');
+  // Results (メニューごとに並存し、タブで切り替える)
+  const [activeMenu, setActiveMenu] = useState<MenuId | null>(init.activeMenu ?? null);
+  const [posts, setPosts] = useState<TweetPost[]>(
+    Array.isArray(init.posts) ? init.posts.filter(p => p && typeof p.text === 'string') : []
+  );
+  const [patterns, setPatterns] = useState<SurveyPattern[]>(Array.isArray(init.patterns) ? init.patterns : []);
+  const [patternsOriginal, setPatternsOriginal] = useState<SurveyPattern[]>(
+    Array.isArray(init.patternsOriginal) ? init.patternsOriginal : []
+  );
+  const [selectedPatternId, setSelectedPatternId] = useState<SurveyPattern['id'] | null>(init.selectedPatternId ?? null);
+  const [showCode, setShowCode] = useState(init.showCode ?? false);
+  const [slideDocReady, setSlideDocReady] = useState(init.slideDocReady ?? false);
 
-  // Active menu & results
-  const [activeMenu, setActiveMenu] = useState<MenuId | null>(null);
-
-  // Promoter results
-  const [posts, setPosts] = useState<string[]>([]);
-
-  // Survey results
-  const [patterns, setPatterns] = useState<SurveyPattern[]>([]);
-  const [selectedPattern, setSelectedPattern] = useState<SurveyPattern | null>(null);
-  const [showCode, setShowCode] = useState(false);
-
-  // Slide Doc copy feedback
   const [copiedSlideDocVersion, setCopiedSlideDocVersion] = useState<ThumbnailPromptVersion | null>(null);
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
 
-  // Survey PatternCard ヘッダー高さ同期
+  // Loading / error
+  const [isLoading, setIsLoading] = useState(false);
+  const [loadingMenu, setLoadingMenu] = useState<MenuId | null>(null);
+  const [errorMenu, setErrorMenu] = useState<MenuId | null>(null);
+  const runTokenRef = useRef(0); // キャンセル時に進め、古いレスポンスを破棄する
+
+  // Creatorで作成済みのサービス（本文入力のワンクリック連携用）
+  const [creatorServices, setCreatorServices] = useState<Array<{ id: string; title: string; content: string }>>([]);
+
+  const containerRef = useRef<HTMLDivElement>(null);
+  const resultRef = useRef<HTMLDivElement>(null);
+
+  const selectedPattern = useMemo(
+    () => patterns.find(p => p.id === selectedPatternId) ?? null,
+    [patterns, selectedPatternId]
+  );
+  const inputWords = useMemo(() => extractWords(serviceBody), [serviceBody]);
+  const hasInput = serviceBody.trim().length > 0;
+
+  // ---- Creatorの作成済みサービスを読み込む（ピッカー用） ----
+  useEffect(() => {
+    try {
+      const ideasRaw = localStorage.getItem(CREATOR_IDEAS_KEY);
+      if (ideasRaw) {
+        const ideas: SkillIdea[] = JSON.parse(ideasRaw);
+        setCreatorServices(
+          ideas
+            .filter(i => i.generatedContent)
+            .map(i => ({ id: i.id, title: i.title, content: i.generatedContent! }))
+        );
+      }
+    } catch (e) {
+      console.warn('Failed to load creator ideas', e);
+    }
+  }, []);
+
+  // ---- 永続化: 保存 ----
+  useEffect(() => {
+    try {
+      const s: PersistedState = {
+        serviceBody, serviceUrl, priceHint, activeMenu,
+        posts, patterns, patternsOriginal, selectedPatternId, showCode, slideDocReady,
+      };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(s));
+    } catch (e) {
+      console.warn('Failed to save support state', e);
+    }
+  }, [serviceBody, serviceUrl, priceHint, activeMenu, posts, patterns, patternsOriginal, selectedPatternId, showCode, slideDocReady]);
+
+  // ---- アンケートカードのヘッダー高さ同期 ----
   const surveyHeaderRefs = useRef<(HTMLDivElement | null)[]>([]);
   const syncSurveyHeaders = useCallback(() => {
     const refs = surveyHeaderRefs.current.filter(Boolean) as HTMLDivElement[];
     if (refs.length < 2) return;
     refs.forEach(r => { r.style.minHeight = ''; });
-    const heights = refs.map(r => r.offsetHeight);
-    const max = Math.max(...heights);
+    const max = Math.max(...refs.map(r => r.offsetHeight));
     refs.forEach(r => { r.style.minHeight = `${max}px`; });
   }, []);
-  useLayoutEffect(() => {
-    if (patterns.length > 0) syncSurveyHeaders();
-  });
+  useEffect(() => {
+    if (patterns.length === 0 || activeMenu !== 'survey') return;
+    syncSurveyHeaders();
+    window.addEventListener('resize', syncSurveyHeaders);
+    return () => window.removeEventListener('resize', syncSurveyHeaders);
+  }, [patterns, activeMenu, syncSurveyHeaders]);
   const setSurveyHeaderRef = useCallback((index: number) => (el: HTMLDivElement | null) => {
     surveyHeaderRefs.current[index] = el;
   }, []);
 
-  // Loading
-  const [isLoading, setIsLoading] = useState(false);
-  const [loadingMenu, setLoadingMenu] = useState<MenuId | null>(null);
-
-  const containerRef = useRef<HTMLDivElement>(null);
-  const resultRef = useRef<HTMLDivElement>(null);
-  const inputWords = useMemo(() => extractWords(serviceBody), [serviceBody]);
-  const hasInput = serviceBody.trim().length > 0;
-
-  // Scroll to results when they appear (container内のみスクロール)
-  useEffect(() => {
-    const hasAny = posts.length > 0 || patterns.length > 0 || activeMenu === 'slidedoc';
-    if (hasAny && resultRef.current && containerRef.current) {
+  const scrollToResults = useCallback(() => {
+    if (resultRef.current && containerRef.current) {
       const container = containerRef.current;
-      const target = resultRef.current;
-      const targetTop = target.offsetTop - container.offsetTop;
+      const targetTop = resultRef.current.offsetTop - container.offsetTop;
       container.scrollTo({ top: targetTop, behavior: 'smooth' });
     }
-  }, [posts, patterns, activeMenu]);
+  }, []);
 
+  // ---- Creator連携 ----
+  const handlePickCreatorService = (id: string) => {
+    const svc = creatorServices.find(s => s.id === id);
+    if (!svc) return;
+    setServiceBody(svc.content);
+    const price = extractPriceHint(svc.content);
+    if (price) setPriceHint(price);
+    notify(`「${svc.title}」を読み込みました${price ? `（価格 ${Number(price).toLocaleString()}円 も自動入力）` : ''}`);
+  };
+
+  // ---- 実行 ----
   const handleRunPromoter = async () => {
     if (!hasInput) return;
-
+    const url = serviceUrl.trim();
+    if (url && !/^https?:\/\/\S+$/.test(url)) {
+      notify('サービスURLは https:// から始まる形式で入力してください。', 'error');
+      return;
+    }
     const keyReady = await ensureKeySet();
     if (!keyReady) return;
 
+    const token = ++runTokenRef.current;
     setIsLoading(true);
     setLoadingMenu('promoter');
+    setErrorMenu(null);
     try {
-      const data = await generatePromotion(serviceBody, serviceUrl);
-      setPosts(data);
-      setPatterns([]);
-      setSelectedPattern(null);
-      setShowCode(false);
+      const data = await generatePromotion(serviceBody, url);
+      if (token !== runTokenRef.current) return; // キャンセル済み
+      setPosts(data.map(t => ({ text: formatTweet(t), used: false })));
       setActiveMenu('promoter');
+      setTimeout(scrollToResults, 100);
     } catch (error) {
+      if (token !== runTokenRef.current) return;
+      setErrorMenu('promoter');
       onHandleApiError(error);
     } finally {
-      setIsLoading(false);
-      setLoadingMenu(null);
+      if (token === runTokenRef.current) {
+        setIsLoading(false);
+        setLoadingMenu(null);
+      }
     }
   };
 
   const handleRunSurvey = async () => {
     if (!hasInput) return;
-
+    // 価格は数値だけに正規化（「5,000円」→「5000」。プロンプト側で「円」が付くため）
+    const priceDigits = priceHint.replace(/[^\d]/g, '');
+    if (priceHint.trim() && !priceDigits) {
+      notify('価格は数値で入力してください（例: 5000）。', 'error');
+      return;
+    }
     const keyReady = await ensureKeySet();
     if (!keyReady) return;
 
+    const token = ++runTokenRef.current;
     setIsLoading(true);
     setLoadingMenu('survey');
+    setErrorMenu(null);
     try {
-      const data = await generateSurveyPatterns(serviceBody, priceHint);
+      const data = await generateSurveyPatterns(serviceBody, priceDigits);
+      if (token !== runTokenRef.current) return;
       setPatterns(data);
-      // デフォルトでパターンB（標準回答プラン）を選択し、コードも表示
+      setPatternsOriginal(JSON.parse(JSON.stringify(data)));
       const defaultPattern = data.find(p => p.id === 'B') || data[1] || data[0];
-      setSelectedPattern(defaultPattern);
+      setSelectedPatternId(defaultPattern?.id ?? null);
       setShowCode(true);
-      setPosts([]);
       setActiveMenu('survey');
+      setTimeout(scrollToResults, 100);
     } catch (error) {
+      if (token !== runTokenRef.current) return;
+      setErrorMenu('survey');
       onHandleApiError(error);
     } finally {
-      setIsLoading(false);
-      setLoadingMenu(null);
+      if (token === runTokenRef.current) {
+        setIsLoading(false);
+        setLoadingMenu(null);
+      }
     }
   };
 
   const handleRunSlideDoc = () => {
     if (!hasInput) return;
-    setPosts([]);
-    setPatterns([]);
-    setSelectedPattern(null);
-    setShowCode(false);
+    setSlideDocReady(true);
     setCopiedSlideDocVersion(null);
     setActiveMenu('slidedoc');
+    setTimeout(scrollToResults, 100);
+  };
+
+  const handleCancelRun = () => {
+    runTokenRef.current++;
+    setIsLoading(false);
+    setLoadingMenu(null);
+    notify('生成をキャンセルしました。');
   };
 
   const handleCopySlideDocPrompt = (version: ThumbnailPromptVersion) => {
@@ -452,35 +319,80 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError 
   };
 
   const handleGenerateCode = () => {
-    if (selectedPattern) {
-      setShowCode(true);
-      setTimeout(() => {
-        const el = document.getElementById('gas-code-section');
-        if (el && containerRef.current) {
-          const container = containerRef.current;
-          const targetTop = el.offsetTop - container.offsetTop;
-          container.scrollTo({ top: targetTop, behavior: 'smooth' });
-        }
-      }, 100);
+    if (!selectedPattern) return;
+    setShowCode(true);
+    setTimeout(() => {
+      const el = document.getElementById('gas-code-section');
+      if (el && containerRef.current) {
+        const container = containerRef.current;
+        container.scrollTo({ top: el.offsetTop - container.offsetTop, behavior: 'smooth' });
+      }
+    }, 100);
+  };
+
+  const handleUpdateQuestions = (questions: SurveyQuestionDef[]) => {
+    if (!selectedPatternId) return;
+    setPatterns(prev => prev.map(p => (p.id === selectedPatternId ? { ...p, questions } : p)));
+  };
+
+  const handleResetQuestions = () => {
+    if (!selectedPatternId) return;
+    const original = patternsOriginal.find(p => p.id === selectedPatternId);
+    if (original) {
+      setPatterns(prev => prev.map(p => (p.id === selectedPatternId ? JSON.parse(JSON.stringify(original)) : p)));
     }
   };
 
-  // Menu definitions (data-driven for future extensibility)
+  const selectedIsDirty = useMemo(() => {
+    if (!selectedPattern) return false;
+    const original = patternsOriginal.find(p => p.id === selectedPattern.id);
+    return !!original && JSON.stringify(original.questions) !== JSON.stringify(selectedPattern.questions);
+  }, [selectedPattern, patternsOriginal]);
+
+  const handleClearAll = () => {
+    try { localStorage.removeItem(STORAGE_KEY); } catch { /* noop */ }
+    setServiceBody('');
+    setServiceUrl('');
+    setPriceHint('');
+    setPosts([]);
+    setPatterns([]);
+    setPatternsOriginal([]);
+    setSelectedPatternId(null);
+    setShowCode(false);
+    setSlideDocReady(false);
+    setActiveMenu(null);
+    setErrorMenu(null);
+    setShowClearConfirm(false);
+  };
+
+  const handleTweetChange = (index: number, next: TweetPost) => {
+    setPosts(prev => prev.map((p, i) => (i === index ? next : p)));
+  };
+
+  // ---- メニュー定義 ----
+  const retryHandlers: Record<MenuId, () => void> = {
+    promoter: handleRunPromoter,
+    survey: handleRunSurvey,
+    slidedoc: handleRunSlideDoc,
+  };
+
   const supportMenus = [
     {
       id: 'promoter' as MenuId,
       title: '宣伝文を作る',
       description: 'リベシティの文化に合う「前向き・丁寧・押しつけない」つぶやきを20本生成',
       icon: <MegaphoneIcon />,
+      runLabel: '実行',
       onRun: handleRunPromoter,
       extraInput: (
         <div className="flex-shrink-0 w-full md:w-auto">
           <input
-            type="text"
+            type="url"
             value={serviceUrl}
             onChange={(e) => setServiceUrl(e.target.value)}
             className="field w-full md:w-64 px-3 py-2 rounded-full bg-white text-sm"
             placeholder="サービスURL（任意）"
+            aria-label="出品サービスURL（任意）"
             disabled={!hasInput}
           />
         </div>
@@ -491,15 +403,18 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError 
       title: 'アンケートを作る',
       description: '購入者の声を集めるGoogleフォームアンケートを自動作成',
       icon: <ClipboardListIcon />,
+      runLabel: '実行',
       onRun: handleRunSurvey,
       extraInput: (
         <div className="flex-shrink-0 w-full md:w-auto">
           <input
             type="text"
+            inputMode="numeric"
             value={priceHint}
             onChange={(e) => setPriceHint(e.target.value)}
             className="field w-full md:w-40 px-3 py-2 rounded-full bg-white text-sm"
-            placeholder="価格（任意）"
+            placeholder="価格・円（任意）"
+            aria-label="サービス価格（円・任意）"
             disabled={!hasInput}
           />
         </div>
@@ -508,33 +423,76 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError 
     {
       id: 'slidedoc' as MenuId,
       title: 'サービス資料を作る',
-      description: 'NotebookLM用のスライド作成プロンプトを生成（トンマナ7種から選択可）',
+      description: 'NotebookLM用のスライド作成プロンプトを表示（トンマナ7種から選択可）',
       icon: <PresentationIcon />,
+      runLabel: '表示', // AIは呼ばずプロンプト一覧を表示するだけなので「実行」とは言わない
       onRun: handleRunSlideDoc,
       extraInput: null,
     },
   ];
 
-  const hasResults = posts.length > 0 || patterns.length > 0 || activeMenu === 'slidedoc';
+  // ---- 結果タブ ----
+  const resultTabs = [
+    posts.length > 0 && { id: 'promoter' as MenuId, label: `宣伝文 ${posts.length}本` },
+    patterns.length > 0 && { id: 'survey' as MenuId, label: 'アンケート 3案' },
+    slideDocReady && { id: 'slidedoc' as MenuId, label: 'スライド資料' },
+  ].filter(Boolean) as Array<{ id: MenuId; label: string }>;
+
+  const hasResults = resultTabs.length > 0;
+  const shownMenu: MenuId | null = resultTabs.some(t => t.id === activeMenu)
+    ? activeMenu
+    : (resultTabs[0]?.id ?? null);
+
+  const usedCount = posts.filter(p => p.used).length;
 
   return (
     <div ref={containerRef} className="h-full flex flex-col overflow-y-auto custom-scrollbar">
       <div className="p-6 md:p-10">
 
         {/* Header */}
-        <div className="mb-8">
-          <span className="eyebrow mb-1 block">Support</span>
-          <h2 className="text-xl md:text-2xl font-bold text-stone-900 tracking-tight">サポートメニュー</h2>
-          <p className="text-stone-500 text-sm mt-2">サービス詳細を入力すると、各メニューが実行できます。</p>
+        <div className="mb-8 flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <span className="eyebrow mb-1 block">Support</span>
+            <h2 className="text-xl md:text-2xl font-bold text-stone-900 tracking-tight">サポートメニュー</h2>
+            <p className="text-stone-500 text-sm mt-2">サービス詳細を入力すると、各メニューが実行できます。入力と結果は自動保存されます。</p>
+          </div>
+          {(hasInput || hasResults) && (
+            showClearConfirm ? (
+              <div className="flex items-center gap-2 animate-in fade-in slide-in-from-right-4 duration-300">
+                <span className="text-xs text-stone-500">入力と結果を消去しますか？</span>
+                <button onClick={handleClearAll} className="btn-dark py-2 px-4 text-xs">はい</button>
+                <button onClick={() => setShowClearConfirm(false)} className="btn-quiet py-2 px-4 text-xs">いいえ</button>
+              </div>
+            ) : (
+              <button onClick={() => setShowClearConfirm(true)} className="btn-secondary py-2 px-4 text-xs">
+                入力と結果をクリア
+              </button>
+            )
+          )}
         </div>
 
         {/* Shared Input */}
         <div className="mb-8">
-          <label className="font-semibold text-stone-700 text-sm mb-2 flex justify-between items-end">
-            <span>出品サービスページ本文</span>
-            <span className="text-xs text-stone-400 font-normal">Creatorで作った「サービス詳細」などを貼り付け</span>
-          </label>
+          <div className="flex flex-wrap justify-between items-end gap-2 mb-2">
+            <label htmlFor="support-body" className="font-semibold text-stone-700 text-sm">出品サービスページ本文</label>
+            {creatorServices.length > 0 ? (
+              <select
+                value=""
+                onChange={(e) => { if (e.target.value) handlePickCreatorService(e.target.value); }}
+                className="text-xs font-semibold text-brand-600 bg-brand-50 border border-brand-100 rounded-full px-3 py-1.5 outline-none cursor-pointer hover:bg-brand-100 transition-colors max-w-[280px]"
+                aria-label="Creatorで作ったサービスから読み込む"
+              >
+                <option value="">Creatorで作ったサービスから読み込む…</option>
+                {creatorServices.map(s => (
+                  <option key={s.id} value={s.id}>{s.title}</option>
+                ))}
+              </select>
+            ) : (
+              <span className="text-xs text-stone-400">Creatorで作った「サービス詳細」などを貼り付け</span>
+            )}
+          </div>
           <textarea
+            id="support-body"
             value={serviceBody}
             onChange={(e) => setServiceBody(e.target.value)}
             className="field w-full p-5 min-h-[180px] text-base leading-relaxed"
@@ -548,7 +506,6 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError 
         {/* Menu List */}
         <div className="mb-8">
           <SectionLabel label="メニュー" />
-
           <div className="card overflow-hidden">
             {supportMenus.map((menu, index) => (
               <div
@@ -563,8 +520,8 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError 
                     <div className="flex-grow min-w-0">
                       <div className="flex items-center gap-2">
                         <h4 className="text-sm font-semibold text-stone-900">{menu.title}</h4>
-                        {activeMenu === menu.id && hasResults && (
-                          <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full">実行済み</span>
+                        {resultTabs.some(t => t.id === menu.id) && (
+                          <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full">結果あり</span>
                         )}
                       </div>
                       <p className="text-xs text-stone-400 mt-0.5 truncate">{menu.description}</p>
@@ -578,37 +535,72 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError 
                       disabled={!hasInput || isLoading}
                       className="btn-dark shrink-0 px-5 py-2 text-xs"
                     >
-                      {loadingMenu === menu.id ? '生成中…' : '実行'}
+                      {loadingMenu === menu.id ? '生成中…' : menu.runLabel}
                     </button>
                   </div>
                 </div>
               </div>
             ))}
           </div>
+
+          {/* エラー時のリトライ導線 */}
+          {errorMenu && !isLoading && (
+            <div className="mt-4 card p-4 border-brand-200 bg-brand-50/50 flex flex-wrap items-center justify-between gap-3 animate-in fade-in">
+              <p className="text-sm text-stone-600">
+                「{supportMenus.find(m => m.id === errorMenu)?.title}」の生成に失敗しました。時間をおいて再試行してください。
+              </p>
+              <button onClick={() => retryHandlers[errorMenu]()} className="btn-dark px-5 py-2 text-xs">
+                再試行
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Results Area */}
         {hasResults && (
-          <div ref={resultRef} className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <div ref={resultRef} className="animate-in fade-in slide-in-from-bottom-4 duration-500 mb-8">
             <SectionLabel label="結果" />
 
+            {/* 結果タブ（複数の結果が並存する） */}
+            {resultTabs.length > 1 && (
+              <div className="flex flex-wrap gap-2 mb-6">
+                {resultTabs.map(tab => (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveMenu(tab.id)}
+                    aria-pressed={shownMenu === tab.id}
+                    className={`px-4 py-2 ${shownMenu === tab.id ? 'chip-active' : 'chip'}`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+            )}
+
             {/* Promoter Results */}
-            {activeMenu === 'promoter' && posts.length > 0 && (
+            {shownMenu === 'promoter' && posts.length > 0 && (
               <div>
-                <div className="mb-6">
-                  <h3 className="text-lg font-bold text-stone-900">生成されたつぶやき ({posts.length}本)</h3>
-                  <p className="text-xs text-stone-500 mt-1">気に入ったものをコピー、または直接つぶやいてください。</p>
+                <div className="flex flex-wrap items-end justify-between gap-2 mb-6">
+                  <div>
+                    <h3 className="text-lg font-bold text-stone-900">生成されたつぶやき ({posts.length}本)</h3>
+                    <p className="text-xs text-stone-500 mt-1">編集してからコピーできます。投稿したら「使用済み」にしておくと管理が楽です。</p>
+                  </div>
+                  {usedCount > 0 && (
+                    <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-full">
+                      {usedCount}/{posts.length} 本 使用済み
+                    </span>
+                  )}
                 </div>
-                <div className="space-y-5 pb-12">
+                <div className="space-y-5 pb-6">
                   {posts.map((post, idx) => (
-                    <TweetCard key={idx} text={post} index={idx} />
+                    <TweetCard key={idx} post={post} index={idx} onChange={handleTweetChange} />
                   ))}
                 </div>
               </div>
             )}
 
             {/* Slide Doc Results */}
-            {activeMenu === 'slidedoc' && (
+            {shownMenu === 'slidedoc' && slideDocReady && (
               <div>
                 <div className="mb-6">
                   <h3 className="text-lg font-bold text-stone-900">スライド資料プロンプト ({SLIDE_DOC_VERSIONS.length}パターン)</h3>
@@ -620,12 +612,13 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError 
                     const isCopied = copiedSlideDocVersion === id;
                     const isMyStyle = id === 'my_style';
                     return (
-                      <div
-                        key={id}
-                        className={`card p-5 ${isMyStyle ? 'md:col-span-2' : ''}`}
-                      >
-                        <div className="flex items-center justify-between gap-3 mb-2">
-                          <h4 className="text-sm font-semibold text-stone-900">{label}</h4>
+                      <div key={id} className={`card p-5 ${isMyStyle ? 'md:col-span-2' : ''}`}>
+                        <div className="flex items-start gap-4">
+                          <div className="flex-1 min-w-0">
+                            <h4 className="text-sm font-semibold text-stone-900">{label}</h4>
+                            <p className="text-xs text-stone-500 leading-relaxed mt-1">{description}</p>
+                          </div>
+                          {PROMPT_PREVIEWS[id]}
                           <button
                             type="button"
                             onClick={() => handleCopySlideDocPrompt(id)}
@@ -638,14 +631,13 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError 
                             {isCopied ? 'コピーしました' : 'コピー'}
                           </button>
                         </div>
-                        <p className="text-xs text-stone-500 leading-relaxed">{description}</p>
                       </div>
                     );
                   })}
                 </div>
 
                 {/* Usage guide */}
-                <div className="bg-stone-50 border border-stone-200/80 rounded-2xl p-6 mb-12">
+                <div className="bg-stone-50 border border-stone-200/80 rounded-2xl p-6 mb-6">
                   <h4 className="text-sm font-bold text-stone-900 mb-3">スライド生成から画像化までの手順</h4>
                   <ol className="text-xs text-stone-600 space-y-2 list-decimal list-inside leading-relaxed mb-4">
                     <li>「NotebookLM を開く」ボタンから新規ノートブックを作成</li>
@@ -684,11 +676,20 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError 
             )}
 
             {/* Survey Results */}
-            {activeMenu === 'survey' && patterns.length > 0 && (
+            {shownMenu === 'survey' && patterns.length > 0 && (
               <div>
-                <div className="mb-6">
-                  <h3 className="text-lg font-bold text-stone-900">アンケート構成案 (3パターン)</h3>
-                  <p className="text-xs text-stone-500 mt-1">目的に合うパターンを選んで、Googleフォーム作成コードを発行してください。</p>
+                <div className="flex flex-wrap items-end justify-between gap-2 mb-6">
+                  <div>
+                    <h3 className="text-lg font-bold text-stone-900">アンケート構成案 (3パターン)</h3>
+                    <p className="text-xs text-stone-500 mt-1">目的に合うパターンを選んで、Googleフォーム作成コードを発行してください。</p>
+                  </div>
+                  <button
+                    onClick={handleRunSurvey}
+                    disabled={isLoading}
+                    className="btn-secondary px-4 py-2 text-xs"
+                  >
+                    別の3案を生成する
+                  </button>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8 items-stretch">
                   {patterns.map((pattern, index) => (
@@ -696,7 +697,7 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError 
                       key={pattern.id}
                       pattern={pattern}
                       isSelected={selectedPattern?.id === pattern.id}
-                      onSelect={() => setSelectedPattern(pattern)}
+                      onSelect={() => setSelectedPatternId(pattern.id)}
                       headerRef={setSurveyHeaderRef(index)}
                     />
                   ))}
@@ -710,8 +711,18 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError 
                     この構成でコードを生成する
                   </button>
                 </div>
-                {showCode && selectedPattern && <CodeViewer pattern={selectedPattern} />}
-                <div className="pb-12"></div>
+                {showCode && selectedPattern && (
+                  <>
+                    <QuestionEditor
+                      pattern={selectedPattern}
+                      onUpdate={handleUpdateQuestions}
+                      onReset={handleResetQuestions}
+                      isDirty={selectedIsDirty}
+                    />
+                    <CodeViewer pattern={selectedPattern} />
+                  </>
+                )}
+                <div className="pb-6"></div>
               </div>
             )}
           </div>
@@ -736,6 +747,7 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError 
             : 'アンケート設問構成を3パターン設計しています…'}
           title={loadingMenu === 'promoter' ? '投稿のたたき台を20本用意しています' : 'アンケートを設計しています'}
           sourceWords={inputWords}
+          onCancel={handleCancelRun}
         />
       )}
     </div>

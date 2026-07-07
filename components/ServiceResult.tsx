@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { getThumbnailPrompt } from '../services/geminiService';
 import { SkillIdea, ThumbnailPromptVersion } from '../types';
+import { PROMPT_PREVIEWS } from './promptPreviews';
 
 interface ServiceResultProps {
   idea: SkillIdea;
@@ -169,97 +170,43 @@ const getMonthEndOptions = () => {
   ];
 };
 
-// 画像生成プロンプトのスタイル定義(カードUIはこの配列から一括生成)
+// 画像生成プロンプトのスタイル定義(カードUIはこの配列から一括生成。プレビューはpromptPreviewsで共用)
 const PROMPT_STYLES: Array<{
   id: ThumbnailPromptVersion;
   label: string;
   description: string;
   note?: string;
   fullWidth?: boolean;
-  preview: React.ReactNode;
 }> = [
   {
     id: 'standard',
     label: '標準',
     description: 'プロフェッショナルで洗練されたデザイン。信頼感と上質な印象。',
-    preview: (
-      <svg viewBox="0 0 600 400" className="w-[104px] shrink-0 rounded-lg block border border-stone-100">
-        <rect fill="#0f172a" width="600" height="400" rx="12"/>
-        <rect x="50" y="130" width="440" height="56" rx="4" fill="#fff" opacity="0.95"/>
-        <rect x="50" y="210" width="320" height="40" rx="4" fill="#fff" opacity="0.4"/>
-        <rect x="50" y="300" width="90" height="6" fill="#fbbf24"/>
-      </svg>
-    ),
   },
   {
     id: 'simple',
     label: 'シンプル',
     description: '詳細なレイアウト指示。丸みのあるやさしいビジネスデザイン。',
-    preview: (
-      <svg viewBox="0 0 600 400" className="w-[104px] shrink-0 rounded-lg block border border-stone-100">
-        <rect fill="#fdfaf6" width="600" height="400" rx="12"/>
-        <rect fill="none" stroke="#d6d3d1" strokeWidth="2" x="14" y="14" width="572" height="372" rx="8"/>
-        <ellipse cx="300" cy="165" rx="190" ry="45" fill="#ede9fe"/>
-        <circle cx="115" cy="295" r="50" fill="#fef3c7"/>
-        <ellipse cx="420" cy="270" rx="115" ry="20" fill="#dbeafe"/>
-        <ellipse cx="420" cy="325" rx="115" ry="20" fill="#dbeafe"/>
-      </svg>
-    ),
   },
   {
     id: 'watercolor',
     label: '水彩画',
     description: '手書き風の柔らかなタッチ。親しみやすく温かい印象。',
-    preview: (
-      <svg viewBox="0 0 600 400" className="w-[104px] shrink-0 rounded-lg block border border-stone-100">
-        <rect fill="#fefbf6" width="600" height="400" rx="12"/>
-        <circle cx="220" cy="200" r="120" fill="#fbcfe8" opacity="0.65"/>
-        <circle cx="340" cy="220" r="110" fill="#c4b5fd" opacity="0.6"/>
-        <circle cx="430" cy="180" r="95" fill="#bae6fd" opacity="0.6"/>
-      </svg>
-    ),
   },
   {
     id: 'pop',
     label: 'ポップ＆フレンドリー',
     description: '鮮やかな多色使いとポップアート感。楽しくフレンドリーな印象。',
-    preview: (
-      <svg viewBox="0 0 600 400" className="w-[104px] shrink-0 rounded-lg block border border-stone-100">
-        <rect fill="#fb923c" width="600" height="400" rx="12"/>
-        <rect x="50" y="80" width="240" height="48" rx="24" fill="#fff"/>
-        <rect x="50" y="150" width="180" height="32" rx="16" fill="#fff" opacity="0.85"/>
-        <circle cx="450" cy="210" r="95" fill="#a78bfa"/>
-        <polygon points="450,135 461,162 490,162 467,179 477,206 450,189 423,206 433,179 410,162 439,162" fill="#facc15"/>
-      </svg>
-    ),
   },
   {
     id: 'youtube',
     label: 'YouTube風',
     description: '人気YouTuberのサムネイル風。インパクト重視で思わずクリックしたくなる印象。',
-    preview: (
-      <svg viewBox="0 0 600 400" className="w-[104px] shrink-0 rounded-lg block border border-stone-100">
-        <rect fill="#dc2626" width="600" height="400" rx="12"/>
-        <circle cx="460" cy="220" r="130" fill="#fbbf24"/>
-        <rect x="40" y="90" width="290" height="60" rx="4" fill="#fff"/>
-        <rect x="40" y="170" width="230" height="60" rx="4" fill="#fbbf24"/>
-        <polygon points="90,310 101,335 128,335 106,351 115,377 90,361 65,377 74,351 52,335 79,335" fill="#fbbf24" stroke="#0f172a" strokeWidth="3"/>
-      </svg>
-    ),
   },
   {
-    id: 'pivot',
-    label: 'PIVOT風',
-    description: 'ビジネスインタビュー番組のトンマナ。落ち着いた深緑ベースで知的・上質な印象。',
-    preview: (
-      <svg viewBox="0 0 600 400" className="w-[104px] shrink-0 rounded-lg block border border-stone-100">
-        <rect fill="#14532d" width="600" height="400" rx="12"/>
-        <rect x="40" y="40" width="90" height="24" rx="3" fill="#fafaf9"/>
-        <rect x="40" y="110" width="360" height="50" rx="3" fill="#fafaf9"/>
-        <rect x="40" y="180" width="260" height="50" rx="3" fill="#fafaf9" opacity="0.75"/>
-        <circle cx="470" cy="220" r="90" fill="#fafaf9" opacity="0.95"/>
-      </svg>
-    ),
+    id: 'puffy_3d',
+    label: 'ぷっくり3D',
+    description: '粘土のようにぷっくり膨らんだ3D調。パステルカラーでやわらかく、思わず目を引く可愛い印象。',
   },
   {
     id: 'my_style',
@@ -267,15 +214,6 @@ const PROMPT_STYLES: Array<{
     description: '参考にしたいサムネイル画像を ChatGPT や Gemini に一緒に添付すると、そのデザインを踏襲した新しいサムネイルを生成できます。アイコンや文章は新しいサービス内容に自動で差し替えられます。',
     note: 'コピー後、ChatGPT または Gemini を開いて参考画像と一緒に貼り付けてください。',
     fullWidth: true,
-    preview: (
-      <svg viewBox="0 0 600 400" className="w-[104px] shrink-0 rounded-lg block border border-stone-100">
-        <rect fill="#faf5ff" width="600" height="400" rx="12"/>
-        <rect x="50" y="100" width="210" height="200" rx="14" fill="#fff" stroke="#c4b5fd" strokeWidth="2.5" strokeDasharray="10 5"/>
-        <rect x="340" y="100" width="210" height="200" rx="14" fill="#a78bfa" opacity="0.2" stroke="#7c3aed" strokeWidth="2.5"/>
-        <path d="M280,200 L330,200" stroke="#7c3aed" strokeWidth="5" strokeLinecap="round"/>
-        <polygon points="323,190 345,200 323,210" fill="#7c3aed"/>
-      </svg>
-    ),
   },
 ];
 
@@ -296,7 +234,7 @@ const PromptCard: React.FC<{
           <p className="text-[11px] text-stone-400 mt-1.5 leading-relaxed">※{style.note}</p>
         )}
       </div>
-      {style.preview}
+      {PROMPT_PREVIEWS[style.id]}
       <CopyButton copied={copied} onClick={onCopy} dark />
     </div>
     <button

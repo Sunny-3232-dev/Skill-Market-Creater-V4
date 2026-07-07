@@ -26,7 +26,8 @@ export enum ToolType {
 }
 
 // Survey Tool Types
-export type QuestionType = 'TEXT' | 'PARAGRAPH' | 'RADIO' | 'CHECKBOX';
+// SCALE = Google Form の均等目盛（0〜10。NPS用）
+export type QuestionType = 'TEXT' | 'PARAGRAPH' | 'RADIO' | 'CHECKBOX' | 'SCALE';
 
 export interface SurveyQuestionDef {
   title: string;
@@ -46,4 +47,5 @@ export interface SurveyPattern {
 }
 
 // Thumbnail Prompt Version
-export type ThumbnailPromptVersion = 'standard' | 'simple' | 'watercolor' | 'pop' | 'my_style' | 'youtube' | 'pivot';
+// pivot はスライド資料用に残存（サムネイルUIからは削除済み）。puffy_3d はサムネイル専用
+export type ThumbnailPromptVersion = 'standard' | 'simple' | 'watercolor' | 'pop' | 'my_style' | 'youtube' | 'pivot' | 'puffy_3d';

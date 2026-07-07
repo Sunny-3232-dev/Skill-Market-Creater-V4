@@ -57,7 +57,7 @@ const App: React.FC = () => {
       case ToolType.CREATOR:
         return <CreatorTool ensureKeySet={ensureKeySet} onHandleApiError={handleApiError} notify={notify} />;
       case ToolType.SUPPORT:
-        return <SupportHub ensureKeySet={ensureKeySet} onHandleApiError={handleApiError} />;
+        return <SupportHub ensureKeySet={ensureKeySet} onHandleApiError={handleApiError} notify={notify} />;
       case ToolType.TOP:
       default:
         return <Hub onSelectTool={setCurrentTool} />;
