@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
 import { generatePromotion, generateSurveyPatterns, getSlideDocPrompt } from '../services/geminiService';
 import { extractWords } from '../utils/textProcessing';
@@ -19,53 +18,148 @@ const SLIDE_DOC_VERSIONS: Array<{
   id: ThumbnailPromptVersion;
   label: string;
   description: string;
-  badgeClass: string;
 }> = [
   {
     id: 'my_style',
     label: 'マイスタイル(参照モード)',
     description: 'リソースに添付した参考画像のトンマナを踏襲。既存のサムネイルと統一感を出したい方に。',
-    badgeClass: 'bg-purple-50 text-purple-500 border-purple-200',
   },
   {
     id: 'standard',
     label: '標準',
     description: 'プロフェッショナルで信頼感のあるビジネスデザイン。落ち着いた上質な印象。',
-    badgeClass: 'bg-slate-50 text-slate-600 border-slate-200',
   },
   {
     id: 'simple',
     label: 'シンプル',
     description: '丸みのあるやさしい印象のミニマルデザイン。清潔感と信頼感を両立。',
-    badgeClass: 'bg-blue-50 text-blue-500 border-blue-200',
   },
   {
     id: 'watercolor',
     label: '水彩画',
     description: '手書き風・柔らかなタッチ。親しみやすく温かみのある印象。',
-    badgeClass: 'bg-pink-50 text-pink-500 border-pink-200',
   },
   {
     id: 'pop',
     label: 'ポップ&フレンドリー',
     description: '鮮やかな多色使いとポップアート感。楽しくワクワクする初心者歓迎の印象。',
-    badgeClass: 'bg-orange-50 text-orange-500 border-orange-200',
   },
   {
     id: 'youtube',
     label: 'YouTube風',
     description: '人気YouTuberのサムネイル調。派手・インパクト重視で思わずクリックしたくなる印象。',
-    badgeClass: 'bg-red-50 text-red-500 border-red-200',
   },
   {
     id: 'pivot',
     label: 'PIVOT風',
     description: 'ビジネスインタビュー番組のトンマナ。深緑ベースで知的・上質な印象。',
-    badgeClass: 'bg-emerald-50 text-emerald-600 border-emerald-200',
   },
 ];
 
-// --- Reusable sub-components (from existing tools) ---
+// --- Curated article links ---
+interface ArticleLink {
+  title: string;
+  description: string;
+  author: string;
+  category: string;
+  url: string;
+}
+
+const MAGAZINE_ARTICLES: ArticleLink[] = [
+  {
+    title: '▼稼ぎ方実践講座「価格の決め方」',
+    description: 'ビジネスをやるときに悩むことランキング上位、いくらで売るか。',
+    author: '学長マガジンチャット',
+    category: '価格',
+    url: 'https://libecity.com/room_list?room_id=President-Tweet&comment_id=nxfgYlqV2Eb3Lh2YOhPS',
+  },
+  {
+    title: '嫌われない宣伝方法の話〜上手に宣伝し〜や〜〜',
+    description: '商品やサービスは作っただけじゃ売れへん！リベッターを活用した宣伝方法',
+    author: '学長マガジンチャット',
+    category: '宣伝',
+    url: 'https://libecity.com/room_list?room_id=President-Tweet&comment_id=ifrXKHuX4QbUTwkPSG7Y',
+  },
+];
+
+const KNOWHOW_ARTICLES: ArticleLink[] = [
+  {
+    title: '【無料で使える！】スキルマーケットOnline構造診断ツール',
+    description: '既に出している商品を「今後も出し続けるか、中身を見直すか」を判定してくれる診断ツール',
+    author: 'おれんじ🍊スプシで稼ぐチャット管理人',
+    category: '改善',
+    url: 'https://library.libecity.com/articles/01KE4E7JX9ZR77663JV9JDW77T',
+  },
+  {
+    title: '【売上120%UP】スキルマーケットで自分のサービスを改善する３つのポイント',
+    description: 'サービスを出してみたけど中々売れない…そんなときに見直すべき３つのポイントと判断基準',
+    author: 'みずの＠寄り添うWebデザイナー',
+    category: '改善',
+    url: 'https://library.libecity.com/articles/01HHE5SC4C5KE81R4AT2CZB25F',
+  },
+  {
+    title: "リベシティプロフィールを『あなたらしい』文章にするコツと例文をご紹介",
+    description: 'プロフィールに何を書けばいいか迷う方へ、項目ごとの書き方をご紹介',
+    author: 'ベリー号🚢採用支援×HPライター',
+    category: 'プロフィール',
+    url: 'https://library.libecity.com/articles/01HKR0A1C9G6NMTDXKC18QVRD2',
+  },
+  {
+    title: '信頼を貯めるリベプロフィールの書き方＊考え方を解説＊',
+    description: '認知されているのに依頼が来ない…信頼につながるプロフィールの考え方',
+    author: 'ベリー号🚢採用支援×HPライター',
+    category: 'プロフィール',
+    url: 'https://library.libecity.com/articles/01K1Z2F6Z0QPR83FPG558EP2PT',
+  },
+  {
+    title: '【デザイン苦手でも大丈夫！】"見られるサムネイル"の作り方',
+    description: 'Canva初心者さん向けに、出品用サムネイルの作り方を7ステップで解説',
+    author: 'まい＠戦略企画×クリエイター',
+    category: 'デザイン',
+    url: 'https://library.libecity.com/articles/01JY8232SXV4X9QHDSG3DW15H2',
+  },
+  {
+    title: '知ってもらわないとモノは売れない【人見知りさん必見！】oviceで認知活動',
+    description: '話しかけるのが苦手ならoviceで話しかけてもらえばいい！を実践した認知活動の記録',
+    author: 'パー子＠おしゃべりなお絵描き屋さん',
+    category: '宣伝',
+    url: 'https://library.libecity.com/articles/01JB6VCAG87W05WFBGMN27EP1V',
+  },
+];
+
+const SectionLabel: React.FC<{ label: string }> = ({ label }) => (
+  <div className="flex items-center gap-2.5 mb-4 px-1">
+    <span className="text-[10px] font-semibold text-stone-400 uppercase tracking-[0.2em]">{label}</span>
+    <span className="w-1 h-1 rounded-full bg-brand-300"></span>
+    <div className="h-px bg-stone-200 flex-grow"></div>
+  </div>
+);
+
+const ArticleList: React.FC<{ articles: ArticleLink[] }> = ({ articles }) => (
+  <div className="card overflow-hidden">
+    {articles.map((article, index) => (
+      <a
+        key={index}
+        href={article.url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className={`group flex items-start gap-4 px-5 py-4 transition-colors hover:bg-stone-50 ${
+          index !== articles.length - 1 ? 'border-b border-stone-100' : ''
+        }`}
+      >
+        <div className="flex-grow min-w-0">
+          <div className="flex items-center gap-2">
+            <h4 className="text-sm font-semibold text-stone-700 group-hover:text-stone-900 transition-colors leading-snug">{article.title}</h4>
+            <span className="shrink-0 text-[10px] font-medium text-stone-400 bg-stone-100 px-2 py-0.5 rounded-full">{article.category}</span>
+          </div>
+          <p className="text-xs text-stone-500 mt-1 truncate">{article.description}</p>
+          <p className="text-[11px] text-stone-400 mt-1">by {article.author}</p>
+        </div>
+        <span className="shrink-0 mt-1 text-stone-300 group-hover:text-brand-400 transition-colors text-xs" aria-hidden>↗</span>
+      </a>
+    ))}
+  </div>
+);
 
 const TweetCard: React.FC<{ text: string; index: number }> = ({ text, index }) => {
   const [copied, setCopied] = useState(false);
@@ -82,25 +176,25 @@ const TweetCard: React.FC<{ text: string; index: number }> = ({ text, index }) =
   const tweetUrl = `https://libecity.com/tweet/all?create=${encodeURIComponent(formattedText)}`;
 
   return (
-    <div className="bg-white rounded-2xl p-5 md:p-6 border border-stone-200 shadow-sm hover:shadow-md transition-all w-full group">
+    <div className="card p-5 md:p-6 w-full">
       <div className="flex justify-between items-center mb-4 pb-3 border-b border-stone-100">
-        <span className="bg-stone-100 text-stone-500 text-xs font-bold px-3 py-1 rounded-full border border-stone-200">
-          Pattern {index + 1}
+        <span className="text-xs font-semibold text-stone-400">
+          {String(index + 1).padStart(2, '0')}
         </span>
         <div className="flex items-center gap-2">
           <a href={tweetUrl} target="_blank" rel="noopener noreferrer"
-            className="text-xs font-bold px-4 py-2 rounded-full border border-sky-200 bg-sky-50 text-sky-600 hover:bg-sky-100 hover:border-sky-300 transition-all flex items-center gap-2 shadow-sm">
-            <span>🕊️</span> つぶやく
+            className="btn-secondary px-4 py-2 text-xs">
+            つぶやく
           </a>
           <button onClick={handleCopy}
-            className={`text-xs font-bold px-4 py-2 rounded-full border transition-all flex items-center gap-2 ${
-              copied ? 'bg-green-100 text-green-700 border-green-200' : 'bg-stone-800 text-white border-stone-800 hover:bg-stone-700 hover:border-stone-700 shadow-sm'
+            className={`text-xs font-semibold px-4 py-2 rounded-full transition-colors ${
+              copied ? 'bg-brand-50 text-brand-600' : 'bg-stone-900 text-white hover:bg-stone-700'
             }`}>
-            {copied ? <><span>✅</span> コピー済</> : <><span>📋</span> コピー</>}
+            {copied ? 'コピーしました' : 'コピー'}
           </button>
         </div>
       </div>
-      <div className="w-full bg-stone-50 rounded-xl p-4 text-sm md:text-base text-stone-700 leading-relaxed border border-stone-100 whitespace-pre-wrap select-text">
+      <div className="w-full bg-stone-50 rounded-xl p-4 text-sm md:text-base text-stone-700 leading-relaxed whitespace-pre-wrap select-text">
         {formattedText}
       </div>
     </div>
@@ -159,34 +253,34 @@ const CodeViewer: React.FC<{ pattern: SurveyPattern }> = ({ pattern }) => {
   };
   return (
     <div id="gas-code-section" className="mt-8 animate-in fade-in slide-in-from-bottom-4">
-      <div className="bg-stone-800 rounded-3xl p-6 md:p-8 text-white shadow-xl relative overflow-hidden">
+      <div className="bg-stone-900 rounded-2xl p-6 md:p-8 text-white">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
           <div>
-            <h3 className="text-xl font-bold text-white flex items-center gap-2"><span>📜</span> Google Apps Script (GAS)</h3>
+            <h3 className="text-lg font-bold text-white">Google Apps Script (GAS)</h3>
             <p className="text-stone-400 text-xs mt-1">以下のコードをコピーして実行すると、Googleフォームが自動生成されます。</p>
           </div>
-          <div className="flex flex-wrap gap-3">
+          <div className="flex flex-wrap gap-2">
             <button onClick={handleCopy}
-              className={`px-5 py-2 rounded-full text-xs font-bold transition-all flex items-center gap-2 ${copied ? 'bg-green-500 text-white' : 'bg-blue-500 hover:bg-blue-400 text-white'}`}>
-              {copied ? '✅ コピーしました' : '📋 コードをコピー'}
+              className={`px-5 py-2 rounded-full text-xs font-semibold transition-colors ${copied ? 'bg-brand-400/20 text-brand-200' : 'bg-white text-stone-900 hover:bg-stone-200'}`}>
+              {copied ? 'コピーしました' : 'コードをコピー'}
             </button>
             <a href="https://script.new" target="_blank" rel="noopener noreferrer"
-              className="bg-white/10 hover:bg-white/20 text-white border border-white/20 px-4 py-2 rounded-full text-xs font-bold transition-all flex items-center gap-2">
-              <span>🚀</span> GAS Editorを開く
+              className="bg-white/10 hover:bg-white/20 text-white border border-white/20 px-4 py-2 rounded-full text-xs font-semibold transition-colors">
+              GAS Editor を開く
             </a>
           </div>
         </div>
-        <pre className="bg-black/50 p-5 rounded-xl text-xs md:text-sm font-mono overflow-x-auto text-blue-100 border border-white/10 custom-scrollbar max-h-[400px]">
+        <pre className="bg-black/40 p-5 rounded-xl text-xs md:text-sm font-mono overflow-x-auto text-stone-200 custom-scrollbar max-h-[400px]">
           {code}
         </pre>
-        <div className="mt-6 bg-stone-700/80 rounded-xl p-6 border border-stone-500 shadow-inner">
-          <h4 className="font-bold text-lg text-white mb-3 flex items-center gap-2"><span>💡</span> 使い方ステップ</h4>
-          <ol className="text-sm md:text-base text-stone-200 space-y-3 list-decimal list-inside leading-relaxed">
-            <li>右上の<span className="text-yellow-300 font-bold border-b border-yellow-300/50">「GAS Editorを開く」</span>ボタンを押してエディタを開く</li>
-            <li>エディタにある既存のコードを消して、<span className="text-yellow-300 font-bold border-b border-yellow-300/50">コピーしたコードを貼り付け</span></li>
-            <li>上のバーにある「保存（💾）」を押し、関数「createSurveyForm」を選択して<span className="text-yellow-300 font-bold border-b border-yellow-300/50">「実行」</span></li>
+        <div className="mt-6 border-t border-white/10 pt-6">
+          <h4 className="font-semibold text-sm text-white mb-3">使い方</h4>
+          <ol className="text-sm text-stone-300 space-y-2 list-decimal list-inside leading-relaxed">
+            <li>右上の「GAS Editor を開く」ボタンを押してエディタを開く</li>
+            <li>エディタにある既存のコードを消して、コピーしたコードを貼り付け</li>
+            <li>上のバーにある「保存」を押し、関数「createSurveyForm」を選択して「実行」</li>
             <li>権限の確認画面が出たら「権限を確認」→「続行」で許可する</li>
-            <li>実行完了後、下の<span className="text-yellow-300 font-bold border-b border-yellow-300/50">「実行ログ」</span>にアンケートのURLが表示されます</li>
+            <li>実行完了後、下の「実行ログ」にアンケートのURLが表示されます</li>
           </ol>
         </div>
       </div>
@@ -195,34 +289,33 @@ const CodeViewer: React.FC<{ pattern: SurveyPattern }> = ({ pattern }) => {
 };
 
 const PatternCard: React.FC<{ pattern: SurveyPattern; isSelected: boolean; onSelect: () => void; headerRef: (el: HTMLDivElement | null) => void }> = ({ pattern, isSelected, onSelect, headerRef }) => {
-  const styles = pattern.id === 'A'
-    ? { accent: 'border-teal-200 bg-teal-50', icon: '🍃' }
-    : pattern.id === 'B'
-    ? { accent: 'border-blue-200 bg-blue-50', icon: '⚖️' }
-    : { accent: 'border-purple-200 bg-purple-50', icon: '📊' };
-
   return (
     <div onClick={onSelect}
-      className={`cursor-pointer rounded-2xl p-5 border-2 transition-all relative h-full flex flex-col ${
-        isSelected ? `${styles.accent} ring-2 ring-offset-2 ring-blue-400 shadow-md transform scale-[1.02]` : 'bg-white border-stone-100 hover:border-blue-200 hover:shadow-lg'
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onSelect(); }}
+      className={`cursor-pointer rounded-2xl p-5 border transition-all duration-200 relative h-full flex flex-col ${
+        isSelected ? 'bg-white border-brand-400 ring-2 ring-brand-100 shadow-card' : 'bg-white border-stone-200/80 hover:border-brand-200'
       }`}>
       <div ref={headerRef} data-role="card-header">
         <div className="flex justify-between items-start mb-3">
-          <span className="w-10 h-10 rounded-full flex items-center justify-center text-xl bg-white shadow-sm border border-stone-100">{styles.icon}</span>
-          {isSelected && <span className="bg-blue-500 text-white text-[10px] font-bold px-2 py-1 rounded-full animate-in zoom-in">SELECTED</span>}
+          <span className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold ${
+            isSelected ? 'bg-brand-500 text-white' : 'bg-stone-100 text-stone-500'
+          }`}>{pattern.id}</span>
+          {isSelected && <span className="text-[10px] font-semibold text-brand-600 bg-brand-50 px-2 py-1 rounded-full animate-in zoom-in">選択中</span>}
         </div>
-        <h3 className="font-bold text-stone-800 text-lg mb-1">{pattern.name}</h3>
-        <p className="text-xs text-stone-500 font-medium leading-relaxed mb-4">{pattern.description}</p>
+        <h3 className="font-bold text-stone-900 text-base mb-1">{pattern.name}</h3>
+        <p className="text-xs text-stone-500 leading-relaxed mb-4">{pattern.description}</p>
       </div>
-      <div className="space-y-3 pt-2 border-t border-stone-100">
-        <p className="text-[10px] font-bold text-stone-400 uppercase tracking-wider flex justify-between items-center mt-2">
-          <span>Questions List</span>
+      <div className="space-y-3 pt-3 border-t border-stone-100">
+        <p className="text-[10px] font-semibold text-stone-400 uppercase tracking-wider flex justify-between items-center">
+          <span>設問</span>
           <span className="bg-stone-100 px-2 py-0.5 rounded-full text-stone-500">{pattern.questions.length}問</span>
         </p>
         <ul className="text-xs text-stone-600 space-y-2">
           {pattern.questions.map((q, i) => (
             <li key={i} className="flex items-start gap-2">
-              <span className={`w-1.5 h-1.5 rounded-full mt-1.5 shrink-0 ${q.required ? 'bg-rose-400' : 'bg-stone-300'}`}></span>
+              <span className={`w-1.5 h-1.5 rounded-full mt-1.5 shrink-0 ${q.required ? 'bg-brand-400' : 'bg-stone-300'}`}></span>
               <span className="leading-relaxed">{q.title}</span>
             </li>
           ))}
@@ -230,21 +323,6 @@ const PatternCard: React.FC<{ pattern: SurveyPattern; isSelected: boolean; onSel
       </div>
     </div>
   );
-};
-
-// --- Icon background styles ---
-const iconBgStyles: Record<string, string> = {
-  orange: 'bg-orange-50 text-orange-600',
-  blue: 'bg-blue-50 text-blue-600',
-  green: 'bg-green-50 text-green-600',
-  purple: 'bg-purple-50 text-purple-600',
-};
-
-const badgeStyles: Record<string, string> = {
-  orange: 'bg-orange-50 text-orange-500 border-orange-200',
-  blue: 'bg-blue-50 text-blue-500 border-blue-200',
-  green: 'bg-green-50 text-green-500 border-green-200',
-  purple: 'bg-purple-50 text-purple-500 border-purple-200',
 };
 
 // --- Main Component ---
@@ -394,8 +472,6 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError 
       title: '宣伝文を作る',
       description: 'リベシティの文化に合う「前向き・丁寧・押しつけない」つぶやきを20本生成',
       icon: <MegaphoneIcon />,
-      themeColor: 'orange',
-      badge: 'Promoter',
       onRun: handleRunPromoter,
       extraInput: (
         <div className="flex-shrink-0 w-full md:w-auto">
@@ -403,7 +479,7 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError 
             type="text"
             value={serviceUrl}
             onChange={(e) => setServiceUrl(e.target.value)}
-            className="w-full md:w-64 px-3 py-2 rounded-lg border border-stone-200 bg-white text-sm focus:ring-2 focus:ring-orange-200 focus:border-orange-300 transition-all"
+            className="field w-full md:w-64 px-3 py-2 rounded-full bg-white text-sm"
             placeholder="サービスURL（任意）"
             disabled={!hasInput}
           />
@@ -415,8 +491,6 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError 
       title: 'アンケートを作る',
       description: '購入者の声を集めるGoogleフォームアンケートを自動作成',
       icon: <ClipboardListIcon />,
-      themeColor: 'blue',
-      badge: 'Survey',
       onRun: handleRunSurvey,
       extraInput: (
         <div className="flex-shrink-0 w-full md:w-auto">
@@ -424,7 +498,7 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError 
             type="text"
             value={priceHint}
             onChange={(e) => setPriceHint(e.target.value)}
-            className="w-full md:w-40 px-3 py-2 rounded-lg border border-stone-200 bg-white text-sm focus:ring-2 focus:ring-blue-200 focus:border-blue-300 transition-all"
+            className="field w-full md:w-40 px-3 py-2 rounded-full bg-white text-sm"
             placeholder="価格（任意）"
             disabled={!hasInput}
           />
@@ -434,10 +508,8 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError 
     {
       id: 'slidedoc' as MenuId,
       title: 'サービス資料を作る',
-      description: 'NotebookLM用のスライド作成プロンプトを生成（トンマナ5種から選択可）',
+      description: 'NotebookLM用のスライド作成プロンプトを生成（トンマナ7種から選択可）',
       icon: <PresentationIcon />,
-      themeColor: 'green',
-      badge: 'Slides',
       onRun: handleRunSlideDoc,
       extraInput: null,
     },
@@ -451,79 +523,62 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError 
 
         {/* Header */}
         <div className="mb-8">
-          <span className="text-purple-500 font-bold tracking-wider text-xs uppercase mb-1 block">Support Tools</span>
-          <h2 className="text-2xl md:text-3xl font-bold text-stone-800 tracking-tight">サポートメニュー</h2>
+          <span className="eyebrow mb-1 block">Support</span>
+          <h2 className="text-xl md:text-2xl font-bold text-stone-900 tracking-tight">サポートメニュー</h2>
           <p className="text-stone-500 text-sm mt-2">サービス詳細を入力すると、各メニューが実行できます。</p>
         </div>
 
         {/* Shared Input */}
         <div className="mb-8">
-          <label className="font-bold text-stone-700 block mb-2 flex justify-between items-end">
+          <label className="font-semibold text-stone-700 text-sm mb-2 flex justify-between items-end">
             <span>出品サービスページ本文</span>
             <span className="text-xs text-stone-400 font-normal">Creatorで作った「サービス詳細」などを貼り付け</span>
           </label>
           <textarea
             value={serviceBody}
             onChange={(e) => setServiceBody(e.target.value)}
-            className="w-full p-5 rounded-2xl border border-stone-200 bg-white/70 backdrop-blur-sm focus:ring-2 focus:ring-purple-200 focus:border-purple-300 min-h-[180px] shadow-inner text-base leading-relaxed transition-all"
-            placeholder="ここにサービス説明文を貼り付けてください..."
+            className="field w-full p-5 min-h-[180px] text-base leading-relaxed"
+            placeholder="ここにサービス説明文を貼り付けてください…"
           />
           {hasInput && (
-            <p className="text-xs text-green-600 mt-2 font-medium animate-in fade-in">入力済み - 以下のメニューを実行できます</p>
+            <p className="text-xs text-emerald-600 mt-2 font-medium animate-in fade-in">入力済み — 以下のメニューを実行できます</p>
           )}
         </div>
 
         {/* Menu List */}
         <div className="mb-8">
-          <div className="flex items-center gap-2.5 mb-4 px-1">
-            <span className="text-[10px] font-bold text-stone-400 uppercase tracking-[0.2em]">メニュー一覧</span>
-            <span className="w-1 h-1 rounded-full bg-stone-300"></span>
-            <div className="h-px bg-gradient-to-r from-stone-200 to-transparent flex-grow"></div>
-          </div>
+          <SectionLabel label="メニュー" />
 
-          <div className="bg-white border border-stone-100 ring-1 ring-black/[0.04] rounded-2xl overflow-hidden shadow-sm">
+          <div className="card overflow-hidden">
             {supportMenus.map((menu, index) => (
               <div
                 key={menu.id}
-                className={`transition-all duration-200 ${!hasInput ? 'opacity-50' : ''} ${index !== supportMenus.length - 1 ? 'border-b border-stone-100' : ''}`}
+                className={`transition-opacity duration-200 ${!hasInput ? 'opacity-50' : ''} ${index !== supportMenus.length - 1 ? 'border-b border-stone-100' : ''}`}
               >
                 <div className="flex flex-col md:flex-row items-start md:items-center gap-4 px-5 py-4">
-                  {/* Icon + Text */}
                   <div className="flex items-center gap-4 flex-grow min-w-0">
-                    <div className={`shrink-0 flex items-center justify-center w-10 h-10 rounded-xl transition-colors ${iconBgStyles[menu.themeColor]}`}>
+                    <div className="shrink-0 flex items-center justify-center w-10 h-10 rounded-xl bg-stone-100 text-stone-600">
                       <div className="scale-90">{menu.icon}</div>
                     </div>
                     <div className="flex-grow min-w-0">
                       <div className="flex items-center gap-2">
-                        <h4 className="text-sm font-bold text-stone-800 tracking-tight">{menu.title}</h4>
-                        <span className={`text-[9px] font-bold tracking-wider uppercase px-1.5 py-0.5 rounded border ${badgeStyles[menu.themeColor]}`}>
-                          {menu.badge}
-                        </span>
+                        <h4 className="text-sm font-semibold text-stone-900">{menu.title}</h4>
                         {activeMenu === menu.id && hasResults && (
-                          <span className="text-[9px] font-bold text-green-600 bg-green-50 px-1.5 py-0.5 rounded border border-green-200">済</span>
+                          <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full">実行済み</span>
                         )}
                       </div>
                       <p className="text-xs text-stone-400 mt-0.5 truncate">{menu.description}</p>
                     </div>
                   </div>
 
-                  {/* Extra Input + Run Button */}
                   <div className="flex items-center gap-3 w-full md:w-auto">
                     {menu.extraInput}
                     <button
                       onClick={menu.onRun}
                       disabled={!hasInput || isLoading}
-                      className={`shrink-0 px-5 py-2 rounded-full text-xs font-bold transition-all flex items-center gap-2 ${
-                        hasInput && !isLoading
-                          ? 'bg-stone-800 text-white hover:bg-stone-700 shadow-sm active:scale-95'
-                          : 'bg-stone-200 text-stone-400 cursor-not-allowed'
-                      }`}
+                      className="btn-dark shrink-0 px-5 py-2 text-xs"
                     >
-                      {loadingMenu === menu.id ? (
-                        <><span className="animate-spin">⏳</span> 生成中...</>
-                      ) : (
-                        '実行'
-                      )}
+                      {loadingMenu === menu.id ? '生成中…' : '実行'}
                     </button>
                   </div>
                 </div>
@@ -535,22 +590,16 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError 
         {/* Results Area */}
         {hasResults && (
           <div ref={resultRef} className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <div className="flex items-center gap-2.5 mb-4 px-1">
-              <span className="text-[10px] font-bold text-stone-400 uppercase tracking-[0.2em]">結果</span>
-              <span className="w-1 h-1 rounded-full bg-stone-300"></span>
-              <div className="h-px bg-gradient-to-r from-stone-200 to-transparent flex-grow"></div>
-            </div>
+            <SectionLabel label="結果" />
 
             {/* Promoter Results */}
             {activeMenu === 'promoter' && posts.length > 0 && (
               <div>
-                <div className="flex justify-between items-center mb-6">
-                  <div>
-                    <h3 className="text-xl font-bold text-stone-800">生成されたつぶやき ({posts.length}本)</h3>
-                    <p className="text-xs text-stone-500 mt-1">気に入ったものをコピー、または直接つぶやいてください。</p>
-                  </div>
+                <div className="mb-6">
+                  <h3 className="text-lg font-bold text-stone-900">生成されたつぶやき ({posts.length}本)</h3>
+                  <p className="text-xs text-stone-500 mt-1">気に入ったものをコピー、または直接つぶやいてください。</p>
                 </div>
-                <div className="space-y-6 pb-12">
+                <div className="space-y-5 pb-12">
                   {posts.map((post, idx) => (
                     <TweetCard key={idx} text={post} index={idx} />
                   ))}
@@ -562,36 +611,31 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError 
             {activeMenu === 'slidedoc' && (
               <div>
                 <div className="mb-6">
-                  <h3 className="text-xl font-bold text-stone-800">スライド資料プロンプト (5パターン)</h3>
+                  <h3 className="text-lg font-bold text-stone-900">スライド資料プロンプト ({SLIDE_DOC_VERSIONS.length}パターン)</h3>
                   <p className="text-xs text-stone-500 mt-1">お好みのトンマナをコピーし、NotebookLM のスライド作成カスタマイズ欄に貼り付けてください。</p>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start mb-8">
-                  {SLIDE_DOC_VERSIONS.map(({ id, label, description, badgeClass }) => {
+                  {SLIDE_DOC_VERSIONS.map(({ id, label, description }) => {
                     const isCopied = copiedSlideDocVersion === id;
                     const isMyStyle = id === 'my_style';
                     return (
                       <div
                         key={id}
-                        className={`bg-white border border-stone-100 rounded-2xl p-5 shadow-soft hover:shadow-card-hover transition-all duration-300 ease-smooth ${
-                          isMyStyle ? 'md:col-span-2' : ''
-                        }`}
+                        className={`card p-5 ${isMyStyle ? 'md:col-span-2' : ''}`}
                       >
                         <div className="flex items-center justify-between gap-3 mb-2">
-                          <div className="flex items-center gap-2 flex-wrap min-w-0">
-                            <span className={`shrink-0 text-[10px] font-bold tracking-widest uppercase px-2 py-0.5 rounded border ${badgeClass}`}>{id}</span>
-                            <h4 className="text-sm font-bold text-stone-700">{label}</h4>
-                          </div>
+                          <h4 className="text-sm font-semibold text-stone-900">{label}</h4>
                           <button
                             type="button"
                             onClick={() => handleCopySlideDocPrompt(id)}
-                            className={`text-xs font-bold px-4 py-1.5 rounded-full border transition-all shrink-0 ${
+                            className={`text-xs font-semibold px-4 py-1.5 rounded-full transition-colors shrink-0 ${
                               isCopied
-                                ? 'bg-green-100 text-green-700 border-green-200'
-                                : 'bg-stone-800 text-white hover:bg-stone-700 shadow-sm border-transparent'
+                                ? 'bg-brand-50 text-brand-600'
+                                : 'bg-stone-900 text-white hover:bg-stone-700'
                             }`}
                           >
-                            {isCopied ? '✅ コピー済' : '📋 コピー'}
+                            {isCopied ? 'コピーしました' : 'コピー'}
                           </button>
                         </div>
                         <p className="text-xs text-stone-500 leading-relaxed">{description}</p>
@@ -601,18 +645,16 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError 
                 </div>
 
                 {/* Usage guide */}
-                <div className="bg-purple-50/70 border border-purple-200 rounded-2xl p-5 mb-12">
-                  <h4 className="text-sm font-bold text-purple-900 mb-3 flex items-center gap-2">
-                    <span>📘</span> スライド生成から画像化までの手順
-                  </h4>
-                  <ol className="text-xs text-purple-800 space-y-2 list-decimal list-inside leading-relaxed mb-4">
+                <div className="bg-stone-50 border border-stone-200/80 rounded-2xl p-6 mb-12">
+                  <h4 className="text-sm font-bold text-stone-900 mb-3">スライド生成から画像化までの手順</h4>
+                  <ol className="text-xs text-stone-600 space-y-2 list-decimal list-inside leading-relaxed mb-4">
                     <li>「NotebookLM を開く」ボタンから新規ノートブックを作成</li>
-                    <li>「ソース」にサービス詳細文章を追加(必要に応じてキャラアイコン画像も添付)</li>
+                    <li>「ソース」にサービス詳細文章を追加（必要に応じてキャラアイコン画像も添付）</li>
                     <li>「スタジオ」→「スライド作成」→ カスタマイズ欄にコピーしたプロンプトを貼り付け</li>
-                    <li>生成を実行してスライドを確認し、<span className="font-bold">PDF形式でダウンロード</span></li>
+                    <li>生成を実行してスライドを確認し、<span className="font-semibold">PDF形式でダウンロード</span></li>
                     <li>「I Love PDF を開く」ボタンから PDF→JPG のページに移動し、ダウンロードした PDF をアップロード</li>
-                    <li>「ページを抽出」→ 変換を実行 → 各スライドを JPG 化した ZIP ファイルがダウンロードされます(解凍すると 1 枚ずつの画像になります)</li>
-                    <li>このあとは、<span className="font-bold">スキルマーケットのサービス画像に追加</span>しましょう 🎉</li>
+                    <li>「ページを抽出」→ 変換を実行 → 各スライドを JPG 化した ZIP ファイルがダウンロードされます（解凍すると 1 枚ずつの画像になります）</li>
+                    <li>このあとは、<span className="font-semibold">スキルマーケットのサービス画像に追加</span>しましょう</li>
                   </ol>
                   <div className="flex gap-2 flex-wrap">
                     <a
@@ -624,17 +666,17 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError 
                         // PWAに吸われず、必ずブラウザの新しいタブで開く
                         window.open('https://notebooklm.google.com/new', '_blank', 'noopener,noreferrer');
                       }}
-                      className="inline-flex items-center gap-1.5 text-xs font-bold text-purple-700 hover:text-purple-900 bg-white border border-purple-200 px-4 py-2 rounded-full shadow-sm hover:shadow transition-all"
+                      className="btn-dark px-4 py-2 text-xs"
                     >
-                      <span>📘</span> NotebookLM を開く
+                      NotebookLM を開く
                     </a>
                     <a
                       href="https://www.ilovepdf.com/ja/pdf_to_jpg"
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 text-xs font-bold text-purple-700 hover:text-purple-900 bg-white border border-purple-200 px-4 py-2 rounded-full shadow-sm hover:shadow transition-all"
+                      className="btn-secondary px-4 py-2 text-xs"
                     >
-                      <span>🖼️</span> I Love PDF を開く
+                      I Love PDF を開く
                     </a>
                   </div>
                 </div>
@@ -645,10 +687,10 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError 
             {activeMenu === 'survey' && patterns.length > 0 && (
               <div>
                 <div className="mb-6">
-                  <h3 className="text-xl font-bold text-stone-800">アンケート構成案 (3パターン)</h3>
+                  <h3 className="text-lg font-bold text-stone-900">アンケート構成案 (3パターン)</h3>
                   <p className="text-xs text-stone-500 mt-1">目的に合うパターンを選んで、Googleフォーム作成コードを発行してください。</p>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8 items-stretch">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8 items-stretch">
                   {patterns.map((pattern, index) => (
                     <PatternCard
                       key={pattern.id}
@@ -663,13 +705,9 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError 
                   <button
                     onClick={handleGenerateCode}
                     disabled={!selectedPattern}
-                    className={`font-bold py-4 px-12 rounded-full shadow-xl transition-all flex items-center gap-2 transform ${
-                      selectedPattern
-                        ? 'bg-gradient-to-r from-stone-800 to-stone-700 text-white hover:scale-105 hover:shadow-2xl cursor-pointer'
-                        : 'bg-stone-200 text-stone-400 cursor-not-allowed grayscale'
-                    }`}
+                    className="btn-primary text-sm py-3.5 px-10"
                   >
-                    <span>💻</span> この構成でコードを生成する
+                    この構成でコードを生成する
                   </button>
                 </div>
                 {showCode && selectedPattern && <CodeViewer pattern={selectedPattern} />}
@@ -679,144 +717,14 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError 
           </div>
         )}
 
-        {/* 学長マガジンチャット */}
         <div className="mb-8">
-          <div className="flex items-center gap-2.5 mb-4 px-1">
-            <span className="text-[10px] font-bold text-stone-400 uppercase tracking-[0.2em]">学長マガジンチャット</span>
-            <span className="w-1 h-1 rounded-full bg-stone-300"></span>
-            <div className="h-px bg-gradient-to-r from-stone-200 to-transparent flex-grow"></div>
-          </div>
-
-          <div className="bg-white border border-stone-100 ring-1 ring-black/[0.04] rounded-2xl overflow-hidden shadow-soft">
-            {[
-              {
-                title: '🦁▼稼ぎ方実践講座「価格の決め方」',
-                description: 'ビジネスをやるときに悩むことランキング上位、いくらで売るか。',
-                author: '学長マガジンチャット',
-                category: '価格',
-                url: 'https://libecity.com/room_list?room_id=President-Tweet&comment_id=nxfgYlqV2Eb3Lh2YOhPS',
-              },
-              {
-                title: '🦁嫌われない宣伝方法の話〜上手に宣伝し〜や〜〜',
-                description: '商品やサービスは作っただけじゃ売れへん！リベッターを活用した宣伝方法',
-                author: '学長マガジンチャット',
-                category: '宣伝',
-                url: 'https://libecity.com/room_list?room_id=President-Tweet&comment_id=ifrXKHuX4QbUTwkPSG7Y',
-              },
-            ].map((article, index, arr) => (
-              <a
-                key={index}
-                href={article.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={`group flex items-start gap-4 px-5 py-4 transition-colors hover:bg-stone-50 ${
-                  index !== arr.length - 1 ? 'border-b border-stone-100' : ''
-                }`}
-              >
-                <span className="shrink-0 mt-0.5 text-stone-300 text-sm">📄</span>
-                <div className="flex-grow min-w-0">
-                  <div className="flex items-center gap-2">
-                    <h4 className="text-sm font-bold text-stone-700 group-hover:text-stone-900 transition-colors leading-snug">{article.title}</h4>
-                    <span className={`shrink-0 text-[9px] font-bold tracking-wider px-1.5 py-0.5 rounded border ${
-                      ({ '価格': 'bg-amber-50 text-amber-500 border-amber-200',
-                         '宣伝': 'bg-orange-50 text-orange-500 border-orange-200',
-                         '改善': 'bg-green-50 text-green-500 border-green-200',
-                         'プロフィール': 'bg-blue-50 text-blue-500 border-blue-200',
-                         'デザイン': 'bg-purple-50 text-purple-500 border-purple-200',
-                      } as Record<string, string>)[article.category] || 'bg-stone-50 text-stone-400 border-stone-200'
-                    }`}>{article.category}</span>
-                  </div>
-                  <p className="text-xs text-stone-500 mt-1 truncate">{article.description}</p>
-                  <p className="text-[10px] text-stone-300 mt-1">by {article.author}</p>
-                </div>
-                <span className="shrink-0 mt-1 text-stone-300 group-hover:text-purple-400 transition-colors text-xs">↗</span>
-              </a>
-            ))}
-          </div>
+          <SectionLabel label="学長マガジンチャット" />
+          <ArticleList articles={MAGAZINE_ARTICLES} />
         </div>
 
-        {/* ノウハウ記事 */}
         <div className="mb-8">
-          <div className="flex items-center gap-2.5 mb-4 px-1">
-            <span className="text-[10px] font-bold text-stone-400 uppercase tracking-[0.2em]">ノウハウ記事</span>
-            <span className="w-1 h-1 rounded-full bg-stone-300"></span>
-            <div className="h-px bg-gradient-to-r from-stone-200 to-transparent flex-grow"></div>
-          </div>
-
-          <div className="bg-white border border-stone-100 ring-1 ring-black/[0.04] rounded-2xl overflow-hidden shadow-soft">
-            {[
-              {
-                title: '【無料で使える！】スキルマーケットOnline構造診断ツール',
-                description: '既に出している商品を「今後も出し続けるか、中身を見直すか」を判定してくれる診断ツール',
-                author: 'おれんじ🍊スプシで稼ぐチャット管理人',
-                category: '改善',
-                url: 'https://library.libecity.com/articles/01KE4E7JX9ZR77663JV9JDW77T',
-              },
-              {
-                title: '【売上120%UP】スキルマーケットで自分のサービスを改善する３つのポイント',
-                description: 'サービスを出してみたけど中々売れない…そんなときに見直すべき３つのポイントと判断基準',
-                author: 'みずの＠寄り添うWebデザイナー',
-                category: '改善',
-                url: 'https://library.libecity.com/articles/01HHE5SC4C5KE81R4AT2CZB25F',
-              },
-              {
-                title: "リベシティプロフィールを『あなたらしい』文章にするコツと例文をご紹介",
-                description: 'プロフィールに何を書けばいいか迷う方へ、項目ごとの書き方をご紹介',
-                author: 'ベリー号🚢採用支援×HPライター',
-                category: 'プロフィール',
-                url: 'https://library.libecity.com/articles/01HKR0A1C9G6NMTDXKC18QVRD2',
-              },
-              {
-                title: '信頼を貯めるリベプロフィールの書き方＊考え方を解説＊',
-                description: '認知されているのに依頼が来ない…信頼につながるプロフィールの考え方',
-                author: 'ベリー号🚢採用支援×HPライター',
-                category: 'プロフィール',
-                url: 'https://library.libecity.com/articles/01K1Z2F6Z0QPR83FPG558EP2PT',
-              },
-              {
-                title: '【デザイン苦手でも大丈夫！】"見られるサムネイル"の作り方',
-                description: 'Canva初心者さん向けに、出品用サムネイルの作り方を7ステップで解説',
-                author: 'まい＠戦略企画×クリエイター',
-                category: 'デザイン',
-                url: 'https://library.libecity.com/articles/01JY8232SXV4X9QHDSG3DW15H2',
-              },
-              {
-                title: '知ってもらわないとモノは売れない【人見知りさん必見！】oviceで認知活動',
-                description: '話しかけるのが苦手ならoviceで話しかけてもらえばいい！を実践した認知活動の記録',
-                author: 'パー子＠おしゃべりなお絵描き屋さん',
-                category: '宣伝',
-                url: 'https://library.libecity.com/articles/01JB6VCAG87W05WFBGMN27EP1V',
-              },
-            ].map((article, index, arr) => (
-              <a
-                key={index}
-                href={article.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={`group flex items-start gap-4 px-5 py-4 transition-colors hover:bg-stone-50 ${
-                  index !== arr.length - 1 ? 'border-b border-stone-100' : ''
-                }`}
-              >
-                <span className="shrink-0 mt-0.5 text-stone-300 text-sm">📄</span>
-                <div className="flex-grow min-w-0">
-                  <div className="flex items-center gap-2">
-                    <h4 className="text-sm font-bold text-stone-700 group-hover:text-stone-900 transition-colors leading-snug">{article.title}</h4>
-                    <span className={`shrink-0 text-[9px] font-bold tracking-wider px-1.5 py-0.5 rounded border ${
-                      ({ '価格': 'bg-amber-50 text-amber-500 border-amber-200',
-                         '宣伝': 'bg-orange-50 text-orange-500 border-orange-200',
-                         '改善': 'bg-green-50 text-green-500 border-green-200',
-                         'プロフィール': 'bg-blue-50 text-blue-500 border-blue-200',
-                         'デザイン': 'bg-purple-50 text-purple-500 border-purple-200',
-                      } as Record<string, string>)[article.category] || 'bg-stone-50 text-stone-400 border-stone-200'
-                    }`}>{article.category}</span>
-                  </div>
-                  <p className="text-xs text-stone-500 mt-1 truncate">{article.description}</p>
-                  <p className="text-[10px] text-stone-300 mt-1">by {article.author}</p>
-                </div>
-                <span className="shrink-0 mt-1 text-stone-300 group-hover:text-purple-400 transition-colors text-xs">↗</span>
-              </a>
-            ))}
-          </div>
+          <SectionLabel label="ノウハウ記事" />
+          <ArticleList articles={KNOWHOW_ARTICLES} />
         </div>
       </div>
 
@@ -825,18 +733,11 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError 
         <LoadingOverlay
           message={loadingMenu === 'promoter'
             ? '困りごとに寄り添ってから、解決策をそっと添える形で。読んだ方が気持ちよく受け取れる文にしています。'
-            : 'アンケート設問構成を3パターン設計しています...'}
-          title={loadingMenu === 'promoter' ? '投稿のたたき台を20本用意しています' : 'アンケート設計中'}
+            : 'アンケート設問構成を3パターン設計しています…'}
+          title={loadingMenu === 'promoter' ? '投稿のたたき台を20本用意しています' : 'アンケートを設計しています'}
           sourceWords={inputWords}
         />
       )}
-
-      <style>{`
-        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #d6d3d1; border-radius: 10px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #a8a29e; }
-      `}</style>
     </div>
   );
 };

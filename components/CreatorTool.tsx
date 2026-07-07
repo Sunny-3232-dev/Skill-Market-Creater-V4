@@ -1,8 +1,7 @@
-
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { UserInput, SkillIdea, Step } from '../types';
-import { generateIdeas, generateServicePage, generateThumbnail } from '../services/geminiService';
+import { generateIdeas, generateServicePage } from '../services/geminiService';
 import { extractWords } from '../utils/textProcessing';
 import InputForm from './InputForm';
 import IdeaList from './IdeaList';
@@ -15,18 +14,18 @@ const STORAGE_KEY_INPUT = "skill_market_raw_input";
 interface CreatorToolProps {
   ensureKeySet: () => Promise<boolean>;
   onHandleApiError: (error: any) => void;
+  notify: (message: string, tone?: 'error' | 'info') => void;
 }
 
-const CreatorTool: React.FC<CreatorToolProps> = ({ ensureKeySet, onHandleApiError }) => {
+const CreatorTool: React.FC<CreatorToolProps> = ({ ensureKeySet, onHandleApiError, notify }) => {
   const [step, setStep] = useState<Step>(Step.INPUT);
   const [ideas, setIdeas] = useState<SkillIdea[]>([]);
   const [selectedIdea, setSelectedIdea] = useState<SkillIdea | null>(null);
   const [serviceText, setServiceText] = useState<string>("");
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [loadingMessage, setLoadingMessage] = useState<string>("");
-  const [loadingTitle, setLoadingTitle] = useState<string>("AIが思考中...");
+  const [loadingTitle, setLoadingTitle] = useState<string>("考えています…");
 
-  const [isHighQuality, setIsHighQuality] = useState<boolean>(false);
   const [showResetConfirm, setShowResetConfirm] = useState<boolean>(false);
   const [rawInputText, setRawInputText] = useState<string>("");
   const containerRef = useRef<HTMLDivElement>(null);
@@ -42,7 +41,7 @@ const CreatorTool: React.FC<CreatorToolProps> = ({ ensureKeySet, onHandleApiErro
     const savedIdeas = localStorage.getItem(STORAGE_KEY_IDEAS);
     const savedInput = localStorage.getItem(STORAGE_KEY_INPUT);
     if (savedInput) setRawInputText(savedInput);
-    
+
     if (savedIdeas) {
       try {
         const parsed = JSON.parse(savedIdeas);
@@ -66,7 +65,7 @@ const CreatorTool: React.FC<CreatorToolProps> = ({ ensureKeySet, onHandleApiErro
           const reducedData = data.map(item => ({ ...item, thumbnailUrl: undefined }));
           localStorage.setItem(STORAGE_KEY_IDEAS, JSON.stringify(reducedData));
           setIdeas(reducedData);
-          alert("ストレージ容量がいっぱいになったため、画像データを削除して保存しました。");
+          notify("保存容量の上限に達したため、画像データを除いて保存しました。");
         } catch (innerE) {
           console.error("Critical storage failure. Clearing ideas from storage.", innerE);
           localStorage.removeItem(STORAGE_KEY_IDEAS);
@@ -89,10 +88,10 @@ const CreatorTool: React.FC<CreatorToolProps> = ({ ensureKeySet, onHandleApiErro
     } catch (e) {
       console.warn("Failed to save raw input to storage", e);
     }
-    
+
     setIsLoading(true);
-    setLoadingTitle("AIが思考中...");
-    setLoadingMessage("あなたの情報を分析し、最適なアイデアを練り上げています...");
+    setLoadingTitle("アイデアを考えています");
+    setLoadingMessage("あなたの情報を分析し、最適なアイデアを練り上げています…");
     try {
       const result = await generateIdeas(input);
       setIdeas(result);
@@ -121,11 +120,11 @@ const CreatorTool: React.FC<CreatorToolProps> = ({ ensureKeySet, onHandleApiErro
     setStep(Step.GENERATING_DETAIL);
     setIsLoading(true);
     setLoadingTitle(`「${idea.title}」`);
-    setLoadingMessage("このアイデアの出品ページを構成しています...");
-    
+    setLoadingMessage("このアイデアの出品ページを構成しています…");
+
     try {
       const pageText = await generateServicePage(idea);
-      const updatedIdeas = ideas.map(i => 
+      const updatedIdeas = ideas.map(i =>
         i.id === idea.id ? { ...i, generatedContent: pageText } : i
       );
       setIdeas(updatedIdeas);
@@ -141,47 +140,18 @@ const CreatorTool: React.FC<CreatorToolProps> = ({ ensureKeySet, onHandleApiErro
     }
   };
 
+  // 削除確認はIdeaList側の2段階クリックで行う
   const handleDeleteIdea = (e: React.MouseEvent, ideaId: string) => {
     e.stopPropagation();
-    if (confirm("このアイデアを削除しますか？")) {
-      const updatedIdeas = ideas.filter(i => i.id !== ideaId);
-      setIdeas(updatedIdeas);
-      saveIdeasToStorage(updatedIdeas);
-    }
-  };
-
-  const handleGenerateThumbnailImage = async (forceQuality?: boolean) => {
-    if (!selectedIdea) return;
-    const useQuality = forceQuality ?? isHighQuality;
-
-    if (useQuality) {
-      const keyReady = await ensureKeySet();
-      if (!keyReady) return;
-    }
-    
-    setIsLoading(true);
-    setLoadingTitle("サムネイル生成中...");
-    setLoadingMessage("サービスに最適な画像を生成しています...");
-
-    try {
-      const imageUrl = await generateThumbnail(selectedIdea, useQuality);
-      const updatedIdeas = ideas.map(i => 
-        i.id === selectedIdea.id ? { ...i, thumbnailUrl: imageUrl } : i
-      );
-      setIdeas(updatedIdeas);
-      saveIdeasToStorage(updatedIdeas);
-      setSelectedIdea(prev => prev ? ({ ...prev, thumbnailUrl: imageUrl }) : null);
-    } catch (error: any) {
-      onHandleApiError(error);
-    } finally {
-      setIsLoading(false);
-    }
+    const updatedIdeas = ideas.filter(i => i.id !== ideaId);
+    setIdeas(updatedIdeas);
+    saveIdeasToStorage(updatedIdeas);
   };
 
   const forceReset = () => {
     localStorage.removeItem(STORAGE_KEY_IDEAS);
     localStorage.removeItem(STORAGE_KEY_INPUT);
-    
+
     setIdeas([]);
     setRawInputText("");
     setStep(Step.INPUT);
@@ -193,11 +163,11 @@ const CreatorTool: React.FC<CreatorToolProps> = ({ ensureKeySet, onHandleApiErro
 
   return (
     <>
-      <div ref={containerRef} className="relative h-full flex flex-col overflow-y-auto">
+      <div ref={containerRef} className="relative h-full flex flex-col overflow-y-auto custom-scrollbar">
           {step === Step.INPUT && (
             <>
                <div className="px-6 md:px-10 lg:px-12 pt-6">
-                 <button onClick={() => setShowResetConfirm(true)} className="text-xs text-stone-400 hover:text-rose-500 underline decoration-stone-200">
+                 <button onClick={() => setShowResetConfirm(true)} className="text-xs text-stone-400 hover:text-brand-500 underline decoration-stone-200 underline-offset-2 transition-colors">
                     履歴を消去してリセット
                  </button>
                </div>
@@ -205,48 +175,39 @@ const CreatorTool: React.FC<CreatorToolProps> = ({ ensureKeySet, onHandleApiErro
             </>
           )}
           {step === Step.IDEAS && (
-            <IdeaList 
-              ideas={ideas} 
-              onSelect={handleSelectIdea} 
+            <IdeaList
+              ideas={ideas}
+              onSelect={handleSelectIdea}
               onDelete={handleDeleteIdea}
               onBack={forceReset}
             />
           )}
           {step === Step.DETAIL && selectedIdea && (
-            <ServiceResult 
+            <ServiceResult
               idea={selectedIdea}
-              content={serviceText} 
-              thumbnailUrl={selectedIdea?.thumbnailUrl}
-              onGenerateImage={() => handleGenerateThumbnailImage()}
-              isHighQuality={isHighQuality}
-              setIsHighQuality={setIsHighQuality}
-              onReset={() => setShowResetConfirm(true)}
+              content={serviceText}
               onBack={() => setStep(Step.IDEAS)}
             />
           )}
       </div>
 
       {showResetConfirm && createPortal(
-        <div className="fixed inset-0 bg-stone-900/70 backdrop-blur-md z-[9999] flex items-start sm:items-center justify-center p-4 pt-16 sm:pt-4 overflow-y-auto">
-          <div className="bg-white rounded-[2rem] md:rounded-[3rem] p-8 md:p-12 max-w-md w-full shadow-2xl border border-white flex flex-col items-center text-center my-auto">
-            <div className="w-20 h-20 bg-rose-50 text-rose-500 rounded-3xl flex items-center justify-center text-4xl mb-8 shadow-inner">
-              🗑️
-            </div>
-            <h3 className="text-2xl font-black text-stone-800 mb-4 tracking-tight">最初からやり直しますか？</h3>
-            <p className="text-stone-500 mb-10 leading-relaxed font-medium">
-              Creatorツールの全てのデータ（履歴・画像）を消去して初期状態に戻しますか？<br/>
-              <span className="text-rose-500 text-sm font-bold mt-2 inline-block">※この操作は取り消せません。</span>
+        <div className="fixed inset-0 bg-stone-900/50 backdrop-blur-sm z-[9999] flex items-start sm:items-center justify-center p-4 pt-16 sm:pt-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl p-8 md:p-10 max-w-sm w-full shadow-card-hover border border-stone-200/60 flex flex-col items-center text-center my-auto animate-in fade-in zoom-in-95 duration-300">
+            <h3 className="text-lg font-bold text-stone-900 mb-3 tracking-tight">最初からやり直しますか？</h3>
+            <p className="text-stone-500 text-sm mb-8 leading-relaxed">
+              Creatorツールの全てのデータ（履歴・画像）を消去して初期状態に戻します。この操作は取り消せません。
             </p>
-            <div className="flex flex-col gap-4 w-full">
+            <div className="flex flex-col gap-3 w-full">
               <button
                 onClick={forceReset}
-                className="w-full py-4.5 px-6 rounded-2xl font-bold text-white bg-gradient-to-r from-rose-500 to-rose-600 hover:from-rose-600 hover:to-rose-700 transition-all shadow-xl shadow-rose-200 active:scale-95"
+                className="btn-dark w-full py-3.5 px-6 text-sm"
               >
-                はい、データを消去
+                データを消去する
               </button>
               <button
                 onClick={() => setShowResetConfirm(false)}
-                className="w-full py-4 px-6 rounded-2xl font-bold text-stone-500 bg-stone-100 hover:bg-stone-200 transition-colors"
+                className="btn-quiet w-full py-3.5 px-6 text-sm"
               >
                 キャンセル
               </button>

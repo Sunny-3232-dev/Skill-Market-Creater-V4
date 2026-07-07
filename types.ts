@@ -1,4 +1,3 @@
-
 export interface UserInput {
   rawText: string;
 }
@@ -20,13 +19,10 @@ export enum Step {
   DETAIL = 'DETAIL'
 }
 
-// Creator Pro Additions
 export enum ToolType {
   TOP = 'TOP',
   CREATOR = 'CREATOR',
-  SUPPORT = 'SUPPORT',
-  PROMOTER = 'PROMOTER',
-  SURVEY = 'SURVEY'
+  SUPPORT = 'SUPPORT'
 }
 
 // Survey Tool Types
@@ -50,5 +46,4 @@ export interface SurveyPattern {
 }
 
 // Thumbnail Prompt Version
-// my_style / youtube / pivot 追加
 export type ThumbnailPromptVersion = 'standard' | 'simple' | 'watercolor' | 'pop' | 'my_style' | 'youtube' | 'pivot';

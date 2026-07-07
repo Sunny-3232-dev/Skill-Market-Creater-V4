@@ -1,0 +1,187 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+/* ============================================================
+   Skill Market Creator Pro — Design Tokens
+   詳細ルールは DESIGN_SYSTEM.md を参照
+   ============================================================ */
+
+@theme {
+  --font-sans: 'Inter', 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN',
+    'Hiragino Sans', Meiryo, sans-serif;
+
+  /* ブランドカラー（rose系。単色アクセントとして使用） */
+  --color-brand-50: #fff1f2;
+  --color-brand-100: #ffe4e6;
+  --color-brand-200: #fecdd3;
+  --color-brand-300: #fda4af;
+  --color-brand-400: #fb7185;
+  --color-brand-500: #f43f5e;
+  --color-brand-600: #e11d48;
+  --color-brand-700: #be123c;
+
+  /* 影 */
+  --shadow-soft: 0 1px 2px rgba(15, 23, 42, 0.04), 0 0 0 1px rgba(15, 23, 42, 0.03);
+  --shadow-card: 0 4px 16px -4px rgba(15, 23, 42, 0.06);
+  --shadow-card-hover: 0 12px 32px -12px rgba(15, 23, 42, 0.14);
+  --shadow-brand: 0 8px 24px -8px rgba(244, 63, 94, 0.35);
+
+  --ease-smooth: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* ブランドグラデーション（トークン本体） */
+:root {
+  --gradient-brand: linear-gradient(to right, #fb923c, #f43f5e, #9333ea); /* orange-400 → rose-500 → purple-600 */
+  --gradient-brand-soft: linear-gradient(to bottom right, #fff7ed, #fff1f2); /* orange-50 → rose-50 */
+}
+
+/* ============================================================
+   コンポーネントクラス
+   ============================================================ */
+
+@layer components {
+  /* --- ボタン --- */
+  /* 共通の基底スタイル（各バリアントに直接適用） */
+  .btn-primary,
+  .btn-dark,
+  .btn-secondary,
+  .btn-quiet {
+    @apply inline-flex items-center justify-center gap-2 font-semibold rounded-full
+      transition-all duration-300 ease-smooth whitespace-nowrap cursor-pointer;
+  }
+
+  /* Primary: 画面内で最重要のアクション1つだけに使う（ブランドグラデーション） */
+  .btn-primary {
+    @apply text-white shadow-brand hover:-translate-y-0.5 hover:brightness-105
+      active:translate-y-0 active:scale-[0.99];
+    background-image: var(--gradient-brand);
+  }
+
+  /* Dark: 中量級のアクション（実行・コピー等の実務ボタン） */
+  .btn-dark {
+    @apply bg-stone-900 text-white hover:bg-stone-700;
+  }
+
+  /* Secondary: 白地ピル。ホバーでブランド色がにじむ */
+  .btn-secondary {
+    @apply bg-white text-stone-600 border border-stone-200
+      hover:border-brand-200 hover:text-brand-600;
+  }
+
+  /* Quiet: 控えめなグレー面ボタン（キャンセル等） */
+  .btn-quiet {
+    @apply bg-stone-100 text-stone-500 hover:bg-stone-200;
+  }
+
+  /* Disabled 共通（disabled属性に反応） */
+  .btn-primary:disabled,
+  .btn-dark:disabled,
+  .btn-secondary:disabled,
+  .btn-quiet:disabled {
+    @apply bg-stone-100 text-stone-400 cursor-not-allowed shadow-none
+      hover:translate-y-0 hover:brightness-100 border-transparent;
+    background-image: none;
+  }
+
+  /* --- テキスト --- */
+  /* ブランドグラデーション文字（ワードマーク・ヒーロー見出し専用） */
+  .text-brand-gradient {
+    @apply bg-clip-text text-transparent;
+    background-image: var(--gradient-brand);
+  }
+
+  /* セクションのアイラベル（STEP 1 等） */
+  .eyebrow {
+    @apply text-brand-500 font-semibold tracking-widest text-[11px] uppercase;
+  }
+
+  /* --- 面 --- */
+  .card,
+  .card-hoverable {
+    @apply bg-white border border-stone-200/80 rounded-2xl;
+  }
+  .card-hoverable {
+    @apply transition-all duration-300 ease-smooth
+      hover:border-brand-200 hover:shadow-card-hover;
+  }
+
+  /* --- 選択チップ（トグル・絞り込み） --- */
+  .chip {
+    @apply rounded-full text-xs font-semibold transition-colors cursor-pointer
+      bg-white text-stone-500 border border-stone-200 hover:border-brand-300 hover:text-brand-600;
+  }
+  .chip-active {
+    @apply rounded-full text-xs font-semibold transition-colors cursor-pointer
+      bg-brand-500 text-white border border-transparent;
+  }
+
+  /* --- 入力欄 --- */
+  .field {
+    @apply bg-stone-50 border border-stone-200 rounded-2xl outline-none transition-colors
+      focus:bg-white focus:border-brand-300 focus:ring-2 focus:ring-brand-100
+      placeholder:text-stone-400;
+  }
+}
+
+/* ============================================================
+   ベーススタイル
+   ============================================================ */
+
+body {
+  background-color: #fafaf9; /* stone-50 */
+  /* ブランドの空気: 上部にほんのり桃色がにじむ背景 */
+  background-image:
+    radial-gradient(at 50% 0%, rgba(251, 146, 60, 0.08) 0, transparent 50%),
+    radial-gradient(at 100% 0%, rgba(244, 63, 94, 0.08) 0, transparent 50%);
+  background-repeat: no-repeat;
+  /* 日本語の詰め組み・ラテン文字のアンチエイリアス */
+  font-feature-settings: "palt" 1, "pkna" 1;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* キーボード操作時のフォーカス表示 */
+:focus-visible {
+  outline: 2px solid rgb(244 63 94 / 0.5); /* brand-500 */
+  outline-offset: 3px;
+  border-radius: 8px;
+}
+
+/* カスタムスクロールバー */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #e7e5e4; /* stone-200 */
+  border-radius: 10px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #d6d3d1; /* stone-300 */
+}
+
+/* ローディング中の入力語の浮遊表示 */
+@keyframes floatFade {
+  0% {
+    transform: translate(0, 32px);
+    opacity: 0;
+  }
+  20% {
+    opacity: 0.5;
+  }
+  80% {
+    opacity: 0.5;
+  }
+  100% {
+    transform: translate(12px, -96px);
+    opacity: 0;
+  }
+}
+.animate-float-fade {
+  animation-name: floatFade;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+}
