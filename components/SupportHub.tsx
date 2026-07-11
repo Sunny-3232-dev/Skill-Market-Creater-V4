@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
-import { generatePromotion, generateSurveyPatterns, getSlideDocPrompt, fetchServiceFromUrl } from '../services/geminiService';
+import { generatePromotion, generateSurveyPatterns, getSlideDocPrompt } from '../services/geminiService';
 import { extractWords } from '../utils/textProcessing';
 import { SkillIdea, SurveyPattern, SurveyQuestionDef, ThumbnailPromptVersion } from '../types';
 import { MegaphoneIcon, ClipboardListIcon, PresentationIcon, SparkleIcon } from './icons';
@@ -112,6 +112,17 @@ const extractPriceFromBody = (content: string): string => {
   return '';
 };
 
+// URLからサービスIDを取り出す（/services/35369 → 35369）
+const serviceIdFromUrl = (url: string): string => url.match(/services\/(\d+)/)?.[1] ?? '';
+
+// 貼り付けた本文の先頭行からサービス名を推定する（自動取得できない代わり）
+const deriveTitle = (body: string, url: string): string => {
+  const firstLine = body.split('\n').map(l => l.trim()).find(l => l.length > 0);
+  if (firstLine) return firstLine.length > 40 ? `${firstLine.slice(0, 40)}…` : firstLine;
+  const sid = serviceIdFromUrl(url);
+  return sid ? `サービス #${sid}` : 'サービス';
+};
+
 interface PersistedState {
   serviceBody: string;
   activeMenu: MenuId | null;
@@ -163,8 +174,6 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
   );
   const [selectedServiceId, setSelectedServiceId] = useState<string | null>(init.selectedServiceId ?? null);
   const [registerUrl, setRegisterUrl] = useState('');
-  const [isFetchingUrl, setIsFetchingUrl] = useState(false);
-  const [refetchingId, setRefetchingId] = useState<string | null>(null);
 
   const [copiedSlideDocVersion, setCopiedSlideDocVersion] = useState<ThumbnailPromptVersion | null>(null);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
@@ -296,44 +305,43 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
     }
   };
 
-  // 出品済みサービスのURLを取得して登録し、本文欄にセットする
-  const handleRegisterUrl = async () => {
+  // 出品済みサービスをURLで登録する（本文はページを開いて貼り付ける運用）。
+  // ※skill.libecity.com はGoogleのクローラをログインへ弾くため自動取得は不可。
+  //   URLは「ページを開く」と宣伝文へのリンク添付に使う。
+  const handleRegisterUrl = () => {
     const url = registerUrl.trim();
     if (!url) return;
     if (!SKILL_URL_PATTERN.test(url)) {
       notify('スキルマーケットの出品ページURL（https://skill.libecity.com/services/…）を入力してください。', 'error');
       return;
     }
-    const isUpdate = registeredServices.some(sv => sv.url === url);
-    if (!isUpdate && registeredServices.length >= MAX_REGISTERED_SERVICES) {
+    // 既に登録済みなら、それを選択するだけ
+    const existing = registeredServices.find(sv => sv.url === url);
+    if (existing) {
+      setSelectedServiceId(existing.id);
+      setServiceBody(existing.content);
+      setRegisterUrl('');
+      notify(`登録済みの「${existing.title}」を選択しました。`);
+      return;
+    }
+    if (registeredServices.length >= MAX_REGISTERED_SERVICES) {
       notify(`登録できるのは最大${MAX_REGISTERED_SERVICES}件です。不要なサービスを削除してから登録してください。`, 'error');
       return;
     }
-    const keyReady = await ensureKeySet();
-    if (!keyReady) return;
-
-    setIsFetchingUrl(true);
-    try {
-      const fetched = await fetchServiceFromUrl(url);
-      const service: RegisteredService = {
-        id: crypto.randomUUID(),
-        url,
-        title: fetched.title,
-        content: fetched.content,
-        fetchedAt: new Date().toISOString(),
-      };
-      // 同じURLは上書き（再取得扱い）
-      setRegisteredServices(prev => [service, ...prev.filter(sv => sv.url !== url)]);
-      // 登録したサービスをそのまま選択状態にする
-      setSelectedServiceId(service.id);
-      setServiceBody(fetched.content);
-      setRegisterUrl('');
-      notify(`「${fetched.title}」を登録して選択しました（口コミ込み）。`);
-    } catch (error) {
-      onHandleApiError(error);
-    } finally {
-      setIsFetchingUrl(false);
-    }
+    const sid = serviceIdFromUrl(url);
+    const service: RegisteredService = {
+      id: crypto.randomUUID(),
+      url,
+      title: sid ? `サービス #${sid}` : 'サービス',
+      content: '',
+      fetchedAt: new Date().toISOString(),
+    };
+    setRegisteredServices(prev => [service, ...prev]);
+    setSelectedServiceId(service.id);
+    setServiceBody('');
+    setRegisterUrl('');
+    notify('登録しました。「ページを開く」で本文をコピーし、下の「対象の本文」に貼り付けてください。');
+    setTimeout(() => document.getElementById('support-body')?.focus(), 50);
   };
 
   // サービスカードをクリックして「対象」を切り替える
@@ -343,22 +351,15 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
     notify(`「${sv.title}」を選択しました。`);
   };
 
-  // 口コミが増えたとき等にページを再取得して内容を更新する
-  const handleRefetchService = async (sv: RegisteredService) => {
-    const keyReady = await ensureKeySet();
-    if (!keyReady) return;
-    setRefetchingId(sv.id);
-    try {
-      const fetched = await fetchServiceFromUrl(sv.url);
-      setRegisteredServices(prev => prev.map(x =>
-        x.id === sv.id ? { ...x, title: fetched.title, content: fetched.content, fetchedAt: new Date().toISOString() } : x
+  // 本文の編集。サービスを選択中なら、その本文として保存し、タイトルも先頭行から更新する
+  const handleBodyChange = (val: string) => {
+    setServiceBody(val);
+    if (selectedServiceId) {
+      setRegisteredServices(prev => prev.map(sv =>
+        sv.id === selectedServiceId
+          ? { ...sv, content: val, title: deriveTitle(val, sv.url) }
+          : sv
       ));
-      if (selectedServiceId === sv.id) setServiceBody(fetched.content);
-      notify(`「${fetched.title}」を最新の内容に更新しました。`);
-    } catch (error) {
-      onHandleApiError(error);
-    } finally {
-      setRefetchingId(null);
     }
   };
 
@@ -520,7 +521,7 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
             <div className="flex flex-wrap justify-between items-center gap-2 mb-2">
               <label htmlFor="register-url" className="text-sm font-semibold text-stone-700">
                 出品済みサービスをURLで登録
-                <span className="text-xs text-stone-400 font-normal ml-2">口コミも含めて自動で読み込みます</span>
+                <span className="text-xs text-stone-400 font-normal ml-2">ページを開いて本文を貼り付けると各メニューで使えます</span>
               </label>
               <span className={`text-xs font-semibold ${registeredServices.length >= MAX_REGISTERED_SERVICES ? 'text-brand-600' : 'text-stone-400'}`}>
                 {registeredServices.length}/{MAX_REGISTERED_SERVICES}件
@@ -535,15 +536,14 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
                 onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleRegisterUrl(); } }}
                 placeholder="https://skill.libecity.com/services/…"
                 className="field flex-grow px-4 py-2.5 text-sm rounded-full bg-white"
-                disabled={isFetchingUrl}
               />
               <button
                 type="button"
                 onClick={handleRegisterUrl}
-                disabled={isFetchingUrl || !registerUrl.trim()}
+                disabled={!registerUrl.trim()}
                 className="btn-dark px-5 py-2.5 text-xs shrink-0"
               >
-                {isFetchingUrl ? '取得中…（10秒ほど）' : '取得して登録'}
+                登録する
               </button>
             </div>
 
@@ -553,7 +553,6 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                   {registeredServices.map(sv => {
                     const isSelected = selectedServiceId === sv.id;
-                    const isRefetching = refetchingId === sv.id;
                     return (
                       <div
                         key={sv.id}
@@ -575,9 +574,11 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
                         </span>
                         <div className="flex-grow min-w-0">
                           <p className="text-sm font-semibold text-stone-800 truncate" title={sv.title}>{sv.title}</p>
-                          <p className="text-[11px] text-stone-400">
-                            {new Date(sv.fetchedAt).toLocaleDateString('ja-JP')} 取得
-                          </p>
+                          {sv.content.trim() ? (
+                            <p className="text-[11px] text-emerald-600 font-medium">本文あり</p>
+                          ) : (
+                            <p className="text-[11px] text-brand-500 font-medium">本文 未貼り付け</p>
+                          )}
                         </div>
                         <a
                           href={sv.url}
@@ -585,19 +586,10 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
                           rel="noopener noreferrer"
                           onClick={(e) => e.stopPropagation()}
                           className="shrink-0 chip px-2.5 py-1 text-[10px] inline-flex items-center gap-1"
-                          title="このサービスの出品ページを新しいタブで開く"
+                          title="このサービスの出品ページを新しいタブで開く（本文をコピーして貼り付け）"
                         >
                           ページを開く<span aria-hidden>↗</span>
                         </a>
-                        <button
-                          type="button"
-                          onClick={(e) => { e.stopPropagation(); handleRefetchService(sv); }}
-                          disabled={isRefetching}
-                          className="shrink-0 chip px-2.5 py-1 text-[10px]"
-                          title="ページを再取得して口コミ等を最新化"
-                        >
-                          {isRefetching ? '更新中…' : '再取得'}
-                        </button>
                         <button
                           type="button"
                           onClick={(e) => { e.stopPropagation(); handleRemoveRegistered(sv.id); }}
@@ -619,14 +611,14 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
         <div className="mb-8">
           <label htmlFor="support-body" className="font-semibold text-stone-700 text-sm block mb-2">
             対象の本文
-            <span className="text-xs text-stone-400 font-normal ml-2">選択したサービスの内容が入ります（直接貼り付け・編集も可）</span>
+            <span className="text-xs text-stone-400 font-normal ml-2">出品ページを開いて本文をコピー → ここに貼り付け（口コミも一緒に貼るとGood）</span>
           </label>
           <textarea
             id="support-body"
             value={serviceBody}
-            onChange={(e) => setServiceBody(e.target.value)}
+            onChange={(e) => handleBodyChange(e.target.value)}
             className="field w-full p-5 min-h-[180px] text-base leading-relaxed"
-            placeholder="上でサービスを選択するか、ここにサービス説明文を直接貼り付けてください…"
+            placeholder="出品ページの本文をコピーして、ここに貼り付けてください。&#10;（上でサービスを登録している場合は「ページを開く」から本文をコピーできます）"
           />
           {hasInput && (
             <p className="text-xs text-emerald-600 mt-2 font-medium animate-in fade-in">
