@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
-import { generatePromotion, generateSurveyPatterns, getSlideDocPrompt } from '../services/geminiService';
+import { generatePromotion, generateSurveyPatterns, getSlideDocPrompt, extractServiceTitle } from '../services/geminiService';
 import { extractWords } from '../utils/textProcessing';
 import { SkillIdea, SurveyPattern, SurveyQuestionDef, ThumbnailPromptVersion } from '../types';
 import { MegaphoneIcon, ClipboardListIcon, PresentationIcon, SparkleIcon } from './icons';
@@ -174,6 +174,7 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
   );
   const [selectedServiceId, setSelectedServiceId] = useState<string | null>(init.selectedServiceId ?? null);
   const [registerUrl, setRegisterUrl] = useState('');
+  const [isRegisteringBody, setIsRegisteringBody] = useState(false);
 
   const [copiedSlideDocVersion, setCopiedSlideDocVersion] = useState<ThumbnailPromptVersion | null>(null);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
@@ -361,15 +362,27 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
     }
   };
 
-  // 貼り付けた本文からサービス名を認識し、カード（ラジオボタンの右）に確定表示する
-  const handleRegisterBody = () => {
+  // 貼り付けた本文からGeminiでサービス名を認識し、カード（ラジオボタンの右）に確定表示する
+  const handleRegisterBody = async () => {
     if (!selectedServiceId || !serviceBody.trim()) return;
     const sv = registeredServices.find(s => s.id === selectedServiceId);
-    const title = deriveTitle(serviceBody, sv?.url ?? '');
-    setRegisteredServices(prev => prev.map(s =>
-      s.id === selectedServiceId ? { ...s, content: serviceBody, title } : s
-    ));
-    notify(`「${title}」として登録しました。`);
+    const keyReady = await ensureKeySet();
+    if (!keyReady) return;
+
+    setIsRegisteringBody(true);
+    try {
+      // ページ取得ではなく手元の本文を読むだけなので確実。失敗時は先頭行にフォールバック
+      const recognized = await extractServiceTitle(serviceBody);
+      const title = recognized || deriveTitle(serviceBody, sv?.url ?? '');
+      setRegisteredServices(prev => prev.map(s =>
+        s.id === selectedServiceId ? { ...s, content: serviceBody, title } : s
+      ));
+      notify(`「${title}」として登録しました。`);
+    } catch (error) {
+      onHandleApiError(error);
+    } finally {
+      setIsRegisteringBody(false);
+    }
   };
 
   const handleRemoveRegistered = (id: string) => {
@@ -634,16 +647,16 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
               <button
                 type="button"
                 onClick={handleRegisterBody}
-                disabled={!hasInput}
+                disabled={!hasInput || isRegisteringBody}
                 className="btn-dark px-5 py-2 text-xs shrink-0"
               >
-                登録する
+                {isRegisteringBody ? 'サービス名を認識中…' : '登録する'}
               </button>
             )}
             {hasInput && (
               <p className="text-xs text-emerald-600 font-medium animate-in fade-in">
                 {selectedServiceId
-                  ? '「登録する」でサービス名が確定します（下のメニューはすぐ実行できます）'
+                  ? '「登録する」でAIがサービス名を認識します（下のメニューはすぐ実行できます）'
                   : '入力済み — 下のメニューを実行できます'}
               </p>
             )}

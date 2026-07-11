@@ -475,6 +475,50 @@ ${text}
   }
 };
 
+// 貼り付けたサービス本文から「出品タイトル」を認識して返す。
+// ページ取得ではなく手元のテキストを読むだけなので確実に動く（失敗時は空文字）。
+export const extractServiceTitle = async (rawText: string): Promise<string> => {
+  const text = rawText?.trim();
+  if (!text) return '';
+  const apiKey = getApiKey();
+  const ai = new GoogleGenAI(apiKey ? { apiKey } : {});
+
+  const prompt = `
+以下は、リベシティ「スキルマーケットonline」の出品ページからコピーした本文です。
+このサービスの「出品タイトル（サービス名）」だけを抜き出してください。
+
+【ルール】
+- 本文中に実在するタイトル表記をそのまま返す（要約・言い換え・創作は禁止）。
+- 価格・説明文・口コミ・見出し記号（■など）はタイトルではない。
+- 見出しが複数ある場合は、サービスを最もよく表す一番上位の名称を選ぶ。
+- 前置き・引用符・記号の追加は不要。タイトルの文字列のみ。
+- 40文字を超える場合は、意味が通る範囲で先頭40文字までにする。
+
+【本文】
+${text.slice(0, 4000)}
+`;
+
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-3.5-flash',
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: { title: { type: Type.STRING } },
+          required: ['title'],
+        },
+      },
+    });
+    const parsed = JSON.parse(response.text || "{}");
+    const title = String(parsed?.title ?? '').trim();
+    return title.length > 40 ? title.slice(0, 40) : title;
+  } catch {
+    return '';
+  }
+};
+
 export const generateServicePage = async (selectedIdea: SkillIdea): Promise<string> => {
   const apiKey = getApiKey();
   // Google AI Studio ではセッションから自動的にキーが利用可能
