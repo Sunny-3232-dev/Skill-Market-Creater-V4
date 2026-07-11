@@ -21,7 +21,7 @@ interface ServiceChatEditorProps {
 
 const SUGGESTIONS = [
   'もっと親しみやすい文体にして',
-  'キャッチコピーをもっと短く',
+  'タイトルだけ別の案にして',
   '専門用語を減らして初心者向けに',
 ];
 
@@ -44,7 +44,8 @@ const ServiceChatEditor: React.FC<ServiceChatEditorProps> = ({
           <div>
             <h4 className="text-sm font-bold text-stone-900">AIに編集を依頼</h4>
             <p className="text-xs text-stone-500 mt-0.5 leading-relaxed">
-              「もっとカジュアルな文体に」など自由な言葉で伝えると、下のプレビュー全体を書き換えます。
+              「もっとカジュアルな文体に」「タイトルだけ変えて」など自由な言葉でOK。指示した箇所だけ書き換えます。
+              誤字などの細かい手直しは、各カードの「編集」ボタンからどうぞ。
             </p>
           </div>
         </div>

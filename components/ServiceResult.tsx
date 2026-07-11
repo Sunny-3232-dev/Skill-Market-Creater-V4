@@ -124,6 +124,27 @@ const parseServiceContent = (text: string) => {
   };
 };
 
+// 手動編集されたセクションから出品ページ本文を組み立て直す（parseServiceContentと往復可能な形式）
+interface ContentParts {
+  category: string; subCategory: string; title: string; catchphrase: string;
+  detail: string; policy: string; skills: string; template: string;
+}
+const reconstructContent = (parts: ContentParts): string => {
+  const headerLines = [
+    parts.category ? `カテゴリ：${parts.category}` : '',
+    parts.subCategory ? `サブカテゴリ：${parts.subCategory}` : '',
+    parts.title ? `タイトル：${parts.title}` : '',
+    parts.catchphrase ? `キャッチコピー：${parts.catchphrase}` : '',
+  ].filter(Boolean).join('\n');
+
+  let out = headerLines;
+  out += `\nサービス詳細（以下の構成と順序）\n${parts.detail}`;
+  if (parts.policy) out += `\n\n⚠️キャンセル時の注意事項\n${parts.policy}`;
+  if (parts.skills) out += `\n\n🎯出品者スキル\n${parts.skills}`;
+  if (parts.template) out += `\n\n📝依頼テンプレート\n${parts.template}`;
+  return out.trim();
+};
+
 const CopyButton: React.FC<{ copied: boolean; onClick: () => void; dark?: boolean }> = ({ copied, onClick, dark }) => (
   <button
     type="button"
@@ -140,22 +161,80 @@ const CopyButton: React.FC<{ copied: boolean; onClick: () => void; dark?: boolea
   </button>
 );
 
-const CopySection: React.FC<{ title: string; content: string }> = ({ title, content }) => {
+const EditButton: React.FC<{ onClick: () => void }> = ({ onClick }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    className="shrink-0 text-xs font-semibold px-4 py-1.5 rounded-full transition-colors bg-white text-stone-600 border border-stone-200 hover:border-brand-200 hover:text-brand-600"
+  >
+    編集
+  </button>
+);
+
+// コピーに加えて、その場での手動編集（textarea）に対応したセクションカード
+const CopySection: React.FC<{
+  title: string;
+  content: string;
+  onSave?: (newContent: string) => void;
+  minRows?: number;
+}> = ({ title, content, onSave, minRows = 3 }) => {
   const [copied, setCopied] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(content);
+
   const handleCopy = () => {
     navigator.clipboard.writeText(content).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     });
   };
+  const startEdit = () => { setValue(content); setEditing(true); };
+  const applyEdit = () => {
+    if (!value.trim()) return;
+    onSave?.(value.trim());
+    setEditing(false);
+  };
+
   if (!content) return null;
+  const rows = Math.min(16, Math.max(minRows, value.split('\n').length + 1));
+
   return (
     <div className="card p-5">
-      <div className="flex justify-between items-center mb-3">
+      <div className="flex justify-between items-center mb-3 gap-2">
         <h4 className="font-semibold text-stone-900 text-sm">{title}</h4>
-        <CopyButton copied={copied} onClick={handleCopy} />
+        <div className="flex items-center gap-2">
+          {editing ? (
+            <>
+              <button type="button" onClick={() => setEditing(false)} className="btn-quiet px-4 py-1.5 text-xs">キャンセル</button>
+              <button
+                type="button"
+                onClick={applyEdit}
+                disabled={!value.trim()}
+                className="btn-dark px-4 py-1.5 text-xs"
+              >
+                完了
+              </button>
+            </>
+          ) : (
+            <>
+              {onSave && <EditButton onClick={startEdit} />}
+              <CopyButton copied={copied} onClick={handleCopy} />
+            </>
+          )}
+        </div>
       </div>
-      <div className="bg-stone-50 rounded-xl p-4 text-stone-600 text-sm whitespace-pre-wrap leading-relaxed">{content}</div>
+      {editing ? (
+        <textarea
+          value={value}
+          rows={rows}
+          onChange={(e) => setValue(e.target.value)}
+          aria-label={`${title}を編集`}
+          className="field w-full p-4 text-sm leading-relaxed resize-y"
+          autoFocus
+        />
+      ) : (
+        <div className="bg-stone-50 rounded-xl p-4 text-stone-600 text-sm whitespace-pre-wrap leading-relaxed">{content}</div>
+      )}
     </div>
   );
 };
@@ -273,6 +352,12 @@ const ServiceResult: React.FC<ServiceResultProps> = ({ idea, content, onBack, on
   const [chatError, setChatError] = useState<string | null>(null);
   const [justSaved, setJustSaved] = useState(false);
 
+  // サービス詳細・カテゴリの手動編集state
+  const [editingDetail, setEditingDetail] = useState(false);
+  const [detailDraft, setDetailDraft] = useState('');
+  const [editingCategory, setEditingCategory] = useState(false);
+  const [categoryDraft, setCategoryDraft] = useState({ category: '', subCategory: '' });
+
   // 選択中のアイデアが変わったら下書き・チャット履歴をリセット
   useEffect(() => {
     setDraftContent(content);
@@ -280,6 +365,8 @@ const ServiceResult: React.FC<ServiceResultProps> = ({ idea, content, onBack, on
     setChatMessages([]);
     setChatError(null);
     setShowBackConfirm(false);
+    setEditingDetail(false);
+    setEditingCategory(false);
   }, [idea.id]);
 
   const isDirty = draftContent !== savedContent;
@@ -361,6 +448,21 @@ const ServiceResult: React.FC<ServiceResultProps> = ({ idea, content, onBack, on
       setCopiedVersion(version);
       setTimeout(() => setCopiedVersion(null), 2000);
     });
+  };
+
+  // 各カードの手動編集を本文（draft）へ反映する
+  const applySectionEdit = (patch: Partial<ContentParts>) => {
+    setDraftContent(reconstructContent({
+      category: parsed.category,
+      subCategory: parsed.subCategory,
+      title: parsed.title,
+      catchphrase: parsed.catchphrase,
+      detail: parsed.detail,
+      policy: parsed.policy,
+      skills: parsed.skills,
+      template: parsed.template,
+      ...patch,
+    }));
   };
 
   const handleSaveDraft = () => {
@@ -505,22 +607,99 @@ const ServiceResult: React.FC<ServiceResultProps> = ({ idea, content, onBack, on
         {/* Content Cards */}
         <div className="space-y-5">
           <div className="card p-5">
-            <h4 className="font-semibold text-stone-900 text-sm mb-3">カテゴリ・サブカテゴリ</h4>
-            <div className="bg-stone-50 rounded-xl p-4 text-sm flex items-center gap-3">
-              <span className="font-semibold text-stone-800">{parsed.category || '未設定'}</span>
-              <span className="text-stone-300">/</span>
-              <span className="text-stone-500">{parsed.subCategory || '未設定'}</span>
+            <div className="flex justify-between items-center mb-3 gap-2">
+              <h4 className="font-semibold text-stone-900 text-sm">カテゴリ・サブカテゴリ</h4>
+              {editingCategory ? (
+                <div className="flex items-center gap-2">
+                  <button type="button" onClick={() => setEditingCategory(false)} className="btn-quiet px-4 py-1.5 text-xs">キャンセル</button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!categoryDraft.category.trim()) return;
+                      applySectionEdit({ category: categoryDraft.category.trim(), subCategory: categoryDraft.subCategory.trim() });
+                      setEditingCategory(false);
+                    }}
+                    disabled={!categoryDraft.category.trim()}
+                    className="btn-dark px-4 py-1.5 text-xs"
+                  >
+                    完了
+                  </button>
+                </div>
+              ) : (
+                <EditButton onClick={() => { setCategoryDraft({ category: parsed.category, subCategory: parsed.subCategory }); setEditingCategory(true); }} />
+              )}
             </div>
+            {editingCategory ? (
+              <div className="flex flex-col sm:flex-row gap-2">
+                <input
+                  value={categoryDraft.category}
+                  onChange={(e) => setCategoryDraft(prev => ({ ...prev, category: e.target.value }))}
+                  aria-label="カテゴリを編集"
+                  placeholder="カテゴリ"
+                  className="field flex-1 px-4 py-2.5 text-sm"
+                  autoFocus
+                />
+                <input
+                  value={categoryDraft.subCategory}
+                  onChange={(e) => setCategoryDraft(prev => ({ ...prev, subCategory: e.target.value }))}
+                  aria-label="サブカテゴリを編集"
+                  placeholder="サブカテゴリ"
+                  className="field flex-1 px-4 py-2.5 text-sm"
+                />
+              </div>
+            ) : (
+              <div className="bg-stone-50 rounded-xl p-4 text-sm flex items-center gap-3">
+                <span className="font-semibold text-stone-800">{parsed.category || '未設定'}</span>
+                <span className="text-stone-300">/</span>
+                <span className="text-stone-500">{parsed.subCategory || '未設定'}</span>
+              </div>
+            )}
           </div>
-          <CopySection title="タイトル" content={parsed.title} />
-          <CopySection title="キャッチコピー" content={parsed.catchphrase} />
+          <CopySection title="タイトル" content={parsed.title} minRows={2} onSave={(v) => applySectionEdit({ title: v })} />
+          <CopySection title="キャッチコピー" content={parsed.catchphrase} minRows={2} onSave={(v) => applySectionEdit({ catchphrase: v })} />
 
           {/* サービス詳細 - 価格モードUIを埋め込んだカスタムカード */}
           <div className="card p-5">
-            <div className="flex justify-between items-center mb-3">
+            <div className="flex justify-between items-center mb-3 gap-2">
               <h4 className="font-semibold text-stone-900 text-sm">サービス詳細</h4>
-              <CopyButton copied={isDetailCopied} onClick={handleCopyDetail} />
+              <div className="flex items-center gap-2">
+                {editingDetail ? (
+                  <>
+                    <button type="button" onClick={() => setEditingDetail(false)} className="btn-quiet px-4 py-1.5 text-xs">キャンセル</button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!detailDraft.trim()) return;
+                        applySectionEdit({ detail: detailDraft.trim() });
+                        setEditingDetail(false);
+                      }}
+                      disabled={!detailDraft.trim()}
+                      className="btn-dark px-4 py-1.5 text-xs"
+                    >
+                      完了
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <EditButton onClick={() => { setDetailDraft(parsed.detail); setEditingDetail(true); }} />
+                    <CopyButton copied={isDetailCopied} onClick={handleCopyDetail} />
+                  </>
+                )}
+              </div>
             </div>
+            {editingDetail ? (
+              <>
+                <textarea
+                  value={detailDraft}
+                  rows={Math.min(28, Math.max(10, detailDraft.split('\n').length + 2))}
+                  onChange={(e) => setDetailDraft(e.target.value)}
+                  aria-label="サービス詳細を編集"
+                  className="field w-full p-4 text-sm leading-relaxed resize-y"
+                  autoFocus
+                />
+                <p className="text-[11px] text-stone-400 mt-1.5">「■ 標準価格」「■ モニター価格」の見出しを残しておくと、価格モードの切り替えが引き続き使えます。</p>
+              </>
+            ) : (
             <div className="bg-stone-50 rounded-xl p-4 text-stone-600 text-sm leading-relaxed">
               {parsed.hasMonitorPrice ? (
                 <>
@@ -592,11 +771,12 @@ const ServiceResult: React.FC<ServiceResultProps> = ({ idea, content, onBack, on
                 <div className="whitespace-pre-wrap">{parsed.detail}</div>
               )}
             </div>
+            )}
           </div>
 
-          <CopySection title="キャンセル時の注意事項" content={parsed.policy} />
-          <CopySection title="スキル" content={parsed.skills} />
-          <CopySection title="依頼テンプレート" content={parsed.template} />
+          <CopySection title="キャンセル時の注意事項" content={parsed.policy} onSave={(v) => applySectionEdit({ policy: v })} />
+          <CopySection title="スキル" content={parsed.skills} onSave={(v) => applySectionEdit({ skills: v })} />
+          <CopySection title="依頼テンプレート" content={parsed.template} onSave={(v) => applySectionEdit({ template: v })} />
 
           {/* Prompt Area */}
           <div className="bg-stone-50 border border-stone-200/80 rounded-2xl p-6 space-y-5">
