@@ -351,16 +351,25 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
     notify(`「${sv.title}」を選択しました。`);
   };
 
-  // 本文の編集。サービスを選択中なら、その本文として保存し、タイトルも先頭行から更新する
+  // 本文の編集。サービスを選択中なら本文として保存する（タイトルの確定は「登録する」で行う）
   const handleBodyChange = (val: string) => {
     setServiceBody(val);
     if (selectedServiceId) {
       setRegisteredServices(prev => prev.map(sv =>
-        sv.id === selectedServiceId
-          ? { ...sv, content: val, title: deriveTitle(val, sv.url) }
-          : sv
+        sv.id === selectedServiceId ? { ...sv, content: val } : sv
       ));
     }
+  };
+
+  // 貼り付けた本文からサービス名を認識し、カード（ラジオボタンの右）に確定表示する
+  const handleRegisterBody = () => {
+    if (!selectedServiceId || !serviceBody.trim()) return;
+    const sv = registeredServices.find(s => s.id === selectedServiceId);
+    const title = deriveTitle(serviceBody, sv?.url ?? '');
+    setRegisteredServices(prev => prev.map(s =>
+      s.id === selectedServiceId ? { ...s, content: serviceBody, title } : s
+    ));
+    notify(`「${title}」として登録しました。`);
   };
 
   const handleRemoveRegistered = (id: string) => {
@@ -541,9 +550,9 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
                 type="button"
                 onClick={handleRegisterUrl}
                 disabled={!registerUrl.trim()}
-                className="btn-dark px-5 py-2.5 text-xs shrink-0"
+                className="btn-secondary px-5 py-2.5 text-xs shrink-0"
               >
-                登録する
+                URLを追加
               </button>
             </div>
 
@@ -620,13 +629,25 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
             className="field w-full p-5 min-h-[180px] text-base leading-relaxed"
             placeholder="出品ページの本文をコピーして、ここに貼り付けてください。&#10;（上でサービスを登録している場合は「ページを開く」から本文をコピーできます）"
           />
-          {hasInput && (
-            <p className="text-xs text-emerald-600 mt-2 font-medium animate-in fade-in">
-              {selectedServiceId
-                ? `選択中: 「${registeredServices.find(sv => sv.id === selectedServiceId)?.title ?? ''}」 — 下のメニューを実行できます`
-                : '入力済み — 下のメニューを実行できます'}
-            </p>
-          )}
+          <div className="mt-3 flex flex-wrap items-center gap-3">
+            {selectedServiceId && (
+              <button
+                type="button"
+                onClick={handleRegisterBody}
+                disabled={!hasInput}
+                className="btn-dark px-5 py-2 text-xs shrink-0"
+              >
+                登録する
+              </button>
+            )}
+            {hasInput && (
+              <p className="text-xs text-emerald-600 font-medium animate-in fade-in">
+                {selectedServiceId
+                  ? '「登録する」でサービス名が確定します（下のメニューはすぐ実行できます）'
+                  : '入力済み — 下のメニューを実行できます'}
+              </p>
+            )}
+          </div>
         </div>
 
         {/* Menu List — この1入力で3つのAIメニューが動く、を強調 */}
