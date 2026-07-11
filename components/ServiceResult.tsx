@@ -367,11 +367,9 @@ const ServiceResult: React.FC<ServiceResultProps> = ({ idea, content, onBack, on
   const [chatError, setChatError] = useState<string | null>(null);
   const [justSaved, setJustSaved] = useState(false);
 
-  // サービス詳細・カテゴリの手動編集state
+  // サービス詳細の手動編集state
   const [editingDetail, setEditingDetail] = useState(false);
   const [detailDraft, setDetailDraft] = useState('');
-  const [editingCategory, setEditingCategory] = useState(false);
-  const [categoryDraft, setCategoryDraft] = useState({ category: '', subCategory: '' });
 
   // 選択中のアイデアが変わったら下書き・チャット履歴をリセット
   useEffect(() => {
@@ -381,7 +379,6 @@ const ServiceResult: React.FC<ServiceResultProps> = ({ idea, content, onBack, on
     setChatError(null);
     setShowBackConfirm(false);
     setEditingDetail(false);
-    setEditingCategory(false);
   }, [idea.id]);
 
   const isDirty = draftContent !== savedContent;
@@ -609,53 +606,12 @@ const ServiceResult: React.FC<ServiceResultProps> = ({ idea, content, onBack, on
         {/* Content Cards */}
         <div className="space-y-5">
           <div className="card p-5">
-            <div className="flex justify-between items-center mb-3 gap-2">
-              <h4 className="font-semibold text-stone-900 text-sm">カテゴリ・サブカテゴリ</h4>
-              {editingCategory ? (
-                <div className="flex items-center gap-2">
-                  <button type="button" onClick={() => setEditingCategory(false)} className="btn-quiet px-4 py-1.5 text-xs">キャンセル</button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (!categoryDraft.category.trim()) return;
-                      applySectionEdit({ category: categoryDraft.category.trim(), subCategory: categoryDraft.subCategory.trim() });
-                      setEditingCategory(false);
-                    }}
-                    disabled={!categoryDraft.category.trim()}
-                    className="btn-dark px-4 py-1.5 text-xs"
-                  >
-                    完了
-                  </button>
-                </div>
-              ) : (
-                <EditButton onClick={() => { setCategoryDraft({ category: parsed.category, subCategory: parsed.subCategory }); setEditingCategory(true); }} />
-              )}
+            <h4 className="font-semibold text-stone-900 text-sm mb-3">カテゴリ・サブカテゴリ</h4>
+            <div className="bg-stone-50 rounded-xl p-4 text-sm flex items-center gap-3">
+              <span className="font-semibold text-stone-800">{parsed.category || '未設定'}</span>
+              <span className="text-stone-300">/</span>
+              <span className="text-stone-500">{parsed.subCategory || '未設定'}</span>
             </div>
-            {editingCategory ? (
-              <div className="flex flex-col sm:flex-row gap-2">
-                <input
-                  value={categoryDraft.category}
-                  onChange={(e) => setCategoryDraft(prev => ({ ...prev, category: e.target.value }))}
-                  aria-label="カテゴリを編集"
-                  placeholder="カテゴリ"
-                  className="field flex-1 px-4 py-2.5 text-sm"
-                  autoFocus
-                />
-                <input
-                  value={categoryDraft.subCategory}
-                  onChange={(e) => setCategoryDraft(prev => ({ ...prev, subCategory: e.target.value }))}
-                  aria-label="サブカテゴリを編集"
-                  placeholder="サブカテゴリ"
-                  className="field flex-1 px-4 py-2.5 text-sm"
-                />
-              </div>
-            ) : (
-              <div className="bg-stone-50 rounded-xl p-4 text-sm flex items-center gap-3">
-                <span className="font-semibold text-stone-800">{parsed.category || '未設定'}</span>
-                <span className="text-stone-300">/</span>
-                <span className="text-stone-500">{parsed.subCategory || '未設定'}</span>
-              </div>
-            )}
           </div>
           <CopySection title="タイトル" content={parsed.title} minRows={2} onSave={(v) => applySectionEdit({ title: v })} />
           <CopySection title="キャッチコピー" content={parsed.catchphrase} minRows={2} onSave={(v) => applySectionEdit({ catchphrase: v })} />

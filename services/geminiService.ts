@@ -607,6 +607,113 @@ ${instruction}
   return { summary: summary || '変更を反映しました。', content };
 };
 
+// スキルマーケットの出品ページURLから、本文と口コミ全件を取得する。
+// ブラウザから直接fetchするとCORSでブロックされるため、GeminiのURL Contextツール
+// （Google側のサーバーがページを取得してモデルに渡す仕組み）を使う。
+// ※口コミはページのHTMLに全件埋め込まれているため「もっと見る」の操作は不要（検証済み）
+export interface FetchedService {
+  title: string;
+  content: string;
+}
+
+export const fetchServiceFromUrl = async (url: string): Promise<FetchedService> => {
+  const apiKey = getApiKey();
+  const ai = new GoogleGenAI(apiKey ? { apiKey } : {});
+
+  const prompt = `
+以下のURLは、リベシティ「スキルマーケットonline」の出品ページです。
+ページを読み、内容を次の形式で忠実に抽出して出力してください。
+要約・言い換え・省略はせず、原文をそのまま保持すること。前置きや説明は一切不要。
+
+URL: ${url}
+
+出力形式:
+タイトル：（サービスタイトル）
+価格：（表示されている価格。見つからなければこの行は省略）
+サービス本文：
+（出品説明の全文。改行も原文どおり）
+
+依頼した人の感想：
+（口コミを全件、「・(投稿日) 本文」の形式で列挙。1件もなければ「なし」とだけ書く）
+`;
+
+  const response = await ai.models.generateContent({
+    model: 'gemini-3.5-flash',
+    contents: prompt,
+    config: {
+      tools: [{ urlContext: {} }],
+    },
+  });
+
+  // ページ取得に失敗している場合はモデルの創作を防ぐためエラーにする
+  const meta: any = (response.candidates?.[0] as any)?.urlContextMetadata;
+  const status = meta?.urlMetadata?.[0]?.urlRetrievalStatus;
+  if (status && status !== 'URL_RETRIEVAL_STATUS_SUCCESS') {
+    throw new Error(`ページを取得できませんでした（${status}）`);
+  }
+
+  const text = (response.text || '').trim();
+  if (!text) throw new Error('ページの内容を読み取れませんでした');
+
+  const titleMatch = text.match(/^タイトル[：:]\s*(.+)$/m);
+  return {
+    title: titleMatch ? titleMatch[1].trim() : url,
+    content: text,
+  };
+};
+
+// 出品ページ本文（口コミ含む）を分析し、磨き上げた本文と改善ポイントを返す
+export interface PolishResult {
+  points: string;
+  revised: string;
+}
+
+export const polishService = async (serviceText: string): Promise<PolishResult> => {
+  const apiKey = getApiKey();
+  const ai = new GoogleGenAI(apiKey ? { apiKey } : {});
+
+  const prompt = `
+あなたはリベシティ「スキルマーケットonline」のプロの出品ページコンサルタントです。
+以下の【現在の出品ページ】を分析し、より成約につながる本文に磨き上げてください。
+
+【分析と改善の観点】
+・「依頼した人の感想」（口コミ）が含まれていれば、そこで実際に評価されている強み（対応の速さ・丁寧さ・仕上がり品質など）を「実績・信頼の証拠」として本文に自然に織り込む（口コミの原文引用や依頼者IDの記載はしない）
+・ターゲットの悩みへの共感 → 提供価値 → 信頼の根拠 → 行動喚起、の流れに整える
+・冗長な表現は圧縮し、あいまいな表現は具体的にする
+・煽り・誇大表現・断定は禁止。丁寧で前向きなトーンを維持する
+・見出しの絵文字スタイルなど、元の本文の雰囲気は踏襲する
+・マークダウンの書式（# や ** など）は一切使わない
+
+【現在の出品ページ】
+${serviceText}
+
+【出力形式（厳守。この2セクションのみを出力する）】
+【改善ポイント】
+（何をどう変えたか・なぜ効くのかを「・」始まりの箇条書きで3〜6個）
+【磨き上げた本文】
+（スキルマーケットの出品ページにそのまま貼れる完成本文の全文。口コミ一覧は含めない）
+`;
+
+  const response = await ai.models.generateContent({
+    model: 'gemini-3.5-flash',
+    contents: prompt,
+    config: {}
+  });
+
+  let text = (response.text || '')
+    .replace(/\*\*/g, '')
+    .replace(/^#+\s/gm, '');
+
+  const marker = '【磨き上げた本文】';
+  const idx = text.indexOf(marker);
+  if (idx === -1) {
+    return { points: '', revised: text.trim() };
+  }
+  const points = text.substring(0, idx).replace('【改善ポイント】', '').trim();
+  const revised = text.substring(idx + marker.length).trim();
+  return { points, revised };
+};
+
 export const generateThumbnail = async (idea: SkillIdea, useHighQuality: boolean = false): Promise<string> => {
   const apiKey = getApiKey();
   // Google AI Studio ではセッションから自動的にキーが利用可能

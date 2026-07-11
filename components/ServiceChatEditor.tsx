@@ -55,15 +55,34 @@ const TEMPLATE_GROUPS: Array<{ label: string; items: string[] }> = [
  * プレビューをスクロールしながらいつでも指示を出せる。
  * 「テンプレ」からありがちな指示を挿入、「履歴」で往復の記録を確認できる。
  */
+const COACH_KEY = 'skill_market_ai_edit_coach_v1';
+
 const ServiceChatEditor: React.FC<ServiceChatEditorProps> = ({
   messages, input, onInputChange, onSend, isLoading, error,
   isDirty, justSaved, onSave, onDiscard,
 }) => {
   const [showTemplates, setShowTemplates] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
+  const [showCoach, setShowCoach] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const historyEndRef = useRef<HTMLDivElement>(null);
   const autoOpenedRef = useRef(false); // 履歴が自動で開いたか（自動なら応答後に自動で畳む）
+
+  // 初回だけ「ここでAI編集できる」コーチマークを表示する（既読はlocalStorageで管理）
+  useEffect(() => {
+    try {
+      if (localStorage.getItem(COACH_KEY)) return;
+    } catch { return; }
+    const show = setTimeout(() => setShowCoach(true), 800);
+    const autoHide = setTimeout(() => dismissCoach(), 14000); // 放置されても14秒で畳む
+    return () => { clearTimeout(show); clearTimeout(autoHide); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const dismissCoach = () => {
+    setShowCoach(false);
+    try { localStorage.setItem(COACH_KEY, '1'); } catch { /* noop */ }
+  };
 
   // 送信したら履歴パネルを開き、応答が返ったら数秒見せてから自動で畳む。
   // ユーザーが「履歴」ボタンで開いた場合は畳まない。
@@ -94,11 +113,32 @@ const ServiceChatEditor: React.FC<ServiceChatEditorProps> = ({
     inputRef.current?.focus();
   };
 
+  const interact = () => { if (showCoach) dismissCoach(); };
+
   const hasHistory = messages.length > 0;
 
   return (
     <div className="fixed bottom-4 inset-x-0 z-40 px-4 pointer-events-none">
-      <div className="max-w-3xl mx-auto pointer-events-auto relative">
+      <div className="max-w-3xl mx-auto pointer-events-auto relative animate-in fade-in slide-in-from-bottom-4 duration-500">
+
+        {/* 初回コーチマーク */}
+        {showCoach && !showTemplates && !showHistory && (
+          <div className="absolute bottom-full left-2 mb-3 z-10 animate-in fade-in slide-in-from-bottom-2 duration-300">
+            <div className="relative bg-stone-900 text-white text-xs rounded-2xl px-4 py-3 shadow-card-hover max-w-[300px] leading-relaxed">
+              <button
+                type="button"
+                onClick={dismissCoach}
+                aria-label="ヒントを閉じる"
+                className="absolute top-1.5 right-2.5 text-stone-400 hover:text-white transition-colors"
+              >
+                ✕
+              </button>
+              <p className="font-bold pr-5">文章はここからAIで直せます</p>
+              <p className="text-stone-300 mt-1">「もっと親しみやすく」のように話しかけるだけ。定型文は「テンプレ」からどうぞ。</p>
+              <span className="absolute -bottom-1.5 left-8 w-3 h-3 bg-stone-900 rotate-45" aria-hidden></span>
+            </div>
+          </div>
+        )}
 
         {/* テンプレのポップオーバー */}
         {showTemplates && (
@@ -165,8 +205,15 @@ const ServiceChatEditor: React.FC<ServiceChatEditorProps> = ({
           )}
           <div className="flex items-center gap-2 flex-wrap">
             <div className="shrink-0 flex items-center gap-2" title="AIに編集を依頼">
-              <div className="w-9 h-9 rounded-xl bg-stone-900 text-white flex items-center justify-center" aria-hidden>
-                <SparkleIcon />
+              <div className="relative w-9 h-9" aria-hidden>
+                {showCoach && (
+                  <span className="absolute inset-0 rounded-xl bg-brand-400 opacity-40 animate-ping"></span>
+                )}
+                <div className="relative w-9 h-9 rounded-xl bg-stone-900 text-white flex items-center justify-center">
+                  <span className="animate-twinkle inline-flex">
+                    <SparkleIcon />
+                  </span>
+                </div>
               </div>
               <div className="hidden sm:block leading-tight pr-1">
                 <p className="text-xs font-bold text-stone-900">AI編集</p>
@@ -175,7 +222,7 @@ const ServiceChatEditor: React.FC<ServiceChatEditorProps> = ({
             </div>
             <button
               type="button"
-              onClick={() => { setShowTemplates(v => !v); setShowHistory(false); }}
+              onClick={() => { interact(); setShowTemplates(v => !v); setShowHistory(false); }}
               aria-pressed={showTemplates}
               className={`${showTemplates ? 'chip-active' : 'chip'} px-3 py-2 shrink-0`}
             >
@@ -184,7 +231,7 @@ const ServiceChatEditor: React.FC<ServiceChatEditorProps> = ({
             {hasHistory && (
               <button
                 type="button"
-                onClick={() => { setShowHistory(v => !v); setShowTemplates(false); autoOpenedRef.current = false; }}
+                onClick={() => { interact(); setShowHistory(v => !v); setShowTemplates(false); autoOpenedRef.current = false; }}
                 aria-pressed={showHistory}
                 className={`${showHistory ? 'chip-active' : 'chip'} px-3 py-2 shrink-0`}
               >
@@ -198,6 +245,7 @@ const ServiceChatEditor: React.FC<ServiceChatEditorProps> = ({
               <input
                 ref={inputRef}
                 value={input}
+                onFocus={interact}
                 onChange={(e) => onInputChange(e.target.value)}
                 placeholder="AIに編集を依頼（例: もっと親しみやすく／タイトルだけ変えて）"
                 aria-label="AIへの編集指示"

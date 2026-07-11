@@ -163,6 +163,27 @@ body {
   background: #d6d3d1; /* stone-300 */
 }
 
+/* AI編集バーのスパークルが時々きらめく（誘目・控えめ） */
+@keyframes sparkleTwinkle {
+  0%, 86%, 100% {
+    transform: none;
+  }
+  90% {
+    transform: scale(1.18) rotate(14deg);
+  }
+  94% {
+    transform: scale(0.94) rotate(-8deg);
+  }
+}
+.animate-twinkle {
+  animation: sparkleTwinkle 5s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-twinkle {
+    animation: none;
+  }
+}
+
 /* ローディング中の入力語の浮遊表示 */
 @keyframes floatFade {
   0% {
