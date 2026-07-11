@@ -677,58 +677,6 @@ URL: ${url}
   };
 };
 
-// 出品ページ本文（口コミ含む）を分析し、磨き上げた本文と改善ポイントを返す
-export interface PolishResult {
-  points: string;
-  revised: string;
-}
-
-export const polishService = async (serviceText: string): Promise<PolishResult> => {
-  const apiKey = getApiKey();
-  const ai = new GoogleGenAI(apiKey ? { apiKey } : {});
-
-  const prompt = `
-あなたはリベシティ「スキルマーケットonline」のプロの出品ページコンサルタントです。
-以下の【現在の出品ページ】を分析し、より成約につながる本文に磨き上げてください。
-
-【分析と改善の観点】
-・「依頼した人の感想」（口コミ）が含まれていれば、そこで実際に評価されている強み（対応の速さ・丁寧さ・仕上がり品質など）を「実績・信頼の証拠」として本文に自然に織り込む（口コミの原文引用や依頼者IDの記載はしない）
-・ターゲットの悩みへの共感 → 提供価値 → 信頼の根拠 → 行動喚起、の流れに整える
-・冗長な表現は圧縮し、あいまいな表現は具体的にする
-・煽り・誇大表現・断定は禁止。丁寧で前向きなトーンを維持する
-・見出しの絵文字スタイルなど、元の本文の雰囲気は踏襲する
-・マークダウンの書式（# や ** など）は一切使わない
-
-【現在の出品ページ】
-${serviceText}
-
-【出力形式（厳守。この2セクションのみを出力する）】
-【改善ポイント】
-（何をどう変えたか・なぜ効くのかを「・」始まりの箇条書きで3〜6個）
-【磨き上げた本文】
-（スキルマーケットの出品ページにそのまま貼れる完成本文の全文。口コミ一覧は含めない）
-`;
-
-  const response = await ai.models.generateContent({
-    model: 'gemini-3.5-flash',
-    contents: prompt,
-    config: {}
-  });
-
-  let text = (response.text || '')
-    .replace(/\*\*/g, '')
-    .replace(/^#+\s/gm, '');
-
-  const marker = '【磨き上げた本文】';
-  const idx = text.indexOf(marker);
-  if (idx === -1) {
-    return { points: '', revised: text.trim() };
-  }
-  const points = text.substring(0, idx).replace('【改善ポイント】', '').trim();
-  const revised = text.substring(idx + marker.length).trim();
-  return { points, revised };
-};
-
 export const generateThumbnail = async (idea: SkillIdea, useHighQuality: boolean = false): Promise<string> => {
   const apiKey = getApiKey();
   // Google AI Studio ではセッションから自動的にキーが利用可能
