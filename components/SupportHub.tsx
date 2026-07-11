@@ -64,6 +64,11 @@ const SLIDE_DOC_VERSIONS: Array<{
     label: 'PIVOT風',
     description: 'ビジネスインタビュー番組のトンマナ。深緑ベースで知的・上質な印象。',
   },
+  {
+    id: 'puffy_3d',
+    label: 'ぷっくり3D',
+    description: '粘土のようにぷっくり膨らんだ3D調。パステルカラーでやわらかく、思わず目を引く可愛い印象。',
+  },
 ];
 
 const SectionLabel: React.FC<{ label: string }> = ({ label }) => (

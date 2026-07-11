@@ -10,6 +10,7 @@ export interface SkillIdea {
   type: 'standard' | 'niche';
   generatedContent?: string;
   thumbnailUrl?: string;
+  pinned?: boolean;
 }
 
 export enum Step {

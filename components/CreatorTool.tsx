@@ -148,6 +148,25 @@ const CreatorTool: React.FC<CreatorToolProps> = ({ ensureKeySet, onHandleApiErro
     saveIdeasToStorage(updatedIdeas);
   };
 
+  const handleTogglePin = (e: React.MouseEvent, ideaId: string) => {
+    e.stopPropagation();
+    const updatedIdeas = ideas.map(i => i.id === ideaId ? { ...i, pinned: !i.pinned } : i);
+    setIdeas(updatedIdeas);
+    saveIdeasToStorage(updatedIdeas);
+  };
+
+  // Step 3のAI編集チャットで確定した内容を、選択中のアイデアに保存する
+  const handleSaveServiceContent = (newContent: string) => {
+    if (!selectedIdea) return;
+    const updatedIdeas = ideas.map(i =>
+      i.id === selectedIdea.id ? { ...i, generatedContent: newContent } : i
+    );
+    setIdeas(updatedIdeas);
+    saveIdeasToStorage(updatedIdeas);
+    setServiceText(newContent);
+    setSelectedIdea(prev => (prev ? { ...prev, generatedContent: newContent } : prev));
+  };
+
   const forceReset = () => {
     localStorage.removeItem(STORAGE_KEY_IDEAS);
     localStorage.removeItem(STORAGE_KEY_INPUT);
@@ -179,6 +198,7 @@ const CreatorTool: React.FC<CreatorToolProps> = ({ ensureKeySet, onHandleApiErro
               ideas={ideas}
               onSelect={handleSelectIdea}
               onDelete={handleDeleteIdea}
+              onTogglePin={handleTogglePin}
               onBack={forceReset}
             />
           )}
@@ -187,6 +207,9 @@ const CreatorTool: React.FC<CreatorToolProps> = ({ ensureKeySet, onHandleApiErro
               idea={selectedIdea}
               content={serviceText}
               onBack={() => setStep(Step.IDEAS)}
+              onSaveContent={handleSaveServiceContent}
+              ensureKeySet={ensureKeySet}
+              onHandleApiError={onHandleApiError}
             />
           )}
       </div>

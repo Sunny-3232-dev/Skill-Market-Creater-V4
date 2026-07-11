@@ -545,6 +545,68 @@ IT・プログラミング（作業自動化・効率化／Webアプリ／モバ
   return text;
 };
 
+export interface ServiceRevision {
+  summary: string;
+  content: string;
+}
+
+// 出品ページ本文を、ユーザーのチャット指示にもとづいてAIが編集する（Step 3の「AIに編集を依頼」機能）
+export const reviseServiceContent = async (
+  currentContent: string,
+  instruction: string
+): Promise<ServiceRevision> => {
+  const apiKey = getApiKey();
+  const ai = new GoogleGenAI(apiKey ? { apiKey } : {});
+
+  const prompt = `
+【役割】
+あなたは、リベシティ「スキルマーケットonline」の出品ページを編集するプロの編集者です。
+以下の【現在の出品ページ本文】を、【編集指示】の内容だけを反映して改稿してください。
+
+【編集ルール】
+・【編集指示】に関係のない箇所の文言・順序は変更しないこと。
+・見出し行（カテゴリ：／サブカテゴリ：／タイトル：／キャッチコピー：／サービス詳細（…）／💰価格の目安／■ 標準価格／■ モニター価格／🔚さいごに／⚠️キャンセル時の注意事項／🎯出品者スキル／📝依頼テンプレート）は、絵文字・記号・文言ともにそのまま維持し、削除・改変しないこと。
+・「💰価格の目安」ブロックがある場合、「■ 標準価格」→「■ モニター価格」の順・同じプラン構造は崩さないこと。編集指示が価格変更を求める場合のみ金額を変更してよい（モニター価格は標準価格のおよそ70%を目安に追随させる）。
+・タイトルは30文字以内、キャッチコピーは100文字以内を維持すること。
+・マークダウンの書式（# や ** など）は一切使わないこと。
+
+【現在の出品ページ本文】
+${currentContent}
+
+【編集指示】
+${instruction}
+
+【出力形式（厳守。この4行構成以外は出力しない）】
+【変更点サマリー】
+（今回の変更点を1〜2文で要約。絵文字は使わない）
+【本文】
+（編集後の出品ページ本文の全文。見出し構成は元の本文と同じにすること）
+`;
+
+  const response = await ai.models.generateContent({
+    model: 'gemini-3.5-flash',
+    contents: prompt,
+    config: {}
+  });
+
+  let text = response.text || "";
+  text = text
+    .replace(/\*\*/g, "")
+    .replace(/__/g, "")
+    .replace(/^#+\s/gm, "")
+    .replace(/`/g, "");
+
+  const marker = '【本文】';
+  const markerIdx = text.indexOf(marker);
+  if (markerIdx === -1) {
+    // 想定外の形式で返ってきた場合は全文を本文として扱う（フォールバック）
+    return { summary: '変更を反映しました。', content: text.trim() };
+  }
+  const summary = text.substring(0, markerIdx).replace('【変更点サマリー】', '').trim();
+  const content = text.substring(markerIdx + marker.length).trim();
+  return { summary: summary || '変更を反映しました。', content };
+};
+
 export const generateThumbnail = async (idea: SkillIdea, useHighQuality: boolean = false): Promise<string> => {
   const apiKey = getApiKey();
   // Google AI Studio ではセッションから自動的にキーが利用可能

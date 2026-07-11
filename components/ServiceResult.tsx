@@ -1,12 +1,16 @@
-import React, { useState, useMemo } from 'react';
-import { getThumbnailPrompt } from '../services/geminiService';
+import React, { useEffect, useMemo, useState } from 'react';
+import { getThumbnailPrompt, reviseServiceContent } from '../services/geminiService';
 import { SkillIdea, ThumbnailPromptVersion } from '../types';
 import { PROMPT_PREVIEWS } from './promptPreviews';
+import ServiceChatEditor, { ChatMessage } from './ServiceChatEditor';
 
 interface ServiceResultProps {
   idea: SkillIdea;
   content: string;
   onBack: () => void;
+  onSaveContent: (newContent: string) => void;
+  ensureKeySet: () => Promise<boolean>;
+  onHandleApiError: (error: any) => void;
 }
 
 const PRICE_HEADER = '💰価格の目安';
@@ -252,19 +256,40 @@ const PromptCard: React.FC<{
   </div>
 );
 
-const ServiceResult: React.FC<ServiceResultProps> = ({ idea, content, onBack }) => {
+const ServiceResult: React.FC<ServiceResultProps> = ({ idea, content, onBack, onSaveContent, ensureKeySet, onHandleApiError }) => {
   const [isAllCopied, setIsAllCopied] = useState(false);
   const [isDetailCopied, setIsDetailCopied] = useState(false);
   const [expandedPrompt, setExpandedPrompt] = useState<ThumbnailPromptVersion | null>(null);
   const [copiedVersion, setCopiedVersion] = useState<ThumbnailPromptVersion | null>(null);
   const [showTip, setShowTip] = useState(false);
+  const [showBackConfirm, setShowBackConfirm] = useState(false);
+
+  // AI編集チャットが書き換える下書き本文。保存するまでは idea.generatedContent に反映されない
+  const [draftContent, setDraftContent] = useState(content);
+  const [savedContent, setSavedContent] = useState(content);
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [chatInput, setChatInput] = useState('');
+  const [isChatLoading, setIsChatLoading] = useState(false);
+  const [chatError, setChatError] = useState<string | null>(null);
+  const [justSaved, setJustSaved] = useState(false);
+
+  // 選択中のアイデアが変わったら下書き・チャット履歴をリセット
+  useEffect(() => {
+    setDraftContent(content);
+    setSavedContent(content);
+    setChatMessages([]);
+    setChatError(null);
+    setShowBackConfirm(false);
+  }, [idea.id]);
+
+  const isDirty = draftContent !== savedContent;
 
   // Price mode state
   const [priceMode, setPriceMode] = useState<PriceMode>('standard');
   const [limitCount, setLimitCount] = useState<LimitCount | null>(null);
   const [limitPeriod, setLimitPeriod] = useState<LimitPeriodId | null>(null);
 
-  const parsed = useMemo(() => parseServiceContent(content), [content]);
+  const parsed = useMemo(() => parseServiceContent(draftContent), [draftContent]);
   const monthEndOptions = useMemo(() => getMonthEndOptions(), []);
 
   // 選択を反映した💰価格の目安ブロックの本文を構築
@@ -296,19 +321,19 @@ const ServiceResult: React.FC<ServiceResultProps> = ({ idea, content, onBack }) 
 
   // 全文コピー用テキスト(選択反映版)
   const rebuiltContent = useMemo(() => {
-    if (!parsed.hasMonitorPrice) return content;
-    const priceIdx = content.indexOf(PRICE_HEADER);
-    if (priceIdx === -1) return content;
+    if (!parsed.hasMonitorPrice) return draftContent;
+    const priceIdx = draftContent.indexOf(PRICE_HEADER);
+    if (priceIdx === -1) return draftContent;
     const endMarkers = ['🔚', '⚠️', '🎯', '📝'];
-    let endIdx = content.length;
+    let endIdx = draftContent.length;
     for (const marker of endMarkers) {
-      const idx = content.indexOf(marker, priceIdx + PRICE_HEADER.length);
+      const idx = draftContent.indexOf(marker, priceIdx + PRICE_HEADER.length);
       if (idx !== -1 && idx < endIdx) endIdx = idx;
     }
-    return content.substring(0, priceIdx) + currentPriceBlock + '\n\n' + content.substring(endIdx);
-  }, [content, parsed.hasMonitorPrice, currentPriceBlock]);
+    return draftContent.substring(0, priceIdx) + currentPriceBlock + '\n\n' + draftContent.substring(endIdx);
+  }, [draftContent, parsed.hasMonitorPrice, currentPriceBlock]);
 
-  const promptCtx = useMemo(() => ({ ...idea, generatedContent: content }), [idea, content]);
+  const promptCtx = useMemo(() => ({ ...idea, generatedContent: draftContent }), [idea, draftContent]);
   const prompts = useMemo(() => {
     const map = {} as Record<ThumbnailPromptVersion, string>;
     for (const s of PROMPT_STYLES) {
@@ -338,6 +363,49 @@ const ServiceResult: React.FC<ServiceResultProps> = ({ idea, content, onBack }) 
     });
   };
 
+  const handleSaveDraft = () => {
+    onSaveContent(draftContent);
+    setSavedContent(draftContent);
+    setJustSaved(true);
+    setTimeout(() => setJustSaved(false), 2000);
+  };
+
+  const handleDiscardDraft = () => {
+    setDraftContent(savedContent);
+    setChatError(null);
+  };
+
+  const handleSendChatInstruction = async () => {
+    const instruction = chatInput.trim();
+    if (!instruction || isChatLoading) return;
+
+    const keyReady = await ensureKeySet();
+    if (!keyReady) return;
+
+    setChatMessages(prev => [...prev, { role: 'user', text: instruction }]);
+    setChatInput('');
+    setIsChatLoading(true);
+    setChatError(null);
+    try {
+      const revision = await reviseServiceContent(draftContent, instruction);
+      setDraftContent(revision.content);
+      setChatMessages(prev => [...prev, { role: 'assistant', text: revision.summary }]);
+    } catch (error) {
+      setChatError('編集に失敗しました。もう一度お試しください。');
+      onHandleApiError(error);
+    } finally {
+      setIsChatLoading(false);
+    }
+  };
+
+  const handleBackClick = () => {
+    if (isDirty) {
+      setShowBackConfirm(true);
+    } else {
+      onBack();
+    }
+  };
+
   const toggleButtonClass = (active: boolean) =>
     `flex-1 py-2.5 px-3 ${active ? 'chip-active' : 'chip'}`;
 
@@ -349,17 +417,43 @@ const ServiceResult: React.FC<ServiceResultProps> = ({ idea, content, onBack }) 
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
         <div>
           <span className="eyebrow mb-1 block">Step 3</span>
-          <h2 className="text-xl md:text-2xl font-bold text-stone-900 tracking-tight">出品用テキストが完成しました</h2>
+          <div className="flex items-center gap-2 flex-wrap">
+            <h2 className="text-xl md:text-2xl font-bold text-stone-900 tracking-tight">出品用テキストが完成しました</h2>
+            {isDirty && (
+              <span className="text-[10px] font-semibold text-brand-600 bg-brand-50 px-2.5 py-1 rounded-full">未保存の変更</span>
+            )}
+          </div>
         </div>
-        <div className="flex gap-2">
-          <button onClick={onBack} className="btn-secondary py-2.5 px-5 text-xs">一覧へ戻る</button>
-          <button onClick={handleCopyAll} className={`py-2.5 px-6 rounded-full font-semibold text-xs transition-colors ${isAllCopied ? 'bg-brand-50 text-brand-600' : 'bg-stone-900 text-white hover:bg-stone-700'}`}>
-            {isAllCopied ? 'コピーしました' : '全文コピー'}
-          </button>
-        </div>
+        {showBackConfirm ? (
+          <div className="flex items-center gap-2 animate-in fade-in slide-in-from-right-4 duration-300">
+            <span className="text-xs text-stone-500">保存せず戻りますか？</span>
+            <button onClick={onBack} className="btn-dark py-2 px-4 text-xs">はい</button>
+            <button onClick={() => setShowBackConfirm(false)} className="btn-quiet py-2 px-4 text-xs">いいえ</button>
+          </div>
+        ) : (
+          <div className="flex gap-2">
+            <button onClick={handleBackClick} className="btn-secondary py-2.5 px-5 text-xs">一覧へ戻る</button>
+            <button onClick={handleCopyAll} className={`py-2.5 px-6 rounded-full font-semibold text-xs transition-colors ${isAllCopied ? 'bg-brand-50 text-brand-600' : 'bg-stone-900 text-white hover:bg-stone-700'}`}>
+              {isAllCopied ? 'コピーしました' : '全文コピー'}
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="space-y-10">
+        <ServiceChatEditor
+          messages={chatMessages}
+          input={chatInput}
+          onInputChange={setChatInput}
+          onSend={handleSendChatInstruction}
+          isLoading={isChatLoading}
+          error={chatError}
+          isDirty={isDirty}
+          justSaved={justSaved}
+          onSave={handleSaveDraft}
+          onDiscard={handleDiscardDraft}
+        />
+
         {/* Next Steps Guide */}
         <div className="border border-brand-100 rounded-2xl p-6 md:p-8" style={{ backgroundImage: 'var(--gradient-brand-soft)' }}>
           <h4 className="text-stone-900 font-bold text-base mb-6">次のステップ — 出品まであと少し</h4>
