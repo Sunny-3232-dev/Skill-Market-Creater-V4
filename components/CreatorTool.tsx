@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { UserInput, SkillIdea, Step } from '../types';
-import { generateIdeas, generateServicePage } from '../services/geminiService';
+import { generateIdeas, generateServicePage, extractProfileKeywords } from '../services/geminiService';
 import { extractWords } from '../utils/textProcessing';
 import InputForm from './InputForm';
 import IdeaList from './IdeaList';
@@ -10,6 +10,7 @@ import LoadingOverlay from './LoadingOverlay';
 
 const STORAGE_KEY_IDEAS = "skill_market_ideas";
 const STORAGE_KEY_INPUT = "skill_market_raw_input";
+const STORAGE_KEY_KEYWORDS = "skill_market_profile_keywords";
 
 interface CreatorToolProps {
   ensureKeySet: () => Promise<boolean>;
@@ -28,6 +29,8 @@ const CreatorTool: React.FC<CreatorToolProps> = ({ ensureKeySet, onHandleApiErro
 
   const [showResetConfirm, setShowResetConfirm] = useState<boolean>(false);
   const [rawInputText, setRawInputText] = useState<string>("");
+  // 自己紹介から抽出した特徴キーワード（再生成バーの絞り込みチップ）
+  const [profileKeywords, setProfileKeywords] = useState<string[]>([]);
   const containerRef = useRef<HTMLDivElement>(null);
 
   // ステップ変更時にスクロール位置を最上部にリセット
@@ -40,7 +43,14 @@ const CreatorTool: React.FC<CreatorToolProps> = ({ ensureKeySet, onHandleApiErro
   useEffect(() => {
     const savedIdeas = localStorage.getItem(STORAGE_KEY_IDEAS);
     const savedInput = localStorage.getItem(STORAGE_KEY_INPUT);
+    const savedKeywords = localStorage.getItem(STORAGE_KEY_KEYWORDS);
     if (savedInput) setRawInputText(savedInput);
+    if (savedKeywords) {
+      try {
+        const parsed = JSON.parse(savedKeywords);
+        if (Array.isArray(parsed)) setProfileKeywords(parsed);
+      } catch { /* noop */ }
+    }
 
     if (savedIdeas) {
       try {
@@ -78,6 +88,27 @@ const CreatorTool: React.FC<CreatorToolProps> = ({ ensureKeySet, onHandleApiErro
 
   const inputWords = useMemo(() => extractWords(rawInputText), [rawInputText]);
 
+  // 自己紹介から特徴キーワードを抽出して保存（失敗しても本流は止めない）
+  const refreshKeywords = (text: string) => {
+    extractProfileKeywords(text)
+      .then(kws => {
+        setProfileKeywords(kws);
+        try { localStorage.setItem(STORAGE_KEY_KEYWORDS, JSON.stringify(kws)); } catch { /* noop */ }
+      })
+      .catch(() => { /* キーワードは補助機能なので失敗は無視 */ });
+  };
+
+  // 既存ユーザー（アイデアはあるがキーワード未取得）に一度だけ補完する
+  const keywordsBootstrapped = useRef(false);
+  useEffect(() => {
+    if (keywordsBootstrapped.current) return;
+    if (step === Step.IDEAS && rawInputText && profileKeywords.length === 0) {
+      keywordsBootstrapped.current = true;
+      refreshKeywords(rawInputText);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, rawInputText, profileKeywords.length]);
+
   // ピン留めしたアイデアは常に先頭に残し、新規生成分を後ろに足す（タイトル重複は除外）
   const mergeWithPinned = (existing: SkillIdea[], generated: SkillIdea[]): SkillIdea[] => {
     const pinned = existing.filter(i => i.pinned);
@@ -108,6 +139,7 @@ const CreatorTool: React.FC<CreatorToolProps> = ({ ensureKeySet, onHandleApiErro
       setIdeas(merged);
       saveIdeasToStorage(merged);
       setStep(Step.IDEAS);
+      refreshKeywords(input.rawText); // プロフィールが変わったのでキーワードも更新
     } catch (error: any) {
       onHandleApiError(error);
     } finally {
@@ -205,9 +237,12 @@ const CreatorTool: React.FC<CreatorToolProps> = ({ ensureKeySet, onHandleApiErro
   const forceReset = () => {
     localStorage.removeItem(STORAGE_KEY_IDEAS);
     localStorage.removeItem(STORAGE_KEY_INPUT);
+    localStorage.removeItem(STORAGE_KEY_KEYWORDS);
 
     setIdeas([]);
     setRawInputText("");
+    setProfileKeywords([]);
+    keywordsBootstrapped.current = false;
     setStep(Step.INPUT);
     setServiceText("");
     setSelectedIdea(null);
@@ -231,6 +266,7 @@ const CreatorTool: React.FC<CreatorToolProps> = ({ ensureKeySet, onHandleApiErro
           {step === Step.IDEAS && (
             <IdeaList
               ideas={ideas}
+              keywords={profileKeywords}
               onSelect={handleSelectIdea}
               onTogglePin={handleTogglePin}
               onRegenerate={handleRegenerate}

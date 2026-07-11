@@ -4,6 +4,7 @@ import { PinIcon, SparkleIcon } from './icons';
 
 interface IdeaListProps {
   ideas: SkillIdea[];
+  keywords?: string[];
   onSelect: (idea: SkillIdea) => void;
   onTogglePin: (e: React.MouseEvent, id: string) => void;
   onRegenerate: (instruction: string) => void;
@@ -11,12 +12,13 @@ interface IdeaListProps {
   onBack: (e?: React.MouseEvent) => void;
 }
 
-// 再生成バーで使える指示のテンプレ
+// 再生成バーで使える指示のテンプレ（初心者・オンライン前提に合うものだけ）
 const REGEN_SUGGESTIONS = [
-  'もっと高単価なもの',
-  'オンラインで完結するもの',
   '副業として始めやすいもの',
   '初心者でも今日から出せるもの',
+  'スキマ時間でできるもの',
+  '顔出しなしでできるもの',
+  '続けて頼まれやすいもの',
 ];
 
 // ピン留めしたアイデアを各セクション内で先頭に寄せる
@@ -39,7 +41,7 @@ const PinButton: React.FC<{ pinned?: boolean; onClick: (e: React.MouseEvent) => 
   </button>
 );
 
-const IdeaList: React.FC<IdeaListProps> = ({ ideas, onSelect, onTogglePin, onRegenerate, onEditProfile, onBack }) => {
+const IdeaList: React.FC<IdeaListProps> = ({ ideas, keywords = [], onSelect, onTogglePin, onRegenerate, onEditProfile, onBack }) => {
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [pinnedOnly, setPinnedOnly] = useState(false);
   const [regenInstruction, setRegenInstruction] = useState('');
@@ -200,7 +202,7 @@ const IdeaList: React.FC<IdeaListProps> = ({ ideas, onSelect, onTogglePin, onReg
             value={regenInstruction}
             onChange={(e) => setRegenInstruction(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleRegenerate(); } }}
-            placeholder="例: もっと高単価に／オンライン完結で（空欄でもOK）"
+            placeholder="例: 副業として始めやすいもの（空欄でもOK）"
             aria-label="作り直しの指示"
             className="field flex-grow px-4 py-2.5 text-sm rounded-full bg-white"
           />
@@ -208,17 +210,40 @@ const IdeaList: React.FC<IdeaListProps> = ({ ideas, onSelect, onTogglePin, onReg
             作り直す
           </button>
         </div>
-        <div className="flex flex-wrap gap-1.5 mt-3">
-          {REGEN_SUGGESTIONS.map(s => (
-            <button
-              key={s}
-              type="button"
-              onClick={() => setRegenInstruction(s)}
-              className="chip px-3 py-1.5 bg-white/70"
-            >
-              {s}
-            </button>
-          ))}
+
+        {/* あなたの自己紹介から抽出した特徴キーワード */}
+        {keywords.length > 0 && (
+          <div className="mt-3">
+            <p className="text-[11px] font-semibold text-stone-500 mb-1.5">あなたのキーワードで絞る</p>
+            <div className="flex flex-wrap gap-1.5">
+              {keywords.map(kw => (
+                <button
+                  key={kw}
+                  type="button"
+                  onClick={() => setRegenInstruction(`「${kw}」を活かせるもの`)}
+                  className="chip px-3 py-1.5 bg-white"
+                >
+                  {kw}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="mt-3">
+          <p className="text-[11px] font-semibold text-stone-500 mb-1.5">こんな方向で</p>
+          <div className="flex flex-wrap gap-1.5">
+            {REGEN_SUGGESTIONS.map(s => (
+              <button
+                key={s}
+                type="button"
+                onClick={() => setRegenInstruction(s)}
+                className="chip px-3 py-1.5 bg-white/70"
+              >
+                {s}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
