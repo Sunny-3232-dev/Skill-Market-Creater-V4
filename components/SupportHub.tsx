@@ -4,18 +4,17 @@ import { extractWords } from '../utils/textProcessing';
 import { SkillIdea, SurveyPattern, SurveyQuestionDef, ThumbnailPromptVersion } from '../types';
 import { MegaphoneIcon, ClipboardListIcon, PresentationIcon, SparkleIcon } from './icons';
 import { PromptPreview } from './promptPreviews';
-import { MAGAZINE_ARTICLES, KNOWHOW_ARTICLES } from '../data/articles';
 import LoadingOverlay from './LoadingOverlay';
 import TweetCard, { TweetPost } from './support/TweetCard';
 import PatternCard from './support/PatternCard';
 import CodeViewer from './support/CodeViewer';
 import QuestionEditor from './support/QuestionEditor';
-import ArticleList from './support/ArticleList';
 
 interface SupportHubProps {
   ensureKeySet: () => Promise<boolean>;
   onHandleApiError: (error: any) => void;
   notify: (message: string, tone?: 'error' | 'info') => void;
+  onGoToLearn: () => void;
 }
 
 type MenuId = 'promoter' | 'survey' | 'slidedoc';
@@ -78,6 +77,12 @@ const SLIDE_DOC_VERSIONS: Array<{
   },
 ];
 
+const BookIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+  </svg>
+);
+
 const SectionLabel: React.FC<{ label: string }> = ({ label }) => (
   <div className="flex items-center gap-2.5 mb-4 px-1">
     <span className="text-[10px] font-semibold text-stone-400 uppercase tracking-[0.2em]">{label}</span>
@@ -130,7 +135,7 @@ const loadPersisted = (): Partial<PersistedState> => {
   }
 };
 
-const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError, notify }) => {
+const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError, notify, onGoToLearn }) => {
   // 保存済み状態を同期的に読み込んで初期値にする（保存effectとの競合を避ける）
   const initRef = useRef<Partial<PersistedState> | null>(null);
   if (initRef.current === null) initRef.current = loadPersisted();
@@ -866,26 +871,20 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
           </div>
         )}
 
-        <div className="mb-8">
-          <div className="flex items-center gap-2.5 mb-5 px-1">
-            <span className="text-[10px] font-semibold text-stone-400 uppercase tracking-[0.2em]">売れる出品者のヒント</span>
-            <span className="w-1 h-1 rounded-full bg-brand-300"></span>
-            <span className="text-[11px] text-stone-400">迷ったら先人の知恵をのぞいてみましょう</span>
-            <div className="h-px bg-stone-200 flex-grow"></div>
+        {/* 「売れる出品者のヒント」記事はトップの第3入口（ヒント集）へ集約 */}
+        <div className="mb-2 rounded-2xl border border-stone-200 bg-stone-50 px-5 py-4 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-start gap-3 min-w-0">
+            <span className="shrink-0 w-9 h-9 rounded-xl bg-brand-50 text-brand-500 flex items-center justify-center mt-0.5">
+              <BookIcon />
+            </span>
+            <div className="min-w-0">
+              <p className="text-sm font-bold text-stone-900">売れている人の考え方も参考に</p>
+              <p className="text-xs text-stone-500 mt-0.5 leading-relaxed">価格・宣伝・改善のコツを学長や先輩出品者の記事で無料で読めます。</p>
+            </div>
           </div>
-
-          <div className="space-y-8">
-            <ArticleList
-              title="学長に学ぶ、売る前の基本"
-              subtitle="リベ大の両学長が「価格の決め方」「嫌われない宣伝のコツ」を解説。出品する前に押さえておきたい考え方です。"
-              articles={MAGAZINE_ARTICLES}
-            />
-            <ArticleList
-              title="先輩出品者のノウハウ図書館"
-              subtitle="実際に売れている出品者が実践しているコツを無料で読めます。「売れない…」のつまずきポイントの解決策も。"
-              articles={KNOWHOW_ARTICLES}
-            />
-          </div>
+          <button onClick={onGoToLearn} className="btn-secondary px-4 py-2 text-xs shrink-0">
+            ヒント集を見る
+          </button>
         </div>
       </div>
 

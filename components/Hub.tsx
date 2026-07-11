@@ -2,6 +2,12 @@ import React from 'react';
 import { ToolType } from '../types';
 import { PenIcon, ArrowRightIcon } from './icons';
 
+const BookIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+  </svg>
+);
+
 interface HubProps {
   onSelectTool: (tool: ToolType) => void;
 }
@@ -13,16 +19,17 @@ const CapabilityChip: React.FC<{ label: string }> = ({ label }) => (
 );
 
 const ToolCard: React.FC<{
-  step: string;
-  stepLabel: string;
+  step?: string;        // STEP番号（省略時は手順外＝参考レイヤー）
+  stepLabel: string;    // STEPなしのときは「いつでも参考に」等のタグ文言
   title: string;
   description: string;
   icon: React.ReactNode;
   onClick: () => void;
   cta: string;
   featured?: boolean;
+  brandIcon?: boolean;  // アイコンタイルをブランド淡色にする（参考カード用）
   capabilities: string[];
-}> = ({ step, stepLabel, title, description, icon, onClick, cta, featured, capabilities }) => (
+}> = ({ step, stepLabel, title, description, icon, onClick, cta, featured, brandIcon, capabilities }) => (
   <button
     onClick={onClick}
     className={`group relative flex flex-col md:flex-row items-start md:items-center text-left w-full rounded-2xl border transition-all duration-300 ease-smooth
@@ -31,26 +38,35 @@ const ToolCard: React.FC<{
         : 'p-5 md:p-6 gap-4 md:gap-6 bg-white border-stone-200 shadow-soft hover:border-brand-200 hover:shadow-card-hover'}`}
     style={featured ? { backgroundImage: 'var(--gradient-brand-soft)' } : undefined}
   >
-    {/* アイコンタイル: 主役はグラデ、補助はニュートラル */}
+    {/* アイコンタイル: 主役はグラデ、参考はブランド淡色、補助はニュートラル */}
     <div
       className={`shrink-0 flex items-center justify-center rounded-2xl
-        ${featured ? 'w-14 h-14 md:w-16 md:h-16 text-white' : 'w-12 h-12 bg-stone-100 text-stone-600'}`}
+        ${featured ? 'w-14 h-14 md:w-16 md:h-16 text-white' : brandIcon ? 'w-12 h-12 bg-brand-50 text-brand-500' : 'w-12 h-12 bg-stone-100 text-stone-600'}`}
       style={featured ? { backgroundImage: 'var(--gradient-brand)' } : undefined}
     >
       {icon}
     </div>
 
     <div className="flex-grow min-w-0">
-      {/* STEPで前工程/後工程の関係を明示 */}
       <div className="flex items-center gap-2 mb-1.5">
-        <span className={`text-[10px] font-bold tracking-wider px-2 py-0.5 rounded-full ${
-          featured ? 'bg-brand-500 text-white' : 'bg-stone-200 text-stone-600'
-        }`}>
-          STEP {step}
-        </span>
-        <span className={`text-[11px] font-semibold ${featured ? 'text-brand-600' : 'text-stone-400'}`}>
-          {stepLabel}
-        </span>
+        {step ? (
+          // STEPで前工程/後工程の関係を明示
+          <>
+            <span className={`text-[10px] font-bold tracking-wider px-2 py-0.5 rounded-full ${
+              featured ? 'bg-brand-500 text-white' : 'bg-stone-200 text-stone-600'
+            }`}>
+              STEP {step}
+            </span>
+            <span className={`text-[11px] font-semibold ${featured ? 'text-brand-600' : 'text-stone-400'}`}>
+              {stepLabel}
+            </span>
+          </>
+        ) : (
+          // 手順の外＝いつでも参照できる前提レイヤー
+          <span className="text-[10px] font-semibold text-brand-600 bg-brand-50 px-2 py-0.5 rounded-full">
+            {stepLabel}
+          </span>
+        )}
       </div>
 
       <h3 className={`font-bold text-stone-900 tracking-tight leading-tight
@@ -121,6 +137,18 @@ const Hub: React.FC<HubProps> = ({ onSelectTool }) => {
             capabilities={["宣伝文づくり", "アンケート", "サービス資料"]}
           />
         </div>
+
+        {/* 手順の外側に置く「前提・読み物」レイヤー（第3の入口・STEP番号なし） */}
+        <ToolCard
+          stepLabel="いつでも参考に"
+          title="売れる人の考え方を学ぶ"
+          description="価格の決め方・宣伝のコツ・改善のヒントを、リベ大の学長や先輩出品者の記事で無料で読めます。迷ったときの下敷きに。"
+          icon={<BookIcon />}
+          onClick={() => onSelectTool(ToolType.LEARN)}
+          cta="ヒントを見る"
+          brandIcon
+          capabilities={["価格の決め方", "宣伝のコツ", "改善のヒント"]}
+        />
 
         <div className="px-1">
           <p className="text-[11px] text-stone-400 leading-relaxed">

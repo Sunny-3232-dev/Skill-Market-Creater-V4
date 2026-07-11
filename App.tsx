@@ -3,6 +3,7 @@ import { ToolType } from './types';
 import Hub from './components/Hub';
 import CreatorTool from './components/CreatorTool';
 import SupportHub from './components/SupportHub';
+import LearnHub from './components/LearnHub';
 
 const getEnvApiKey = (): string => {
   try {
@@ -57,7 +58,9 @@ const App: React.FC = () => {
       case ToolType.CREATOR:
         return <CreatorTool ensureKeySet={ensureKeySet} onHandleApiError={handleApiError} notify={notify} />;
       case ToolType.SUPPORT:
-        return <SupportHub ensureKeySet={ensureKeySet} onHandleApiError={handleApiError} notify={notify} />;
+        return <SupportHub ensureKeySet={ensureKeySet} onHandleApiError={handleApiError} notify={notify} onGoToLearn={() => setCurrentTool(ToolType.LEARN)} />;
+      case ToolType.LEARN:
+        return <LearnHub />;
       case ToolType.TOP:
       default:
         return <Hub onSelectTool={setCurrentTool} />;
@@ -66,6 +69,7 @@ const App: React.FC = () => {
 
   const toolName = currentTool === ToolType.CREATOR ? 'Creator'
     : currentTool === ToolType.SUPPORT ? 'サポートメニュー'
+    : currentTool === ToolType.LEARN ? 'ヒント集'
     : '';
 
   return (

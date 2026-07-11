@@ -23,7 +23,8 @@ export enum Step {
 export enum ToolType {
   TOP = 'TOP',
   CREATOR = 'CREATOR',
-  SUPPORT = 'SUPPORT'
+  SUPPORT = 'SUPPORT',
+  LEARN = 'LEARN'
 }
 
 // Survey Tool Types
