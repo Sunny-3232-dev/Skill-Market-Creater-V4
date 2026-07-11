@@ -3,7 +3,7 @@ import { generatePromotion, generateSurveyPatterns, getSlideDocPrompt } from '..
 import { extractWords } from '../utils/textProcessing';
 import { SkillIdea, SurveyPattern, SurveyQuestionDef, ThumbnailPromptVersion } from '../types';
 import { MegaphoneIcon, ClipboardListIcon, PresentationIcon } from './icons';
-import { PROMPT_PREVIEWS } from './promptPreviews';
+import { PromptPreview } from './promptPreviews';
 import { MAGAZINE_ARTICLES, KNOWHOW_ARTICLES } from '../data/articles';
 import LoadingOverlay from './LoadingOverlay';
 import TweetCard, { TweetPost } from './support/TweetCard';
@@ -617,7 +617,7 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
                             <h4 className="text-sm font-semibold text-stone-900">{label}</h4>
                             <p className="text-xs text-stone-500 leading-relaxed mt-1">{description}</p>
                           </div>
-                          {PROMPT_PREVIEWS[id]}
+                          <PromptPreview version={id} className="w-[120px] shrink-0 rounded-lg border border-stone-100" />
                           <button
                             type="button"
                             onClick={() => handleCopySlideDocPrompt(id)}

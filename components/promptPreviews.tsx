@@ -2,82 +2,71 @@ import React from 'react';
 import { ThumbnailPromptVersion } from '../types';
 
 /**
- * 画像生成プロンプト／スライド資料のトンマナ別ミニプレビュー。
- * ServiceResult と SupportHub で共用する。
+ * 画像生成プロンプト／スライド資料のトンマナ別プレビュー。
+ * 7スタイルは gpt-image-2 で実際に生成したサンプルサムネイル（public/previews/）。
+ * サンプル文言は全スタイル共通: 「スプシ自動化で時短！／面倒な集計をワンクリックに」
+ * my_style は「参考画像→生成」の仕組みの図解なのでSVGで描画する。
  */
-export const PROMPT_PREVIEWS: Record<ThumbnailPromptVersion, React.ReactNode> = {
-  standard: (
-    <svg viewBox="0 0 600 400" className="w-[104px] shrink-0 rounded-lg block border border-stone-100">
-      <rect fill="#0f172a" width="600" height="400" rx="12"/>
-      <rect x="50" y="130" width="440" height="56" rx="4" fill="#fff" opacity="0.95"/>
-      <rect x="50" y="210" width="320" height="40" rx="4" fill="#fff" opacity="0.4"/>
-      <rect x="50" y="300" width="90" height="6" fill="#fbbf24"/>
-    </svg>
-  ),
-  simple: (
-    <svg viewBox="0 0 600 400" className="w-[104px] shrink-0 rounded-lg block border border-stone-100">
-      <rect fill="#fdfaf6" width="600" height="400" rx="12"/>
-      <rect fill="none" stroke="#d6d3d1" strokeWidth="2" x="14" y="14" width="572" height="372" rx="8"/>
-      <ellipse cx="300" cy="165" rx="190" ry="45" fill="#ede9fe"/>
-      <circle cx="115" cy="295" r="50" fill="#fef3c7"/>
-      <ellipse cx="420" cy="270" rx="115" ry="20" fill="#dbeafe"/>
-      <ellipse cx="420" cy="325" rx="115" ry="20" fill="#dbeafe"/>
-    </svg>
-  ),
-  watercolor: (
-    <svg viewBox="0 0 600 400" className="w-[104px] shrink-0 rounded-lg block border border-stone-100">
-      <rect fill="#fefbf6" width="600" height="400" rx="12"/>
-      <circle cx="220" cy="200" r="120" fill="#fbcfe8" opacity="0.65"/>
-      <circle cx="340" cy="220" r="110" fill="#c4b5fd" opacity="0.6"/>
-      <circle cx="430" cy="180" r="95" fill="#bae6fd" opacity="0.6"/>
-    </svg>
-  ),
-  pop: (
-    <svg viewBox="0 0 600 400" className="w-[104px] shrink-0 rounded-lg block border border-stone-100">
-      <rect fill="#fb923c" width="600" height="400" rx="12"/>
-      <rect x="50" y="80" width="240" height="48" rx="24" fill="#fff"/>
-      <rect x="50" y="150" width="180" height="32" rx="16" fill="#fff" opacity="0.85"/>
-      <circle cx="450" cy="210" r="95" fill="#a78bfa"/>
-      <polygon points="450,135 461,162 490,162 467,179 477,206 450,189 423,206 433,179 410,162 439,162" fill="#facc15"/>
-    </svg>
-  ),
-  youtube: (
-    <svg viewBox="0 0 600 400" className="w-[104px] shrink-0 rounded-lg block border border-stone-100">
-      <rect fill="#dc2626" width="600" height="400" rx="12"/>
-      <circle cx="460" cy="220" r="130" fill="#fbbf24"/>
-      <rect x="40" y="90" width="290" height="60" rx="4" fill="#fff"/>
-      <rect x="40" y="170" width="230" height="60" rx="4" fill="#fbbf24"/>
-      <polygon points="90,310 101,335 128,335 106,351 115,377 90,361 65,377 74,351 52,335 79,335" fill="#fbbf24" stroke="#0f172a" strokeWidth="3"/>
-    </svg>
-  ),
-  pivot: (
-    <svg viewBox="0 0 600 400" className="w-[104px] shrink-0 rounded-lg block border border-stone-100">
-      <rect fill="#14532d" width="600" height="400" rx="12"/>
-      <rect x="40" y="40" width="90" height="24" rx="3" fill="#fafaf9"/>
-      <rect x="40" y="110" width="360" height="50" rx="3" fill="#fafaf9"/>
-      <rect x="40" y="180" width="260" height="50" rx="3" fill="#fafaf9" opacity="0.75"/>
-      <circle cx="470" cy="220" r="90" fill="#fafaf9" opacity="0.95"/>
-    </svg>
-  ),
-  puffy_3d: (
-    <svg viewBox="0 0 600 400" className="w-[104px] shrink-0 rounded-lg block border border-stone-100">
-      <rect fill="#f5f3ff" width="600" height="400" rx="12"/>
-      <rect x="40" y="90" width="260" height="54" rx="27" fill="#c4b5fd"/>
-      <rect x="40" y="168" width="180" height="36" rx="18" fill="#ddd6fe"/>
-      <circle cx="450" cy="215" r="100" fill="#f9a8d4"/>
-      <ellipse cx="415" cy="178" rx="32" ry="18" fill="#fce7f3" opacity="0.9"/>
-      <ellipse cx="450" cy="330" rx="90" ry="14" fill="#e9d5ff" opacity="0.7"/>
-      <circle cx="350" cy="300" r="26" fill="#a7f3d0"/>
-      <circle cx="535" cy="115" r="18" fill="#fde68a"/>
-    </svg>
-  ),
-  my_style: (
-    <svg viewBox="0 0 600 400" className="w-[104px] shrink-0 rounded-lg block border border-stone-100">
-      <rect fill="#faf5ff" width="600" height="400" rx="12"/>
-      <rect x="50" y="100" width="210" height="200" rx="14" fill="#fff" stroke="#c4b5fd" strokeWidth="2.5" strokeDasharray="10 5"/>
-      <rect x="340" y="100" width="210" height="200" rx="14" fill="#a78bfa" opacity="0.2" stroke="#7c3aed" strokeWidth="2.5"/>
-      <path d="M280,200 L330,200" stroke="#7c3aed" strokeWidth="5" strokeLinecap="round"/>
-      <polygon points="323,190 345,200 323,210" fill="#7c3aed"/>
-    </svg>
-  ),
+
+const GENERATED_PREVIEWS: Partial<Record<ThumbnailPromptVersion, string>> = {
+  standard: '/previews/standard.jpg',
+  simple: '/previews/simple.jpg',
+  watercolor: '/previews/watercolor.jpg',
+  pop: '/previews/pop.jpg',
+  youtube: '/previews/youtube.jpg',
+  puffy_3d: '/previews/puffy_3d.jpg',
+  pivot: '/previews/pivot.jpg',
+};
+
+const MyStylePreview = () => (
+  <svg viewBox="0 0 600 400" xmlns="http://www.w3.org/2000/svg" className="block w-full h-full">
+    <rect width="600" height="400" rx="12" fill="#faf5ff"/>
+    <text x="150" y="82" fontSize="19" fontWeight="700" fill="#7c3aed" textAnchor="middle">お手持ちの参考画像</text>
+    {/* 参考画像（ミニサムネ: 別サービスのトンマナ） */}
+    <g>
+      <rect x="52" y="100" width="196" height="132" rx="12" fill="#0f172a" stroke="#c4b5fd" strokeWidth="3" strokeDasharray="10 6"/>
+      <rect x="68" y="128" width="132" height="18" rx="4" fill="#ffffff" opacity="0.95"/>
+      <rect x="68" y="156" width="96" height="12" rx="4" fill="#ffffff" opacity="0.4"/>
+      <rect x="68" y="196" width="52" height="6" fill="#fbbf24"/>
+      <circle cx="216" cy="196" r="20" fill="#334155"/>
+    </g>
+    {/* 矢印 */}
+    <path d="M268 166 L330 166" stroke="#7c3aed" strokeWidth="7" strokeLinecap="round"/>
+    <polygon points="324,152 352,166 324,180" fill="#7c3aed"/>
+    <text x="300" y="140" fontSize="15" fontWeight="600" fill="#a78bfa" textAnchor="middle">同じ雰囲気で</text>
+    {/* 生成結果: 同じレイアウト・配色で新サービス */}
+    <text x="450" y="82" fontSize="19" fontWeight="700" fill="#7c3aed" textAnchor="middle">新しいサービス用に生成</text>
+    <g>
+      <rect x="352" y="100" width="196" height="132" rx="12" fill="#0f172a" stroke="#7c3aed" strokeWidth="3"/>
+      <rect x="368" y="122" width="150" height="16" rx="4" fill="#ffffff" opacity="0.95"/>
+      <text x="368" y="135" fontSize="12" fontWeight="800" fill="#0f172a">スプシ自動化で時短！</text>
+      <rect x="368" y="150" width="110" height="10" rx="4" fill="#ffffff" opacity="0.4"/>
+      <rect x="368" y="196" width="52" height="6" fill="#fbbf24"/>
+      <circle cx="516" cy="196" r="20" fill="#334155"/>
+      <rect x="500" y="182" width="14" height="18" rx="2" fill="#e2e8f0"/>
+      <rect x="518" y="188" width="14" height="12" rx="2" fill="#e2e8f0"/>
+    </g>
+    <text x="300" y="300" fontSize="18" fill="#78716c" textAnchor="middle">レイアウト・配色・世界観はそのまま、</text>
+    <text x="300" y="328" fontSize="18" fill="#78716c" textAnchor="middle">文章とアイコンだけ新しい内容に差し替え</text>
+  </svg>
+);
+
+export const PromptPreview: React.FC<{ version: ThumbnailPromptVersion; className?: string }> = ({ version, className = '' }) => {
+  const src = GENERATED_PREVIEWS[version];
+  if (src) {
+    return (
+      <img
+        src={src}
+        alt=""
+        aria-hidden
+        loading="lazy"
+        className={`block aspect-[3/2] object-cover bg-stone-100 ${className}`}
+      />
+    );
+  }
+  return (
+    <div className={`overflow-hidden aspect-[3/2] ${className}`} aria-hidden>
+      <MyStylePreview />
+    </div>
+  );
 };

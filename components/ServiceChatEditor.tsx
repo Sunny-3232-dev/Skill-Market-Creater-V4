@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { SparkleIcon } from './icons';
 
 export interface ChatMessage {
@@ -19,110 +19,185 @@ interface ServiceChatEditorProps {
   onDiscard: () => void;
 }
 
-const SUGGESTIONS = [
-  'もっと親しみやすい文体にして',
-  'タイトルだけ別の案にして',
-  '専門用語を減らして初心者向けに',
+// ありがちな編集指示のテンプレ。クリックで入力欄に挿入される（自動送信はしない＝価格など微調整できる）
+const TEMPLATE_GROUPS: Array<{ label: string; items: string[] }> = [
+  {
+    label: '文体・トーン',
+    items: [
+      'もっと親しみやすい文体にして',
+      'もっと丁寧でプロフェッショナルな文体にして',
+      '初心者にもわかる言葉に言い換えて',
+      '絵文字を少し減らして落ち着いた印象にして',
+    ],
+  },
+  {
+    label: '内容の調整',
+    items: [
+      '全体をもう少し簡潔にして',
+      'サービス詳細をもっと具体的にして',
+      '実績・安心感が伝わる表現を強化して',
+      '「こんな方におすすめ」の項目を増やして',
+    ],
+  },
+  {
+    label: '部分だけ変える',
+    items: [
+      'タイトルだけ別の案にして',
+      'キャッチコピーを短くインパクトのある表現にして',
+      '価格を8,000円に変更して',
+      '依頼テンプレートの項目をもっと簡単にして',
+    ],
+  },
 ];
 
 /**
- * Step 3（出品用テキスト完成画面）に埋め込む、AIへの編集チャット。
- * 送信するたびに出品ページ本文全体をAIが書き換え、下のプレビュー（各コピーカード）に反映する。
- * 反映内容は「変更を保存」を押すまでは下書き扱いで、押すとCreatorのアイデア一覧にも保存される。
+ * Step 3（出品用テキスト完成画面）の画面下部に常駐するAI編集バー。
+ * プレビューをスクロールしながらいつでも指示を出せる。
+ * 「テンプレ」からありがちな指示を挿入、「履歴」で往復の記録を確認できる。
  */
 const ServiceChatEditor: React.FC<ServiceChatEditorProps> = ({
   messages, input, onInputChange, onSend, isLoading, error,
   isDirty, justSaved, onSave, onDiscard,
 }) => {
-  return (
-    <div className="card p-6 space-y-4">
-      <div className="flex items-start justify-between gap-3 flex-wrap">
-        <div className="flex items-start gap-3">
-          <div className="shrink-0 w-9 h-9 rounded-xl bg-stone-900 text-white flex items-center justify-center">
-            <SparkleIcon />
-          </div>
-          <div>
-            <h4 className="text-sm font-bold text-stone-900">AIに編集を依頼</h4>
-            <p className="text-xs text-stone-500 mt-0.5 leading-relaxed">
-              「もっとカジュアルな文体に」「タイトルだけ変えて」など自由な言葉でOK。指示した箇所だけ書き換えます。
-              誤字などの細かい手直しは、各カードの「編集」ボタンからどうぞ。
-            </p>
-          </div>
-        </div>
+  const [showTemplates, setShowTemplates] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const historyEndRef = useRef<HTMLDivElement>(null);
 
-        {isDirty && (
-          <div className="flex items-center gap-2 shrink-0">
-            <button onClick={onDiscard} className="btn-quiet px-3 py-1.5 text-xs">元に戻す</button>
-            <button onClick={onSave} className="btn-primary px-4 py-1.5 text-xs">
-              {justSaved ? '保存しました' : '変更を保存'}
-            </button>
+  // 送信したら履歴パネルを開き、テンプレは閉じる
+  useEffect(() => {
+    if (isLoading) {
+      setShowHistory(true);
+      setShowTemplates(false);
+    }
+  }, [isLoading]);
+
+  // 履歴は常に最新までスクロール
+  useEffect(() => {
+    if (showHistory) historyEndRef.current?.scrollIntoView({ block: 'end' });
+  }, [messages, isLoading, showHistory]);
+
+  const pickTemplate = (t: string) => {
+    onInputChange(t);
+    setShowTemplates(false);
+    inputRef.current?.focus();
+  };
+
+  const hasHistory = messages.length > 0;
+
+  return (
+    <div className="fixed bottom-4 inset-x-0 z-40 px-4 pointer-events-none">
+      <div className="max-w-3xl mx-auto pointer-events-auto relative">
+
+        {/* テンプレのポップオーバー */}
+        {showTemplates && (
+          <div className="absolute bottom-full mb-2 inset-x-0 card shadow-card-hover p-4 space-y-3 max-h-[50vh] overflow-y-auto custom-scrollbar animate-in fade-in slide-in-from-bottom-2 duration-200">
+            <p className="text-[11px] text-stone-400 leading-relaxed">
+              クリックすると入力欄に入ります。送信前に文言（価格など）を調整できます。
+            </p>
+            {TEMPLATE_GROUPS.map(g => (
+              <div key={g.label}>
+                <p className="text-[10px] font-semibold text-stone-400 uppercase tracking-widest mb-1.5">{g.label}</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {g.items.map(t => (
+                    <button key={t} type="button" onClick={() => pickTemplate(t)} className="chip px-3 py-1.5">
+                      {t}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
           </div>
         )}
-      </div>
 
-      {messages.length === 0 && !isLoading && (
-        <div className="flex flex-wrap gap-2">
-          {SUGGESTIONS.map(s => (
-            <button
-              key={s}
-              type="button"
-              onClick={() => onInputChange(s)}
-              className="chip px-3 py-1.5"
-            >
-              {s}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {messages.length > 0 && (
-        <div className="space-y-2 max-h-56 overflow-y-auto custom-scrollbar pr-1">
-          {messages.map((m, i) => (
-            <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-              <div className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-xs leading-relaxed ${
-                m.role === 'user'
-                  ? 'bg-stone-900 text-white'
-                  : 'bg-stone-50 text-stone-600 border border-stone-100'
-              }`}>
-                {m.text}
+        {/* 履歴のポップオーバー */}
+        {showHistory && !showTemplates && (hasHistory || isLoading) && (
+          <div className="absolute bottom-full mb-2 inset-x-0 card shadow-card-hover p-4 max-h-[40vh] overflow-y-auto custom-scrollbar space-y-2 animate-in fade-in slide-in-from-bottom-2 duration-200">
+            {messages.map((m, i) => (
+              <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                <div className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-xs leading-relaxed ${
+                  m.role === 'user'
+                    ? 'bg-stone-900 text-white'
+                    : 'bg-stone-50 text-stone-600 border border-stone-100'
+                }`}>
+                  {m.text}
+                </div>
               </div>
-            </div>
-          ))}
-          {isLoading && (
-            <div className="flex justify-start">
-              <div className="bg-stone-50 border border-stone-100 rounded-2xl px-4 py-2.5 text-xs text-stone-400 flex items-center gap-2">
-                <span className="w-1.5 h-1.5 rounded-full bg-stone-300 animate-bounce [animation-delay:-0.3s]"></span>
-                <span className="w-1.5 h-1.5 rounded-full bg-stone-300 animate-bounce [animation-delay:-0.15s]"></span>
-                <span className="w-1.5 h-1.5 rounded-full bg-stone-300 animate-bounce"></span>
-                編集しています…
+            ))}
+            {isLoading && (
+              <div className="flex justify-start">
+                <div className="bg-stone-50 border border-stone-100 rounded-2xl px-4 py-2.5 text-xs text-stone-400 flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 rounded-full bg-stone-300 animate-bounce [animation-delay:-0.3s]"></span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-stone-300 animate-bounce [animation-delay:-0.15s]"></span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-stone-300 animate-bounce"></span>
+                  編集しています…
+                </div>
+              </div>
+            )}
+            <div ref={historyEndRef} />
+          </div>
+        )}
+
+        {/* コマンドバー本体 */}
+        <div className="card shadow-card-hover p-3">
+          {error && <p className="text-xs text-brand-600 px-1 pb-2">{error}</p>}
+          {isDirty && (
+            <div className="flex items-center justify-between gap-2 px-1 pb-2">
+              <span className="text-[11px] font-semibold text-brand-600">未保存の変更があります</span>
+              <div className="flex items-center gap-2">
+                <button type="button" onClick={onDiscard} className="btn-quiet px-3 py-1.5 text-xs">元に戻す</button>
+                <button type="button" onClick={onSave} className="btn-primary px-4 py-1.5 text-xs">
+                  {justSaved ? '保存しました' : '変更を保存'}
+                </button>
               </div>
             </div>
           )}
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="shrink-0 w-9 h-9 rounded-xl bg-stone-900 text-white flex items-center justify-center" title="AIに編集を依頼" aria-hidden>
+              <SparkleIcon />
+            </div>
+            <button
+              type="button"
+              onClick={() => { setShowTemplates(v => !v); setShowHistory(false); }}
+              aria-pressed={showTemplates}
+              className={`${showTemplates ? 'chip-active' : 'chip'} px-3 py-2 shrink-0`}
+            >
+              テンプレ
+            </button>
+            {hasHistory && (
+              <button
+                type="button"
+                onClick={() => { setShowHistory(v => !v); setShowTemplates(false); }}
+                aria-pressed={showHistory}
+                className={`${showHistory ? 'chip-active' : 'chip'} px-3 py-2 shrink-0`}
+              >
+                履歴
+              </button>
+            )}
+            <form
+              onSubmit={(e) => { e.preventDefault(); onSend(); }}
+              className="flex-grow flex gap-2 min-w-[220px]"
+            >
+              <input
+                ref={inputRef}
+                value={input}
+                onChange={(e) => onInputChange(e.target.value)}
+                placeholder="AIに編集を依頼（例: もっと親しみやすく／タイトルだけ変えて）"
+                aria-label="AIへの編集指示"
+                disabled={isLoading}
+                className="field flex-grow px-4 py-2.5 text-sm rounded-full"
+              />
+              <button
+                type="submit"
+                disabled={isLoading || !input.trim()}
+                className="btn-dark px-5 py-2.5 text-xs shrink-0"
+              >
+                送信
+              </button>
+            </form>
+          </div>
         </div>
-      )}
-
-      {error && <p className="text-xs text-brand-600">{error}</p>}
-
-      <form
-        onSubmit={(e) => { e.preventDefault(); onSend(); }}
-        className="flex gap-2"
-      >
-        <input
-          value={input}
-          onChange={(e) => onInputChange(e.target.value)}
-          placeholder="例: もっと親しみやすい文体にして"
-          aria-label="AIへの編集指示"
-          disabled={isLoading}
-          className="field flex-grow px-4 py-2.5 text-sm"
-        />
-        <button
-          type="submit"
-          disabled={isLoading || !input.trim()}
-          className="btn-dark px-5 py-2.5 text-xs shrink-0"
-        >
-          送信
-        </button>
-      </form>
+      </div>
     </div>
   );
 };

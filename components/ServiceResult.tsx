@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { getThumbnailPrompt, reviseServiceContent } from '../services/geminiService';
 import { SkillIdea, ThumbnailPromptVersion } from '../types';
-import { PROMPT_PREVIEWS } from './promptPreviews';
+import { PromptPreview } from './promptPreviews';
 import ServiceChatEditor, { ChatMessage } from './ServiceChatEditor';
 
 interface ServiceResultProps {
@@ -308,18 +308,33 @@ const PromptCard: React.FC<{
   onCopy: () => void;
   onToggle: () => void;
 }> = ({ style, prompt, copied, expanded, onCopy, onToggle }) => (
-  <div className={`card p-5 space-y-3 ${style.fullWidth ? 'md:col-span-2' : ''}`}>
-    <div className="flex items-start gap-4">
-      <div className="flex-1 min-w-0">
-        <h6 className="text-sm font-semibold text-stone-900">{style.label}</h6>
-        <p className="text-xs text-stone-500 mt-1 leading-relaxed">{style.description}</p>
-        {style.note && (
-          <p className="text-[11px] text-stone-400 mt-1.5 leading-relaxed">※{style.note}</p>
-        )}
+  <div className={`card p-4 space-y-3 ${style.fullWidth ? 'md:col-span-2' : ''}`}>
+    {style.fullWidth ? (
+      <div className="flex flex-col sm:flex-row items-start gap-4">
+        <PromptPreview version={style.id} className="w-full sm:w-[240px] shrink-0 rounded-xl border border-stone-100" />
+        <div className="flex-1 min-w-0">
+          <div className="flex items-start justify-between gap-3">
+            <h6 className="text-sm font-semibold text-stone-900">{style.label}</h6>
+            <CopyButton copied={copied} onClick={onCopy} dark />
+          </div>
+          <p className="text-xs text-stone-500 mt-1 leading-relaxed">{style.description}</p>
+          {style.note && (
+            <p className="text-[11px] text-stone-400 mt-1.5 leading-relaxed">※{style.note}</p>
+          )}
+        </div>
       </div>
-      {PROMPT_PREVIEWS[style.id]}
-      <CopyButton copied={copied} onClick={onCopy} dark />
-    </div>
+    ) : (
+      <>
+        <PromptPreview version={style.id} className="w-full rounded-xl border border-stone-100" />
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex-1 min-w-0">
+            <h6 className="text-sm font-semibold text-stone-900">{style.label}</h6>
+            <p className="text-xs text-stone-500 mt-1 leading-relaxed">{style.description}</p>
+          </div>
+          <CopyButton copied={copied} onClick={onCopy} dark />
+        </div>
+      </>
+    )}
     <button
       onClick={onToggle}
       className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-stone-400 hover:text-brand-500 transition-colors"
@@ -515,7 +530,7 @@ const ServiceResult: React.FC<ServiceResultProps> = ({ idea, content, onBack, on
     `px-4 py-1.5 ${active ? 'chip-active' : 'chip'}`;
 
   return (
-    <div className="p-6 md:p-10 lg:p-12 h-full flex flex-col">
+    <div className="p-6 md:p-10 lg:p-12 pb-32 h-full flex flex-col">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
         <div>
           <span className="eyebrow mb-1 block">Step 3</span>
@@ -543,19 +558,6 @@ const ServiceResult: React.FC<ServiceResultProps> = ({ idea, content, onBack, on
       </div>
 
       <div className="space-y-10">
-        <ServiceChatEditor
-          messages={chatMessages}
-          input={chatInput}
-          onInputChange={setChatInput}
-          onSend={handleSendChatInstruction}
-          isLoading={isChatLoading}
-          error={chatError}
-          isDirty={isDirty}
-          justSaved={justSaved}
-          onSave={handleSaveDraft}
-          onDiscard={handleDiscardDraft}
-        />
-
         {/* Next Steps Guide */}
         <div className="border border-brand-100 rounded-2xl p-6 md:p-8" style={{ backgroundImage: 'var(--gradient-brand-soft)' }}>
           <h4 className="text-stone-900 font-bold text-base mb-6">次のステップ — 出品まであと少し</h4>
@@ -821,6 +823,20 @@ const ServiceResult: React.FC<ServiceResultProps> = ({ idea, content, onBack, on
           </div>
         </div>
       </div>
+
+      {/* 画面下部に常駐するAI編集バー（fixed配置） */}
+      <ServiceChatEditor
+        messages={chatMessages}
+        input={chatInput}
+        onInputChange={setChatInput}
+        onSend={handleSendChatInstruction}
+        isLoading={isChatLoading}
+        error={chatError}
+        isDirty={isDirty}
+        justSaved={justSaved}
+        onSave={handleSaveDraft}
+        onDiscard={handleDiscardDraft}
+      />
     </div>
   );
 };
