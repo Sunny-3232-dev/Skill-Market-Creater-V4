@@ -604,6 +604,7 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
                 <div className="mb-6">
                   <h3 className="text-lg font-bold text-stone-900">スライド資料プロンプト ({SLIDE_DOC_VERSIONS.length}パターン)</h3>
                   <p className="text-xs text-stone-500 mt-1">お好みのトンマナをコピーし、NotebookLM のスライド作成カスタマイズ欄に貼り付けてください。</p>
+                  <p className="text-[11px] text-stone-400 mt-1">※画像は雰囲気を伝えるトンマナ見本です。実際に作られるのはサムネイルではなくスライド資料です。</p>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start mb-8">
@@ -617,7 +618,7 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
                             <h4 className="text-sm font-semibold text-stone-900">{label}</h4>
                             <p className="text-xs text-stone-500 leading-relaxed mt-1">{description}</p>
                           </div>
-                          <PromptPreview version={id} className="w-[120px] shrink-0 rounded-lg border border-stone-100" />
+                          <PromptPreview version={id} badge="トンマナ見本" className="w-[120px] shrink-0 rounded-lg border border-stone-100" />
                           <button
                             type="button"
                             onClick={() => handleCopySlideDocPrompt(id)}

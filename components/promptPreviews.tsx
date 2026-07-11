@@ -51,17 +51,23 @@ const MyStylePreview = () => (
   </svg>
 );
 
-export const PromptPreview: React.FC<{ version: ThumbnailPromptVersion; className?: string }> = ({ version, className = '' }) => {
+export const PromptPreview: React.FC<{
+  version: ThumbnailPromptVersion;
+  className?: string;
+  /** 画像左上に重ねるラベル。誤解防止のため「これはサンプル」と明示する */
+  badge?: string;
+}> = ({ version, className = '', badge = '仕上がりイメージ' }) => {
   const src = GENERATED_PREVIEWS[version];
   if (src) {
     return (
-      <img
-        src={src}
-        alt=""
-        aria-hidden
-        loading="lazy"
-        className={`block aspect-[3/2] object-cover bg-stone-100 ${className}`}
-      />
+      <div className={`relative overflow-hidden aspect-[3/2] bg-stone-100 ${className}`} aria-hidden>
+        <img src={src} alt="" loading="lazy" className="block w-full h-full object-cover" />
+        {badge && (
+          <span className="absolute top-1.5 left-1.5 text-[9px] font-semibold text-white bg-stone-900/60 backdrop-blur-sm px-1.5 py-0.5 rounded">
+            {badge}
+          </span>
+        )}
+      </div>
     );
   }
   return (

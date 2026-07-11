@@ -63,12 +63,23 @@ const ServiceChatEditor: React.FC<ServiceChatEditorProps> = ({
   const [showHistory, setShowHistory] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const historyEndRef = useRef<HTMLDivElement>(null);
+  const autoOpenedRef = useRef(false); // 履歴が自動で開いたか（自動なら応答後に自動で畳む）
 
-  // 送信したら履歴パネルを開き、テンプレは閉じる
+  // 送信したら履歴パネルを開き、応答が返ったら数秒見せてから自動で畳む。
+  // ユーザーが「履歴」ボタンで開いた場合は畳まない。
   useEffect(() => {
     if (isLoading) {
       setShowHistory(true);
       setShowTemplates(false);
+      autoOpenedRef.current = true;
+      return;
+    }
+    if (autoOpenedRef.current) {
+      const timer = setTimeout(() => {
+        setShowHistory(false);
+        autoOpenedRef.current = false;
+      }, 4000);
+      return () => clearTimeout(timer);
     }
   }, [isLoading]);
 
@@ -153,8 +164,14 @@ const ServiceChatEditor: React.FC<ServiceChatEditorProps> = ({
             </div>
           )}
           <div className="flex items-center gap-2 flex-wrap">
-            <div className="shrink-0 w-9 h-9 rounded-xl bg-stone-900 text-white flex items-center justify-center" title="AIに編集を依頼" aria-hidden>
-              <SparkleIcon />
+            <div className="shrink-0 flex items-center gap-2" title="AIに編集を依頼">
+              <div className="w-9 h-9 rounded-xl bg-stone-900 text-white flex items-center justify-center" aria-hidden>
+                <SparkleIcon />
+              </div>
+              <div className="hidden sm:block leading-tight pr-1">
+                <p className="text-xs font-bold text-stone-900">AI編集</p>
+                <p className="text-[10px] text-stone-400">文章で指示</p>
+              </div>
             </div>
             <button
               type="button"
@@ -167,7 +184,7 @@ const ServiceChatEditor: React.FC<ServiceChatEditorProps> = ({
             {hasHistory && (
               <button
                 type="button"
-                onClick={() => { setShowHistory(v => !v); setShowTemplates(false); }}
+                onClick={() => { setShowHistory(v => !v); setShowTemplates(false); autoOpenedRef.current = false; }}
                 aria-pressed={showHistory}
                 className={`${showHistory ? 'chip-active' : 'chip'} px-3 py-2 shrink-0`}
               >

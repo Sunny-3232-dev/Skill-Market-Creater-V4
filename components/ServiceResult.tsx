@@ -786,6 +786,7 @@ const ServiceResult: React.FC<ServiceResultProps> = ({ idea, content, onBack, on
               <div>
                 <h5 className="text-base font-bold text-stone-900">画像生成プロンプト</h5>
                 <p className="text-xs text-stone-500 mt-1">ChatGPT がおすすめ（Gemini でも OK）。Gemini の場合は「画像を作成」と思考モードにしてください。</p>
+                <p className="text-[11px] text-stone-400 mt-1">※各カードの画像は仕上がりのサンプルです。コピーしたプロンプトから、あなたのサービス内容でAIが新しく生成します。</p>
               </div>
               <div className="flex gap-2 flex-wrap">
                 <a
