@@ -53,7 +53,7 @@ const InputForm: React.FC<InputFormProps> = ({ onSubmit, initialText = '', hasId
         <GuideStep number={3} title="出品セットが完成" description="文章と画像プロンプトが出来上がります。" />
       </div>
 
-      <div className="mb-5 flex items-start justify-between gap-3">
+      <div className="mb-4 flex items-start justify-between gap-3">
         <div>
           <span className="eyebrow mb-1 block">Step 1</span>
           <h2 className="text-xl md:text-2xl font-bold text-stone-900 tracking-tight">あなたの好き・得意・経験を教えてください</h2>
@@ -65,12 +65,16 @@ const InputForm: React.FC<InputFormProps> = ({ onSubmit, initialText = '', hasId
         )}
       </div>
 
+      <p className="text-sm text-stone-500 leading-relaxed mb-5">
+        いちばんかんたんなのは、<span className="font-semibold text-stone-700">リベシティのプロフィールをそのままコピペ</span>。もっと掘り下げたい人は「スキルの種シート」の内容でもOKです。
+      </p>
+
       <form onSubmit={handleSubmit} className="flex-grow flex flex-col gap-5">
         <textarea
           value={rawText}
           onChange={(e) => setRawText(e.target.value)}
           className="field w-full flex-grow min-h-[200px] md:min-h-[260px] p-5 md:p-6 text-stone-800 text-base leading-relaxed resize-none"
-          placeholder={"ここに自由に書き込んでください。\n・好きなこと、得意なこと\n・これまでの仕事や人生の経験\n\n箇条書きやメモのコピーでも構いません。AIが魅力的なサービス案に変換します。"}
+          placeholder={"ここに貼り付け、または自由に入力してください。\n・好きなこと、得意なこと\n・これまでの仕事や人生の経験\n\nプロフィールの文章をまるごと貼り付けてもOKです。"}
         />
 
         {hasIdeas && (
