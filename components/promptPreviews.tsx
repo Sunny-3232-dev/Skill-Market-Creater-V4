@@ -15,7 +15,6 @@ const GENERATED_PREVIEWS: Partial<Record<ThumbnailPromptVersion, string>> = {
   pop: '/previews/pop.jpg',
   youtube: '/previews/youtube.jpg',
   puffy_3d: '/previews/puffy_3d.jpg',
-  pivot: '/previews/pivot.jpg',
 };
 
 const MyStylePreview = () => (

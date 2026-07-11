@@ -72,11 +72,6 @@ const SLIDE_DOC_VERSIONS: Array<{
     description: '人気YouTuberのサムネイル調。派手・インパクト重視で思わずクリックしたくなる印象。',
   },
   {
-    id: 'pivot',
-    label: 'PIVOT風',
-    description: 'ビジネスインタビュー番組のトンマナ。深緑ベースで知的・上質な印象。',
-  },
-  {
     id: 'puffy_3d',
     label: 'ぷっくり3D',
     description: '粘土のようにぷっくり膨らんだ3D調。パステルカラーでやわらかく、思わず目を引く可愛い印象。',
@@ -872,13 +867,25 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
         )}
 
         <div className="mb-8">
-          <SectionLabel label="学長マガジンチャット" />
-          <ArticleList articles={MAGAZINE_ARTICLES} />
-        </div>
+          <div className="flex items-center gap-2.5 mb-5 px-1">
+            <span className="text-[10px] font-semibold text-stone-400 uppercase tracking-[0.2em]">売れる出品者のヒント</span>
+            <span className="w-1 h-1 rounded-full bg-brand-300"></span>
+            <span className="text-[11px] text-stone-400">迷ったら先人の知恵をのぞいてみましょう</span>
+            <div className="h-px bg-stone-200 flex-grow"></div>
+          </div>
 
-        <div className="mb-8">
-          <SectionLabel label="ノウハウ記事" />
-          <ArticleList articles={KNOWHOW_ARTICLES} />
+          <div className="space-y-8">
+            <ArticleList
+              title="学長に学ぶ、売る前の基本"
+              subtitle="リベ大の両学長が「価格の決め方」「嫌われない宣伝のコツ」を解説。出品する前に押さえておきたい考え方です。"
+              articles={MAGAZINE_ARTICLES}
+            />
+            <ArticleList
+              title="先輩出品者のノウハウ図書館"
+              subtitle="実際に売れている出品者が実践しているコツを無料で読めます。「売れない…」のつまずきポイントの解決策も。"
+              articles={KNOWHOW_ARTICLES}
+            />
+          </div>
         </div>
       </div>
 

@@ -48,5 +48,4 @@ export interface SurveyPattern {
 }
 
 // Thumbnail Prompt Version
-// pivot はスライド資料用に残存（サムネイルUIからは削除済み）。puffy_3d はサムネイル専用
-export type ThumbnailPromptVersion = 'standard' | 'simple' | 'watercolor' | 'pop' | 'my_style' | 'youtube' | 'pivot' | 'puffy_3d';
+export type ThumbnailPromptVersion = 'standard' | 'simple' | 'watercolor' | 'pop' | 'my_style' | 'youtube' | 'puffy_3d';
