@@ -108,15 +108,11 @@ const App: React.FC = () => {
         </div>
       </header>
 
-      <main className="bg-white rounded-3xl border border-stone-200/70 shadow-card overflow-hidden min-h-[500px] md:min-h-[600px] flex flex-col">
+      <main className="bg-white rounded-3xl border border-stone-200/70 shadow-card overflow-hidden min-h-[500px] md:min-h-[600px] flex flex-col mb-10 md:mb-14">
         <div className="flex-grow w-full flex flex-col">
           {renderTool()}
         </div>
       </main>
-
-      <footer className="mt-10 md:mt-14 pb-8">
-        <p className="text-center text-stone-400 text-xs">Powered by Gemini</p>
-      </footer>
 
       {toast && (
         <div className="fixed bottom-6 inset-x-0 z-[200] flex justify-center px-4 pointer-events-none">

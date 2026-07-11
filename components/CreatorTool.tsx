@@ -78,6 +78,14 @@ const CreatorTool: React.FC<CreatorToolProps> = ({ ensureKeySet, onHandleApiErro
 
   const inputWords = useMemo(() => extractWords(rawInputText), [rawInputText]);
 
+  // ピン留めしたアイデアは常に先頭に残し、新規生成分を後ろに足す（タイトル重複は除外）
+  const mergeWithPinned = (existing: SkillIdea[], generated: SkillIdea[]): SkillIdea[] => {
+    const pinned = existing.filter(i => i.pinned);
+    const pinnedTitles = new Set(pinned.map(i => i.title));
+    const fresh = generated.filter(g => !pinnedTitles.has(g.title));
+    return [...pinned, ...fresh];
+  };
+
   const handleStartIdeaGeneration = async (input: UserInput) => {
     const keyReady = await ensureKeySet();
     if (!keyReady) return;
@@ -93,15 +101,50 @@ const CreatorTool: React.FC<CreatorToolProps> = ({ ensureKeySet, onHandleApiErro
     setLoadingTitle("アイデアを考えています");
     setLoadingMessage("あなたの情報を分析し、最適なアイデアを練り上げています…");
     try {
-      const result = await generateIdeas(input);
-      setIdeas(result);
-      saveIdeasToStorage(result);
+      // プロフィールを変更して作り直す場合でも、ピン留めしたアイデアは残す
+      const pinned = ideas.filter(i => i.pinned);
+      const result = await generateIdeas(input, { pinnedIdeas: pinned.map(p => ({ title: p.title })) });
+      const merged = mergeWithPinned(ideas, result);
+      setIdeas(merged);
+      saveIdeasToStorage(merged);
       setStep(Step.IDEAS);
     } catch (error: any) {
       onHandleApiError(error);
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // Step 2 でAIに追加指示を出して、ピン留め以外のアイデアを作り直す
+  const handleRegenerate = async (instruction: string) => {
+    const keyReady = await ensureKeySet();
+    if (!keyReady) return;
+
+    setIsLoading(true);
+    setLoadingTitle("アイデアを作り直しています");
+    setLoadingMessage(instruction.trim()
+      ? "リクエストを反映して、新しい切り口を考えています…"
+      : "別の角度から、新しいアイデアを考えています…");
+    try {
+      const pinned = ideas.filter(i => i.pinned);
+      const result = await generateIdeas(
+        { rawText: rawInputText },
+        { instruction, pinnedIdeas: pinned.map(p => ({ title: p.title })) }
+      );
+      const merged = mergeWithPinned(ideas, result);
+      setIdeas(merged);
+      saveIdeasToStorage(merged);
+    } catch (error: any) {
+      onHandleApiError(error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // プロフィール（好き・得意・経験）を編集し直す。ピン留め等のデータは保持したまま入力画面へ戻る
+  const handleEditProfile = () => {
+    setStep(Step.INPUT);
+    window.scrollTo(0, 0);
   };
 
   const handleSelectIdea = async (idea: SkillIdea) => {
@@ -138,14 +181,6 @@ const CreatorTool: React.FC<CreatorToolProps> = ({ ensureKeySet, onHandleApiErro
     } finally {
       setIsLoading(false);
     }
-  };
-
-  // 削除確認はIdeaList側の2段階クリックで行う
-  const handleDeleteIdea = (e: React.MouseEvent, ideaId: string) => {
-    e.stopPropagation();
-    const updatedIdeas = ideas.filter(i => i.id !== ideaId);
-    setIdeas(updatedIdeas);
-    saveIdeasToStorage(updatedIdeas);
   };
 
   const handleTogglePin = (e: React.MouseEvent, ideaId: string) => {
@@ -190,15 +225,16 @@ const CreatorTool: React.FC<CreatorToolProps> = ({ ensureKeySet, onHandleApiErro
                     履歴を消去してリセット
                  </button>
                </div>
-               <InputForm onSubmit={handleStartIdeaGeneration} />
+               <InputForm onSubmit={handleStartIdeaGeneration} initialText={rawInputText} hasIdeas={ideas.length > 0} onBackToIdeas={() => setStep(Step.IDEAS)} />
             </>
           )}
           {step === Step.IDEAS && (
             <IdeaList
               ideas={ideas}
               onSelect={handleSelectIdea}
-              onDelete={handleDeleteIdea}
               onTogglePin={handleTogglePin}
+              onRegenerate={handleRegenerate}
+              onEditProfile={handleEditProfile}
               onBack={forceReset}
             />
           )}

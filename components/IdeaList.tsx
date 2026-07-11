@@ -1,25 +1,55 @@
 import React, { useMemo, useState } from 'react';
 import { SkillIdea } from '../types';
-import { PinIcon } from './icons';
+import { PinIcon, SparkleIcon } from './icons';
 
 interface IdeaListProps {
   ideas: SkillIdea[];
   onSelect: (idea: SkillIdea) => void;
-  onDelete: (e: React.MouseEvent, id: string) => void;
   onTogglePin: (e: React.MouseEvent, id: string) => void;
+  onRegenerate: (instruction: string) => void;
+  onEditProfile: () => void;
   onBack: (e?: React.MouseEvent) => void;
 }
+
+// 再生成バーで使える指示のテンプレ
+const REGEN_SUGGESTIONS = [
+  'もっと高単価なもの',
+  'オンラインで完結するもの',
+  '副業として始めやすいもの',
+  '初心者でも今日から出せるもの',
+];
 
 // ピン留めしたアイデアを各セクション内で先頭に寄せる
 const sortPinnedFirst = (items: SkillIdea[]): SkillIdea[] =>
   [...items].sort((a, b) => Number(!!b.pinned) - Number(!!a.pinned));
 
-const IdeaList: React.FC<IdeaListProps> = ({ ideas, onSelect, onDelete, onTogglePin, onBack }) => {
+const PinButton: React.FC<{ pinned?: boolean; onClick: (e: React.MouseEvent) => void }> = ({ pinned, onClick }) => (
+  <button
+    onClick={onClick}
+    aria-pressed={!!pinned}
+    title={pinned ? 'ピン留めを外す' : 'ピン留めする'}
+    className={`inline-flex items-center gap-1.5 rounded-full text-[11px] font-semibold transition-colors px-3 py-1.5 ${
+      pinned
+        ? 'bg-brand-500 text-white hover:bg-brand-600'
+        : 'bg-white text-stone-400 border border-stone-200 hover:border-brand-300 hover:text-brand-600'
+    }`}
+  >
+    <PinIcon filled={pinned} />
+    {pinned ? 'ピン留め中' : 'ピン留め'}
+  </button>
+);
+
+const IdeaList: React.FC<IdeaListProps> = ({ ideas, onSelect, onTogglePin, onRegenerate, onEditProfile, onBack }) => {
   const [showResetConfirm, setShowResetConfirm] = useState(false);
-  const [deleteCandidate, setDeleteCandidate] = useState<string | null>(null);
   const [pinnedOnly, setPinnedOnly] = useState(false);
+  const [regenInstruction, setRegenInstruction] = useState('');
 
   const pinnedCount = useMemo(() => ideas.filter(i => i.pinned).length, [ideas]);
+
+  const handleRegenerate = () => {
+    onRegenerate(regenInstruction);
+    setRegenInstruction('');
+  };
 
   if (ideas.length === 0) {
     return (
@@ -44,17 +74,6 @@ const IdeaList: React.FC<IdeaListProps> = ({ ideas, onSelect, onDelete, onToggle
   const standardIdeas = sortPinnedFirst(visibleIdeas.filter(i => i.type === 'standard'));
   const nicheIdeas = sortPinnedFirst(visibleIdeas.filter(i => i.type === 'niche'));
 
-  const handleDeleteClick = (e: React.MouseEvent, id: string) => {
-    e.stopPropagation();
-    if (deleteCandidate === id) {
-      setDeleteCandidate(null);
-      onDelete(e, id);
-    } else {
-      setDeleteCandidate(id);
-      setTimeout(() => setDeleteCandidate(prev => (prev === id ? null : prev)), 3000);
-    }
-  };
-
   const renderSection = (title: string, badge: string, description: string, items: SkillIdea[]) => {
     if (items.length === 0) return null;
     return (
@@ -70,7 +89,6 @@ const IdeaList: React.FC<IdeaListProps> = ({ ideas, onSelect, onDelete, onToggle
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {items.map((idea) => {
             const isGenerated = !!idea.generatedContent;
-            const isDeleting = deleteCandidate === idea.id;
             return (
               <div
                 key={idea.id}
@@ -78,11 +96,12 @@ const IdeaList: React.FC<IdeaListProps> = ({ ideas, onSelect, onDelete, onToggle
                 tabIndex={0}
                 onClick={() => onSelect(idea)}
                 onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onSelect(idea); }}
-                className={`card-hoverable cursor-pointer text-left p-6 group flex flex-col h-full relative ${
-                  idea.pinned ? 'border-brand-200 ring-1 ring-brand-100' : ''
+                className={`card-hoverable cursor-pointer text-left p-6 group flex flex-col h-full relative overflow-hidden ${
+                  idea.pinned ? 'border-brand-300 ring-1 ring-brand-100 bg-brand-50/20' : ''
                 }`}
               >
-                <div className="flex justify-between items-center mb-3">
+                {idea.pinned && <span className="absolute top-0 left-0 w-1 h-full bg-brand-400"></span>}
+                <div className="flex justify-between items-center mb-3 gap-2">
                   {isGenerated ? (
                     <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full">
                       作成済み
@@ -90,37 +109,8 @@ const IdeaList: React.FC<IdeaListProps> = ({ ideas, onSelect, onDelete, onToggle
                   ) : (
                     <span className="text-[11px] font-semibold text-stone-400">未作成</span>
                   )}
-                  <div className="flex items-center gap-1">
-                    <button
-                      onClick={(e) => { e.stopPropagation(); onTogglePin(e, idea.id); }}
-                      className={`p-1.5 rounded-lg transition-all ${
-                        idea.pinned
-                          ? 'text-brand-500 hover:text-brand-600 hover:bg-brand-50 opacity-100'
-                          : 'text-stone-300 hover:text-brand-500 hover:bg-brand-50 opacity-0 group-hover:opacity-100'
-                      }`}
-                      title={idea.pinned ? 'ピン留めを外す' : 'ピン留めする'}
-                      aria-pressed={!!idea.pinned}
-                    >
-                      <PinIcon filled={idea.pinned} />
-                    </button>
-                    <button
-                      onClick={(e) => handleDeleteClick(e, idea.id)}
-                      className={`text-[11px] font-semibold rounded-full transition-all ${
-                        isDeleting
-                          ? 'px-3 py-1 bg-brand-500 text-white'
-                          : 'p-1.5 text-stone-300 hover:text-brand-500 hover:bg-brand-50 opacity-0 group-hover:opacity-100'
-                      }`}
-                      title="削除"
-                    >
-                      {isDeleting ? 'もう一度押すと削除' : (
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                      )}
-                    </button>
-                    {!isGenerated && !isDeleting && (
-                      <span className="opacity-0 group-hover:opacity-100 transition-opacity duration-300 text-xs font-semibold text-brand-500 ml-1">
-                        作成する →
-                      </span>
-                    )}
+                  <div onClick={(e) => e.stopPropagation()}>
+                    <PinButton pinned={idea.pinned} onClick={(e) => onTogglePin(e, idea.id)} />
                   </div>
                 </div>
 
@@ -136,6 +126,12 @@ const IdeaList: React.FC<IdeaListProps> = ({ ideas, onSelect, onDelete, onToggle
                 <p className="text-sm text-stone-500 leading-relaxed flex-grow">
                   <span className="font-semibold text-stone-600 mr-1">解決する悩み:</span>{idea.solution}
                 </p>
+
+                <div className="mt-4 flex justify-end">
+                  <span className="text-xs font-semibold text-brand-500 opacity-0 group-hover:opacity-100 transition-opacity">
+                    {isGenerated ? '内容を見る →' : '出品ページを作成 →'}
+                  </span>
+                </div>
               </div>
             );
           })}
@@ -146,29 +142,32 @@ const IdeaList: React.FC<IdeaListProps> = ({ ideas, onSelect, onDelete, onToggle
 
   return (
     <div className="p-6 md:p-10 lg:p-12">
-      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-5 mb-10 pb-8 border-b border-stone-100">
+      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-5 mb-8">
         <div>
           <span className="eyebrow mb-1 block">Step 2</span>
           <h2 className="text-xl md:text-2xl font-bold text-stone-900 tracking-tight">気になるアイデアを選択</h2>
           <p className="text-stone-500 mt-1.5 text-sm">
-            あなたにぴったりの <span className="text-stone-900 font-bold">{ideas.length}</span> 件のアイデアが見つかりました
+            ぴったりの案が見つかったら、<span className="text-brand-600 font-semibold">ピン留め</span>して残せます。残りはAIで何度でも作り直せます。
           </p>
         </div>
-        <div className="flex items-center gap-3 shrink-0">
+        <div className="flex items-center gap-2 shrink-0">
+          <button type="button" onClick={onEditProfile} className="btn-secondary py-2.5 px-4 text-xs">
+            プロフィールを修正
+          </button>
           {showResetConfirm ? (
             <div className="flex items-center gap-2 animate-in fade-in slide-in-from-right-4 duration-300">
-              <span className="text-xs text-stone-500">データを消去しますか？</span>
+              <span className="text-xs text-stone-500">全部消しますか？</span>
               <button
                 type="button"
                 onClick={(e) => { setShowResetConfirm(false); onBack(e); }}
-                className="btn-dark py-2 px-4 text-xs"
+                className="btn-dark py-2.5 px-4 text-xs"
               >
                 はい
               </button>
               <button
                 type="button"
                 onClick={() => setShowResetConfirm(false)}
-                className="btn-quiet py-2 px-4 text-xs"
+                className="btn-quiet py-2.5 px-4 text-xs"
               >
                 いいえ
               </button>
@@ -177,11 +176,49 @@ const IdeaList: React.FC<IdeaListProps> = ({ ideas, onSelect, onDelete, onToggle
             <button
               type="button"
               onClick={() => setShowResetConfirm(true)}
-              className="btn-secondary py-2.5 px-5 text-xs"
+              className="btn-secondary py-2.5 px-4 text-xs"
             >
-              最初からやり直す
+              最初から
             </button>
           )}
+        </div>
+      </div>
+
+      {/* AIで作り直すバー */}
+      <div className="mb-8 rounded-2xl border border-brand-100 p-5" style={{ backgroundImage: 'var(--gradient-brand-soft)' }}>
+        <div className="flex items-center gap-2 mb-3">
+          <span className="w-7 h-7 rounded-lg bg-stone-900 text-white flex items-center justify-center shrink-0">
+            <SparkleIcon />
+          </span>
+          <div>
+            <h3 className="text-sm font-bold text-stone-900">AIでアイデアを作り直す</h3>
+            <p className="text-[11px] text-stone-500">ピン留めした案は残したまま、それ以外を作り直します。</p>
+          </div>
+        </div>
+        <div className="flex flex-col sm:flex-row gap-2">
+          <input
+            value={regenInstruction}
+            onChange={(e) => setRegenInstruction(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleRegenerate(); } }}
+            placeholder="例: もっと高単価に／オンライン完結で（空欄でもOK）"
+            aria-label="作り直しの指示"
+            className="field flex-grow px-4 py-2.5 text-sm rounded-full bg-white"
+          />
+          <button type="button" onClick={handleRegenerate} className="btn-primary px-6 py-2.5 text-xs shrink-0">
+            作り直す
+          </button>
+        </div>
+        <div className="flex flex-wrap gap-1.5 mt-3">
+          {REGEN_SUGGESTIONS.map(s => (
+            <button
+              key={s}
+              type="button"
+              onClick={() => setRegenInstruction(s)}
+              className="chip px-3 py-1.5 bg-white/70"
+            >
+              {s}
+            </button>
+          ))}
         </div>
       </div>
 

@@ -3,6 +3,10 @@ import { UserInput } from '../types';
 
 interface InputFormProps {
   onSubmit: (input: UserInput) => void;
+  initialText?: string;
+  // 既存のアイデアがある状態でプロフィール編集に来た場合の表示切り替え
+  hasIdeas?: boolean;
+  onBackToIdeas?: () => void;
 }
 
 const GuideStep: React.FC<{
@@ -31,8 +35,8 @@ const GuideStep: React.FC<{
   </div>
 );
 
-const InputForm: React.FC<InputFormProps> = ({ onSubmit }) => {
-  const [rawText, setRawText] = useState('');
+const InputForm: React.FC<InputFormProps> = ({ onSubmit, initialText = '', hasIdeas = false, onBackToIdeas }) => {
+  const [rawText, setRawText] = useState(initialText);
   const canSubmit = rawText.trim().length > 0;
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -49,9 +53,16 @@ const InputForm: React.FC<InputFormProps> = ({ onSubmit }) => {
         <GuideStep number={3} title="出品セットが完成" description="文章と画像プロンプトが出来上がります。" />
       </div>
 
-      <div className="mb-5">
-        <span className="eyebrow mb-1 block">Step 1</span>
-        <h2 className="text-xl md:text-2xl font-bold text-stone-900 tracking-tight">あなたの好き・得意・経験を教えてください</h2>
+      <div className="mb-5 flex items-start justify-between gap-3">
+        <div>
+          <span className="eyebrow mb-1 block">Step 1</span>
+          <h2 className="text-xl md:text-2xl font-bold text-stone-900 tracking-tight">あなたの好き・得意・経験を教えてください</h2>
+        </div>
+        {hasIdeas && onBackToIdeas && (
+          <button type="button" onClick={onBackToIdeas} className="btn-secondary px-4 py-2 text-xs shrink-0">
+            ← アイデア一覧へ
+          </button>
+        )}
       </div>
 
       <form onSubmit={handleSubmit} className="flex-grow flex flex-col gap-5">
@@ -62,12 +73,18 @@ const InputForm: React.FC<InputFormProps> = ({ onSubmit }) => {
           placeholder={"ここに自由に書き込んでください。\n・好きなこと、得意なこと\n・これまでの仕事や人生の経験\n\n箇条書きやメモのコピーでも構いません。AIが魅力的なサービス案に変換します。"}
         />
 
+        {hasIdeas && (
+          <p className="text-xs text-stone-400 -mt-1">
+            プロフィールを書き換えて生成すると、ピン留めしたアイデアは残したまま、それ以外を作り直します。
+          </p>
+        )}
+
         <button
           type="submit"
           disabled={!canSubmit}
           className="btn-primary w-full text-base py-4 px-8"
         >
-          アイデアを生成する
+          {hasIdeas ? 'このプロフィールで作り直す' : 'アイデアを生成する'}
           <span aria-hidden>→</span>
         </button>
       </form>
