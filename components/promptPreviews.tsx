@@ -1,20 +1,23 @@
 import React from 'react';
 import { ThumbnailPromptVersion } from '../types';
+import { PREVIEW_DATA_URIS } from './previewImages';
 
 /**
  * 画像生成プロンプト／スライド資料のトンマナ別プレビュー。
- * 7スタイルは gpt-image-2 で実際に生成したサンプルサムネイル（public/previews/）。
+ * 7スタイルは gpt-image-2 で実際に生成したサンプルサムネイル。
+ * ※ Google AI Studio では外部ファイル（public/）が配信されないため、
+ *   画像は base64 データURI（previewImages.ts）としてソースに埋め込んで確実に表示する。
  * サンプル文言は全スタイル共通: 「スプシ自動化で時短！／面倒な集計をワンクリックに」
  * my_style は「参考画像→生成」の仕組みの図解なのでSVGで描画する。
  */
 
 const GENERATED_PREVIEWS: Partial<Record<ThumbnailPromptVersion, string>> = {
-  standard: '/previews/standard.jpg',
-  simple: '/previews/simple.jpg',
-  watercolor: '/previews/watercolor.jpg',
-  pop: '/previews/pop.jpg',
-  youtube: '/previews/youtube.jpg',
-  puffy_3d: '/previews/puffy_3d.jpg',
+  standard: PREVIEW_DATA_URIS.standard,
+  simple: PREVIEW_DATA_URIS.simple,
+  watercolor: PREVIEW_DATA_URIS.watercolor,
+  pop: PREVIEW_DATA_URIS.pop,
+  youtube: PREVIEW_DATA_URIS.youtube,
+  puffy_3d: PREVIEW_DATA_URIS.puffy_3d,
 };
 
 const MyStylePreview = () => (
