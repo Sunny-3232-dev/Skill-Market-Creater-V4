@@ -668,15 +668,13 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
                 </div>
               </>
             )}
-          </div>
-        </div>
 
-        {/* 対象の本文（選択したサービスが入る／手動貼り付けも可） */}
-        <div className="mb-8">
-          <label htmlFor="support-body" className="font-semibold text-stone-700 text-sm block mb-2">
-            対象の本文
-            <span className="text-xs text-stone-400 font-normal ml-2">出品ページを開いて本文をコピー → ここに貼り付け（口コミも一緒に貼るとGood）</span>
-          </label>
+            {/* 対象の本文 — URLとセットで登録するので同じカード内に置く */}
+            <div className="mt-5 pt-5 border-t border-stone-100">
+            <label htmlFor="support-body" className="font-semibold text-stone-700 text-sm block mb-2">
+              対象の本文
+              <span className="text-xs text-stone-400 font-normal ml-2">出品ページを開いて本文をコピー → ここに貼り付け（口コミも一緒に貼るとGood）</span>
+            </label>
           <textarea
             id="support-body"
             value={serviceBody}
@@ -702,6 +700,8 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
                   : '入力済み — 下のメニューを実行できます'}
               </p>
             )}
+          </div>
+            </div>
           </div>
         </div>
 
