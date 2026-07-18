@@ -183,8 +183,45 @@ const IdeaList: React.FC<IdeaListProps> = ({ ideas, keywords = [], onSelect, onT
         </div>
       </div>
 
-      {/* AIで作り直すバー */}
-      <div className="mb-8 rounded-2xl border border-brand-100 p-5" style={{ backgroundImage: 'var(--gradient-brand-soft)' }}>
+      {pinnedCount > 0 && (
+        <div className="mb-8">
+          <button
+            type="button"
+            onClick={() => setPinnedOnly(!pinnedOnly)}
+            aria-pressed={pinnedOnly}
+            className={`inline-flex items-center gap-1.5 px-4 py-2 ${pinnedOnly ? 'chip-active' : 'chip'}`}
+          >
+            <PinIcon filled={pinnedOnly} />
+            ピン留めのみ表示（{pinnedCount}）
+          </button>
+        </div>
+      )}
+
+      {pinnedOnly && standardIdeas.length === 0 && nicheIdeas.length === 0 && (
+        <p className="text-stone-400 text-sm py-12 text-center">ピン留めされたアイデアはありません。</p>
+      )}
+
+      {renderSection(
+        "王道アイデア",
+        "Standard",
+        "みんなが求めていて、安心して選べる手堅い案",
+        standardIdeas
+      )}
+
+      {renderSection(
+        "ニッチ・ユニーク",
+        "Niche",
+        "ライバルが少なく、あなただから選ばれる個性派の案",
+        nicheIdeas
+      )}
+
+      {/* 一覧の一番下：ピン留め／作り直しの案内（下の作り直しバーへの導入） */}
+      <p className="text-stone-500 text-sm text-center mt-10 pt-6 border-t border-stone-100 mb-4">
+        ぴったりの案が見つかったら、<span className="text-brand-600 font-semibold">ピン留め</span>して残せます。残りはAIで何度でも作り直せます。
+      </p>
+
+      {/* AIで作り直すバー（一覧を見終わった最下部に配置） */}
+      <div className="rounded-2xl border border-brand-100 p-5" style={{ backgroundImage: 'var(--gradient-brand-soft)' }}>
         <div className="flex items-center gap-2 mb-3">
           <span className="w-7 h-7 rounded-lg bg-stone-900 text-white flex items-center justify-center shrink-0">
             <SparkleIcon />
@@ -243,43 +280,6 @@ const IdeaList: React.FC<IdeaListProps> = ({ ideas, keywords = [], onSelect, onT
           </div>
         </div>
       </div>
-
-      {pinnedCount > 0 && (
-        <div className="mb-8">
-          <button
-            type="button"
-            onClick={() => setPinnedOnly(!pinnedOnly)}
-            aria-pressed={pinnedOnly}
-            className={`inline-flex items-center gap-1.5 px-4 py-2 ${pinnedOnly ? 'chip-active' : 'chip'}`}
-          >
-            <PinIcon filled={pinnedOnly} />
-            ピン留めのみ表示（{pinnedCount}）
-          </button>
-        </div>
-      )}
-
-      {pinnedOnly && standardIdeas.length === 0 && nicheIdeas.length === 0 && (
-        <p className="text-stone-400 text-sm py-12 text-center">ピン留めされたアイデアはありません。</p>
-      )}
-
-      {renderSection(
-        "王道アイデア",
-        "Standard",
-        "みんなが求めていて、安心して選べる手堅い案",
-        standardIdeas
-      )}
-
-      {renderSection(
-        "ニッチ・ユニーク",
-        "Niche",
-        "ライバルが少なく、あなただから選ばれる個性派の案",
-        nicheIdeas
-      )}
-
-      {/* 一覧の一番下：ピン留め／作り直しの案内 */}
-      <p className="text-stone-500 text-sm text-center mt-10 pt-6 border-t border-stone-100">
-        ぴったりの案が見つかったら、<span className="text-brand-600 font-semibold">ピン留め</span>して残せます。残りはAIで何度でも作り直せます。
-      </p>
     </div>
   );
 };
