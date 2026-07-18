@@ -53,12 +53,61 @@ const MyStylePreview = () => (
   </svg>
 );
 
+// AIおまかせ：本文の内容 → AIが解析 → 内容に合ったトンマナで自動デザイン、を表す図解
+const AiAutoPreview = () => (
+  <svg viewBox="0 0 600 400" xmlns="http://www.w3.org/2000/svg" className="block w-full h-full">
+    <rect width="600" height="400" rx="12" fill="#faf5ff"/>
+    <text x="300" y="52" fontSize="20" fontWeight="700" fill="#7c3aed" textAnchor="middle">内容に合わせてAIが自動デザイン</text>
+    {/* 左：サービス本文 */}
+    <g>
+      <rect x="44" y="92" width="150" height="210" rx="12" fill="#ffffff" stroke="#e2e8f0" strokeWidth="3"/>
+      <rect x="64" y="116" width="92" height="12" rx="4" fill="#0f172a" opacity="0.8"/>
+      <rect x="64" y="140" width="110" height="8" rx="4" fill="#94a3b8"/>
+      <rect x="64" y="158" width="110" height="8" rx="4" fill="#94a3b8"/>
+      <rect x="64" y="176" width="82" height="8" rx="4" fill="#94a3b8"/>
+      <rect x="64" y="206" width="110" height="8" rx="4" fill="#cbd5e1"/>
+      <rect x="64" y="224" width="96" height="8" rx="4" fill="#cbd5e1"/>
+      <text x="119" y="286" fontSize="14" fontWeight="600" fill="#78716c" textAnchor="middle">サービス本文</text>
+    </g>
+    {/* 中：AI解析（きらめき） */}
+    <g>
+      <circle cx="300" cy="197" r="40" fill="#7c3aed"/>
+      <path d="M300 176 l6 15 15 6 -15 6 -6 15 -6 -15 -15 -6 15 -6 z" fill="#ffffff"/>
+      <circle cx="330" cy="170" r="6" fill="#c4b5fd"/>
+      <circle cx="272" cy="224" r="4" fill="#c4b5fd"/>
+      <text x="300" y="266" fontSize="14" fontWeight="700" fill="#7c3aed" textAnchor="middle">AIが解析</text>
+    </g>
+    <path d="M204 197 L250 197" stroke="#c4b5fd" strokeWidth="6" strokeLinecap="round"/>
+    <path d="M350 197 L400 197" stroke="#c4b5fd" strokeWidth="6" strokeLinecap="round"/>
+    <polygon points="394,187 418,197 394,207" fill="#7c3aed"/>
+    {/* 右：自動デザインされたスライド＋パレット */}
+    <g>
+      <rect x="412" y="92" width="150" height="210" rx="12" fill="#0f172a" stroke="#7c3aed" strokeWidth="3"/>
+      <rect x="432" y="116" width="110" height="16" rx="4" fill="#ffffff" opacity="0.95"/>
+      <rect x="432" y="142" width="80" height="9" rx="4" fill="#fbbf24"/>
+      <rect x="432" y="162" width="100" height="7" rx="4" fill="#ffffff" opacity="0.4"/>
+      <rect x="432" y="176" width="100" height="7" rx="4" fill="#ffffff" opacity="0.4"/>
+      {/* パレット */}
+      <circle cx="440" cy="276" r="10" fill="#1e3a8a"/>
+      <circle cx="466" cy="276" r="10" fill="#fbbf24"/>
+      <circle cx="492" cy="276" r="10" fill="#ffffff"/>
+    </g>
+  </svg>
+);
+
 export const PromptPreview: React.FC<{
   version: ThumbnailPromptVersion;
   className?: string;
   /** 画像左上に重ねるラベル。誤解防止のため「これはサンプル」と明示する */
   badge?: string;
 }> = ({ version, className = '', badge = '仕上がりイメージ' }) => {
+  if (version === 'ai_auto') {
+    return (
+      <div className={`overflow-hidden aspect-[3/2] ${className}`} aria-hidden>
+        <AiAutoPreview />
+      </div>
+    );
+  }
   const src = GENERATED_PREVIEWS[version];
   if (src) {
     return (

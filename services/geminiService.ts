@@ -1,6 +1,6 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
-import { UserInput, SkillIdea, SurveyPattern, ThumbnailPromptVersion, SlideImagePrompt } from "../types";
+import { UserInput, SkillIdea, SurveyPattern, ThumbnailPromptVersion } from "../types";
 
 const generateUniqueId = (): string => {
   return crypto.randomUUID();
@@ -50,6 +50,20 @@ export const getThumbnailPrompt = (
 
   // ── バージョン別パート（統一セクション構成） ──
   const versionStyles: Record<ThumbnailPromptVersion, string> = {
+    ai_auto: `
+■ デザインスタイル：AIおまかせ（内容に合わせて自動設計）
+・サービス内容・ターゲット・価格帯・雰囲気を読み取り、最も伝わるデザイン方針をあなた自身が決めて適用する。
+
+■ 方針の目安（内容に応じて調整）：
+・IT/士業/コンサル/BtoB → 信頼感のあるネイビー系、装飾控えめ、洗練
+・クリエイティブ/ハンドメイド/占い → 温かいパステル・手書き感
+・教育/子ども/初心者向け → 明るく親しみやすい丸ゴシック
+・副業入門/エンタメ/集客系 → 目を引くポップな配色と強い見出し
+・美容/健康/癒やし → 清潔感のある淡色、余白多め、上品
+
+■ 共通：
+・配色はベース＋アクセント2〜3色に絞る。見出しは大きく可読性優先。情報を詰め込みすぎない。`,
+
     standard: `
 ■ デザインスタイル：
 ・プロフェッショナルで信頼感のあるビジネスデザイン。
@@ -247,8 +261,27 @@ export const getThumbnailPrompt = (
   return commonBase + versionStyles[promptVersion];
 };
 
-// スライドのデザインスタイル指定（NotebookLM一括／ChatGPT1枚ずつ の両方で共通利用）
+// スライド資料のデザインスタイル（トンマナ）指定。NotebookLM のカスタマイズ欄用プロンプトに差し込む。
 const SLIDE_STYLE_DIRECTIVES: Record<ThumbnailPromptVersion, string> = {
+  ai_auto: `■ デザインスタイル：AIおまかせ（内容に合わせて自動設計）
+・まずサービス詳細文章を読み取り、次の4点を推定する：
+  ① ジャンル・業種（例：IT/士業/コンサル、クリエイティブ/ハンドメイド、教育/子ども、美容/健康、副業入門/エンタメ など）
+  ② 主なターゲット層（年齢・立場・フォーマル度）
+  ③ 価格帯と本気度（高単価・専門的か／気軽・低単価か）
+  ④ 伝えたい雰囲気（信頼・誠実／やさしい・温かい／楽しい・にぎやか）
+・推定結果に最も合うデザイン方針を、あなた自身が決めて全スライドに一貫して適用する：
+  - 配色：ベース＋アクセントの2〜3色に絞る（内容に合うトーンで）
+  - 書体：見出しと本文の2種、可読性を最優先
+  - 装飾レベル：フォーマルなら最小限、カジュアルなら図形・アイコンを適度に
+  - 余白：情報過多にせず、ゆとりを持たせる
+・方針の目安（あくまで参考。内容に応じて調整すること）：
+  - IT/士業/コンサル/BtoB   → 信頼感（ネイビー・チャコール＋差し色）、装飾控えめ、洗練
+  - クリエイティブ/ハンドメイド/占い → 温かいパステル・手書き風の柔らかさ
+  - 教育/子ども/初心者向け   → 明るく親しみやすい丸ゴシック、やさしい配色
+  - 副業入門/エンタメ/集客系 → 目を引くポップな配色と強めの見出し
+  - 美容/健康/癒やし         → 清潔感のある淡色、余白多め、上品
+・全スライドで配色・書体・装飾ルールを固定し、テンプレートを統一すること。
+`,
   standard: `■ デザインスタイル：標準
 ・プロフェッショナルで信頼感のあるビジネスデザイン
 ・落ち着いたカラーパレット（ネイビー／チャコール＋ゴールドのアクセント）
@@ -341,131 +374,6 @@ ${bodyExcerpt}
 `;
 
   return commonBase + SLIDE_STYLE_DIRECTIVES[toneVersion];
-};
-
-// ChatGPTで1枚ずつ画像生成するための、スライドごとのプロンプトを作る。
-// ノウハウ図書館編集部の手法（1枚目で画風確定→同一スレッドで続けて一貫性維持）を踏襲。
-// ※ChatGPTはプロンプトに書いた内容しか知らないため、各スライドの中身はGeminiで本文から作る。
-const SLIDE_ROLE_LABELS: Record<string, string> = {
-  cover: '表紙',
-  problem: 'お悩み',
-  can_do: 'できること',
-  strength: '強み',
-  recommend: 'おすすめ',
-  flow: 'ご依頼の流れ',
-  voice: 'お客様の声',
-  cta: 'CTA',
-};
-
-export const generateSlideImagePrompts = async (
-  serviceBody: string
-): Promise<SlideImagePrompt[]> => {
-  const body = serviceBody?.trim();
-  if (!body) return [];
-  const apiKey = getApiKey();
-  const ai = new GoogleGenAI(apiKey ? { apiKey } : {});
-
-  const prompt = `
-あなたはSNS・スキルマーケット向けの「サービス紹介画像」を設計するアートディレクターです。
-以下のサービス本文をもとに、ChatGPTの画像生成（GPT Image）で「1枚ずつ」作るサービス紹介画像の、各枚に文字として描き込む中身を作成してください。
-※これはプレゼン資料（PowerPoint／スライド）ではなく、文字を一緒にデザインした画像を1枚ずつ生成する用途です。
-
-【画像の構成（この順。各1枚の画像）】
-- cover（表紙）: サービス名＋一言キャッチ
-- problem（こんなお悩みありませんか？）: ターゲットの悩みを3〜5点
-- can_do（このサービスでできること）: 提供価値・解決できることを3〜4点
-- strength（このサービスの強み）: 他と違う差別化ポイントを2〜3点
-- recommend（こんな方におすすめ）: 具体的なペルソナ像を3点
-- flow（ご依頼の流れ）: 依頼から納品までをステップ（1. → 2. → 3. …）で
-- voice（お客様の声）: 本文にレビュー・感想があれば2〜3件を抜粋。無ければこの画像は配列に含めない
-- cta（行動喚起）: 申し込み・問い合わせを促す一言＋次のアクション
-
-【ルール】
-- 各画像の body は、その画像に文字として描き込む文言そのものにする（箇条書きは改行で区切る。ステップは「1. …」形式）。
-- 本文に書かれている情報だけを使う。創作・誇張はしない。価格・特典・所要時間など本文にあれば具体的に反映する。
-- 伝えたい内容は省略しすぎず、しっかり載せる（1枚あたり箇条書き3〜5行程度を目安に、詰め込みすぎない）。
-- マークダウン記法（#、* など）は使わない。
-- voice（お客様の声）は、本文にレビュー・感想の記載が無ければ配列に含めないこと。
-
-【サービス本文】
-${body.slice(0, 4000)}
-`;
-
-  let slidesRaw: Array<{ role: string; title: string; body: string }> = [];
-  try {
-    const response = await ai.models.generateContent({
-      model: 'gemini-3.5-flash',
-      contents: prompt,
-      config: {
-        responseMimeType: 'application/json',
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            slides: {
-              type: Type.ARRAY,
-              items: {
-                type: Type.OBJECT,
-                properties: {
-                  role: { type: Type.STRING },
-                  title: { type: Type.STRING },
-                  body: { type: Type.STRING },
-                },
-                required: ['role', 'title', 'body'],
-              },
-            },
-          },
-          required: ['slides'],
-        },
-      },
-    });
-    const parsed = JSON.parse(response.text || '{}');
-    if (Array.isArray(parsed?.slides)) slidesRaw = parsed.slides;
-  } catch {
-    return [];
-  }
-
-  // トンマナはコピー時に buildSlideImagePromptText で差し込むため、ここでは中身だけ返す。
-  return slidesRaw.map((s, i) => ({
-    no: i + 1,
-    role: s.role,
-    label: SLIDE_ROLE_LABELS[s.role] ?? `画像${i + 1}`,
-    title: String(s.title || '').trim(),
-    body: String(s.body || '').trim(),
-  }));
-};
-
-// 1枚分の中身＋選択中トンマナから、ChatGPTにそのまま貼れる画像生成プロンプトを組み立てる。
-// トンマナはここで差し込むだけなので、切り替えても中身の再生成（作り直し）は不要。
-export const buildSlideImagePromptText = (
-  slide: SlideImagePrompt,
-  toneVersion: ThumbnailPromptVersion,
-  total: number
-): string => {
-  const styleDirective = SLIDE_STYLE_DIRECTIVES[toneVersion];
-  const { no, title, body } = slide;
-  if (no === 1) {
-    // 1枚目：画風・レイアウトをこの1枚で確定させる（プレゼン資料ではなく1枚の画像）
-    return `ChatGPTの画像生成（GPT Image）で、スキルマーケットのサービス紹介画像を1枚ずつ作ります（全${total}枚）。まずは1枚目です。
-これはプレゼンのスライドやPowerPointではなく、文字を一緒にデザインした「1枚のグラフィック画像」です。画像を1枚だけ生成してください。
-この1枚でデザイン（画風・配色・レイアウト・フォント・余白）を確定します。2枚目以降も、まったく同じデザインテンプレートのまま、内容だけ差し替えて作ります。
-
-${styleDirective}
-■ 画像ルール
-・出力は1枚の画像（横長／landscape）。プレゼン資料・PowerPoint・複数ページにはしない
-・文字はすべて日本語で、画像内にくっきり読めるように描く（見出しは大きく、本文は読みやすい大きさで）
-・下に指定した文言だけを正確に入れる（誤字なく。勝手に文章を足さない）
-・マークダウン記号（#、* など）は画像に出さない
-
-【1枚目：${title}】
-（画像に入れる文字）
-${body}`;
-  }
-  // 2枚目以降：同一スレッドで続けて、デザインテンプレートを固定
-  return `続けて${no}枚目の画像を1枚生成してください。前の画像とまったく同じデザイン（画風・配色・レイアウト・フォント・余白）のまま、内容だけ差し替えます。横長／landscape・日本語・1枚の画像（スライドやPowerPointにはしない）。
-
-【${title}】
-（画像に入れる文字）
-${body}`;
 };
 
 const getApiKey = (): string => {
