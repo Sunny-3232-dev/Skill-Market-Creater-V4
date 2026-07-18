@@ -148,9 +148,6 @@ const IdeaList: React.FC<IdeaListProps> = ({ ideas, keywords = [], onSelect, onT
         <div>
           <span className="eyebrow mb-1 block">Step 2</span>
           <h2 className="text-xl md:text-2xl font-bold text-stone-900 tracking-tight">気になるアイデアを選択</h2>
-          <p className="text-stone-500 mt-1.5 text-sm">
-            ぴったりの案が見つかったら、<span className="text-brand-600 font-semibold">ピン留め</span>して残せます。残りはAIで何度でも作り直せます。
-          </p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <button type="button" onClick={onEditProfile} className="btn-secondary py-2.5 px-4 text-xs">
@@ -278,6 +275,11 @@ const IdeaList: React.FC<IdeaListProps> = ({ ideas, keywords = [], onSelect, onT
         "ライバルが少なく、あなただから選ばれる個性派の案",
         nicheIdeas
       )}
+
+      {/* 一覧の一番下：ピン留め／作り直しの案内 */}
+      <p className="text-stone-500 text-sm text-center mt-10 pt-6 border-t border-stone-100">
+        ぴったりの案が見つかったら、<span className="text-brand-600 font-semibold">ピン留め</span>して残せます。残りはAIで何度でも作り直せます。
+      </p>
     </div>
   );
 };

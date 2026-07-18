@@ -359,7 +359,23 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
   };
 
   // サービスカードをクリックして「対象」を切り替える
+  // 生成物（宣伝文・アンケート・スライド資料・結果タブ）だけを初期化する。
+  // 本文や登録サービスは触らない。対象を切り替えたら結果もそれに連動させるために使う。
+  const resetGeneratedResults = () => {
+    setPosts([]);
+    setPatterns([]);
+    setPatternsOriginal([]);
+    setSelectedPatternId(null);
+    setShowCode(false);
+    setSlideDocReady(false);
+    setSlidePrompts([]);
+    setActiveMenu(null);
+    setErrorMenu(null);
+  };
+
   const handleSelectService = (sv: RegisteredService) => {
+    // 別のサービスに切り替えたら、前のサービスの生成結果は消して連動させる
+    if (sv.id !== selectedServiceId) resetGeneratedResults();
     setSelectedServiceId(sv.id);
     setServiceBody(sv.content);
     notify(`「${sv.title}」を選択しました。`);
@@ -491,15 +507,7 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
   const handleClearAll = () => {
     setServiceBody('');
     setSelectedServiceId(null);
-    setPosts([]);
-    setPatterns([]);
-    setPatternsOriginal([]);
-    setSelectedPatternId(null);
-    setShowCode(false);
-    setSlideDocReady(false);
-    setSlidePrompts([]);
-    setActiveMenu(null);
-    setErrorMenu(null);
+    resetGeneratedResults();
     setShowClearConfirm(false);
   };
 
