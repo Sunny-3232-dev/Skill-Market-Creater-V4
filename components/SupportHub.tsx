@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
-import { generatePromotion, generateSurveyPatterns, getSlideDocPrompt, extractServiceTitle } from '../services/geminiService';
+import { generatePromotion, generateSurveyPatterns, getSlideDocPrompt, extractServiceTitle, generateSlideImagePrompts } from '../services/geminiService';
 import { extractWords } from '../utils/textProcessing';
-import { SkillIdea, SurveyPattern, SurveyQuestionDef, ThumbnailPromptVersion } from '../types';
+import { SkillIdea, SurveyPattern, SurveyQuestionDef, ThumbnailPromptVersion, SlideImagePrompt } from '../types';
 import { MegaphoneIcon, ClipboardListIcon, PresentationIcon, SparkleIcon } from './icons';
 import { PromptPreview } from './promptPreviews';
 import LoadingOverlay from './LoadingOverlay';
@@ -132,6 +132,9 @@ interface PersistedState {
   selectedPatternId: SurveyPattern['id'] | null;
   showCode: boolean;
   slideDocReady: boolean;
+  slideMode: 'notebooklm' | 'chatgpt';
+  slideVersion: ThumbnailPromptVersion;
+  slidePrompts: SlideImagePrompt[];
   registeredServices: RegisteredService[];
   selectedServiceId: string | null;
 }
@@ -167,6 +170,15 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
   const [selectedPatternId, setSelectedPatternId] = useState<SurveyPattern['id'] | null>(init.selectedPatternId ?? null);
   const [showCode, setShowCode] = useState(init.showCode ?? false);
   const [slideDocReady, setSlideDocReady] = useState(init.slideDocReady ?? false);
+
+  // スライド資料: NotebookLMで一括 / ChatGPTで1枚ずつ の切り替え
+  const [slideMode, setSlideMode] = useState<'notebooklm' | 'chatgpt'>(init.slideMode ?? 'notebooklm');
+  const [slideVersion, setSlideVersion] = useState<ThumbnailPromptVersion>(init.slideVersion ?? 'standard');
+  const [slidePrompts, setSlidePrompts] = useState<SlideImagePrompt[]>(
+    Array.isArray(init.slidePrompts) ? init.slidePrompts : []
+  );
+  const [isSlideGenLoading, setIsSlideGenLoading] = useState(false);
+  const [copiedSlideNo, setCopiedSlideNo] = useState<number | null>(null);
 
   // 出品済みサービスのURL登録
   const [registeredServices, setRegisteredServices] = useState<RegisteredService[]>(
@@ -206,13 +218,14 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
       const s: PersistedState = {
         serviceBody, activeMenu,
         posts, patterns, patternsOriginal, selectedPatternId, showCode, slideDocReady,
+        slideMode, slideVersion, slidePrompts,
         registeredServices, selectedServiceId,
       };
       localStorage.setItem(STORAGE_KEY, JSON.stringify(s));
     } catch (e) {
       console.warn('Failed to save support state', e);
     }
-  }, [serviceBody, activeMenu, posts, patterns, patternsOriginal, selectedPatternId, showCode, slideDocReady, registeredServices, selectedServiceId]);
+  }, [serviceBody, activeMenu, posts, patterns, patternsOriginal, selectedPatternId, showCode, slideDocReady, slideMode, slideVersion, slidePrompts, registeredServices, selectedServiceId]);
 
   // ---- アンケートカードのヘッダー高さ同期 ----
   const surveyHeaderRefs = useRef<(HTMLDivElement | null)[]>([]);
@@ -398,6 +411,34 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
     setTimeout(scrollToResults, 100);
   };
 
+  // ChatGPTで1枚ずつ作るためのスライド別プロンプトを生成する
+  const handleGenerateSlidePrompts = async () => {
+    if (!hasInput) return;
+    const keyReady = await ensureKeySet();
+    if (!keyReady) return;
+    setIsSlideGenLoading(true);
+    try {
+      const data = await generateSlideImagePrompts(serviceBody, slideVersion);
+      if (data.length === 0) {
+        notify('スライドのプロンプトを生成できませんでした。本文を増やして再度お試しください。', 'error');
+        return;
+      }
+      setSlidePrompts(data);
+      setCopiedSlideNo(null);
+    } catch (error) {
+      onHandleApiError(error);
+    } finally {
+      setIsSlideGenLoading(false);
+    }
+  };
+
+  const handleCopySlidePrompt = (slide: SlideImagePrompt) => {
+    navigator.clipboard.writeText(slide.prompt).then(() => {
+      setCopiedSlideNo(slide.no);
+      setTimeout(() => setCopiedSlideNo(prev => (prev === slide.no ? null : prev)), 2000);
+    });
+  };
+
   const handleCancelRun = () => {
     runTokenRef.current++;
     setIsLoading(false);
@@ -450,6 +491,7 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
     setSelectedPatternId(null);
     setShowCode(false);
     setSlideDocReady(false);
+    setSlidePrompts([]);
     setActiveMenu(null);
     setErrorMenu(null);
     setShowClearConfirm(false);
@@ -572,7 +614,7 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
             {registeredServices.length > 0 && (
               <>
                 <p className="text-xs text-stone-500 mt-4 mb-2 font-medium">改善したいサービスを選択してください</p>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                <div className="flex flex-col gap-2">
                   {registeredServices.map(sv => {
                     const isSelected = selectedServiceId === sv.id;
                     return (
@@ -595,7 +637,7 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
                           {isSelected && <span className="w-2 h-2 rounded-full bg-brand-500"></span>}
                         </span>
                         <div className="flex-grow min-w-0">
-                          <p className="text-sm font-semibold text-stone-800 truncate" title={sv.title}>{sv.title}</p>
+                          <p className="text-sm font-semibold text-stone-800 leading-snug break-words" title={sv.title}>{sv.title}</p>
                           {sv.content.trim() ? (
                             <p className="text-[11px] text-emerald-600 font-medium">本文あり</p>
                           ) : (
@@ -770,8 +812,35 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
             {/* Slide Doc Results */}
             {shownMenu === 'slidedoc' && slideDocReady && (
               <div>
+                <div className="mb-5">
+                  <h3 className="text-lg font-bold text-stone-900">スライド資料をつくる</h3>
+                  <p className="text-xs text-stone-500 mt-1">作り方を選べます。まとめて作るなら NotebookLM、1枚ずつ画風をそろえて作るなら ChatGPT がおすすめです。</p>
+                </div>
+
+                {/* 作り方の切り替え */}
+                <div className="flex flex-wrap gap-2 mb-6">
+                  <button
+                    type="button"
+                    onClick={() => setSlideMode('notebooklm')}
+                    aria-pressed={slideMode === 'notebooklm'}
+                    className={`px-4 py-2 text-xs ${slideMode === 'notebooklm' ? 'chip-active' : 'chip'}`}
+                  >
+                    NotebookLMで一括
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSlideMode('chatgpt')}
+                    aria-pressed={slideMode === 'chatgpt'}
+                    className={`px-4 py-2 text-xs ${slideMode === 'chatgpt' ? 'chip-active' : 'chip'}`}
+                  >
+                    ChatGPTで1枚ずつ
+                  </button>
+                </div>
+
+              {slideMode === 'notebooklm' && (
+              <div>
                 <div className="mb-6">
-                  <h3 className="text-lg font-bold text-stone-900">スライド資料プロンプト ({SLIDE_DOC_VERSIONS.length}パターン)</h3>
+                  <h4 className="text-base font-bold text-stone-900">トンマナを選んでコピー（{SLIDE_DOC_VERSIONS.length}パターン）</h4>
                   <p className="text-xs text-stone-500 mt-1">お好みのトンマナをコピーし、NotebookLM のスライド作成カスタマイズ欄に貼り付けてください。</p>
                   <p className="text-[11px] text-stone-400 mt-1">※画像は雰囲気を伝えるトンマナ見本です。実際に作られるのはサムネイルではなくスライド資料です。</p>
                 </div>
@@ -841,6 +910,100 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
                     </a>
                   </div>
                 </div>
+              </div>
+              )}
+
+              {slideMode === 'chatgpt' && (
+              <div>
+                <div className="mb-5">
+                  <h4 className="text-base font-bold text-stone-900">トンマナを選んで、1枚ずつのプロンプトを作る</h4>
+                  <p className="text-xs text-stone-500 mt-1">同じ ChatGPT のチャットに上から順に貼ると、画風のそろったスライドが1枚ずつ作れます。</p>
+                </div>
+
+                {/* トンマナ選択 */}
+                <div className="flex flex-wrap gap-2 mb-4">
+                  {SLIDE_DOC_VERSIONS.map(({ id, label }) => (
+                    <button
+                      key={id}
+                      type="button"
+                      onClick={() => setSlideVersion(id)}
+                      aria-pressed={slideVersion === id}
+                      className={`px-3.5 py-1.5 text-xs ${slideVersion === id ? 'chip-active' : 'chip'}`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleGenerateSlidePrompts}
+                  disabled={isSlideGenLoading}
+                  className="btn-primary px-6 py-2.5 text-xs mb-6"
+                >
+                  {isSlideGenLoading ? 'スライドを設計中…' : (slidePrompts.length > 0 ? 'このトンマナで作り直す' : '1枚ずつのプロンプトを作る')}
+                </button>
+
+                {slidePrompts.length > 0 && (
+                  <>
+                    <p className="text-xs text-stone-500 mb-3 font-medium">上から順番に、同じ ChatGPT のチャットへ貼り付けてください（全{slidePrompts.length}枚）。</p>
+                    <div className="space-y-3 mb-8">
+                      {slidePrompts.map((slide) => {
+                        const isCopied = copiedSlideNo === slide.no;
+                        return (
+                          <div key={slide.no} className="card p-5">
+                            <div className="flex items-start gap-3">
+                              <span className="shrink-0 w-7 h-7 rounded-full bg-stone-900 text-white text-xs font-bold flex items-center justify-center">{slide.no}</span>
+                              <div className="flex-grow min-w-0">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <span className="text-[10px] font-semibold text-brand-600 bg-brand-50 px-2 py-0.5 rounded-full shrink-0">{slide.label}</span>
+                                  <h5 className="text-sm font-bold text-stone-900 truncate">{slide.title}</h5>
+                                </div>
+                                <p className="text-xs text-stone-500 leading-relaxed whitespace-pre-line line-clamp-4">{slide.body}</p>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => handleCopySlidePrompt(slide)}
+                                className={`text-xs font-semibold px-4 py-1.5 rounded-full transition-colors shrink-0 ${
+                                  isCopied ? 'bg-brand-50 text-brand-600' : 'bg-stone-900 text-white hover:bg-stone-700'
+                                }`}
+                              >
+                                {isCopied ? 'コピー済み' : 'プロンプトをコピー'}
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* Usage guide (ChatGPT) */}
+                    <div className="bg-stone-50 border border-stone-200/80 rounded-2xl p-6 mb-6">
+                      <h4 className="text-sm font-bold text-stone-900 mb-3">ChatGPTで1枚ずつ作る手順</h4>
+                      <ol className="text-xs text-stone-600 space-y-2 list-decimal list-inside leading-relaxed mb-4">
+                        <li>「ChatGPT を開く」ボタンから新しいチャットを開く（画像生成に対応したモデルを選択）</li>
+                        <li>参考にしたい画像（既存サムネ等）があれば、先に添付するとより狙い通りの画風になります</li>
+                        <li><span className="font-semibold">1枚目のプロンプトをコピーして送信</span> → 画風・レイアウトが決まります</li>
+                        <li><span className="font-semibold">同じチャットのまま</span>、2枚目以降を順番に送信（前の画風が自動で引き継がれます）</li>
+                        <li>気になる箇所は「ここだけ直して」と同じチャットで微調整</li>
+                        <li>各画像をダウンロードし、<span className="font-semibold">スキルマーケットのサービス画像に追加</span></li>
+                      </ol>
+                      <a
+                        href="https://chatgpt.com/"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          window.open('https://chatgpt.com/', '_blank', 'noopener,noreferrer');
+                        }}
+                        className="btn-dark px-4 py-2 text-xs"
+                      >
+                        ChatGPT を開く
+                      </a>
+                    </div>
+                  </>
+                )}
+              </div>
+              )}
               </div>
             )}
 

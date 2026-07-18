@@ -50,3 +50,13 @@ export interface SurveyPattern {
 
 // Thumbnail Prompt Version
 export type ThumbnailPromptVersion = 'standard' | 'simple' | 'watercolor' | 'pop' | 'my_style' | 'youtube' | 'puffy_3d';
+
+// ChatGPTで1枚ずつ画像生成するためのスライドごとのプロンプト
+export interface SlideImagePrompt {
+  no: number;        // 1始まりの通し番号
+  role: string;      // cover / problem / can_do / strength / recommend / flow / voice / cta
+  label: string;     // カード見出し用の短いタグ（表紙 / お悩み など）
+  title: string;     // スライドの見出し
+  body: string;      // スライドに載せる本文（改行区切り）
+  prompt: string;    // ChatGPTにそのまま貼れる画像生成プロンプト
+}

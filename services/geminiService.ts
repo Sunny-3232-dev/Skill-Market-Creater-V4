@@ -1,6 +1,6 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
-import { UserInput, SkillIdea, SurveyPattern, ThumbnailPromptVersion } from "../types";
+import { UserInput, SkillIdea, SurveyPattern, ThumbnailPromptVersion, SlideImagePrompt } from "../types";
 
 const generateUniqueId = (): string => {
   return crypto.randomUUID();
@@ -247,6 +247,52 @@ export const getThumbnailPrompt = (
   return commonBase + versionStyles[promptVersion];
 };
 
+// スライドのデザインスタイル指定（NotebookLM一括／ChatGPT1枚ずつ の両方で共通利用）
+const SLIDE_STYLE_DIRECTIVES: Record<ThumbnailPromptVersion, string> = {
+  standard: `■ デザインスタイル：標準
+・プロフェッショナルで信頼感のあるビジネスデザイン
+・落ち着いたカラーパレット（ネイビー／チャコール＋ゴールドのアクセント）
+・洗練されたタイポグラフィ、余白を確保した大人な印象
+・装飾は最小限で、情報の伝達を最優先に
+`,
+  simple: `■ デザインスタイル：シンプル
+・丸みのあるやさしい印象のミニマル・ビジネスデザイン
+・ベースカラー＋アクセント1色に抑えたクリーンな配色
+・太めで読みやすいフォント、行間ゆったり
+・フレーム枠や楕円・角丸の図形で親しみやすく
+`,
+  watercolor: `■ デザインスタイル：水彩画
+・手書き風・柔らかいタッチ（水彩画風／色鉛筆風）
+・水彩のにじみを思わせるパステル配色
+・イラストエリアとテキストエリアを左右に分離した構成
+・温かみ・安心感のある穏やかなムード
+`,
+  pop: `■ デザインスタイル：ポップ＆フレンドリー
+・鮮やかな多色使い、ポップアートのような賑やかさ
+・文字に高コントラストな縁取り（白縁／黒縁）
+・ドットパターン・星・吹き出しなど漫符を適度に配置
+・楽しくワクワクする、初心者歓迎のフレンドリーな印象
+`,
+  my_style: `■ デザインスタイル：マイスタイル（参照モード）
+・リソースに添付された参考画像（サムネイル・アイコン）があれば、そのレイアウト・配色・トーン・世界観を忠実に踏襲すること
+・参考画像と同じトンマナで、新しいサービス内容に自然に差し替える（アイコンや装飾の配置スタイルもミラー）
+・参考画像がリソースに無い場合は、シンプル寄りの落ち着いたトンマナで作成すること
+`,
+  youtube: `■ デザインスタイル：YouTube風
+・人気YouTuberのサムネイル調で、一目で内容が伝わる強いビジュアルインパクト
+・極太ゴシック＋太い白縁・黒縁のダブルアウトラインで文字を浮き立たせる
+・赤・黄・青・ネオン系の高彩度配色、2〜3色の強い色面で画面を分割
+・矢印・吹き出し・稲妻・星・手書き風の丸囲みなどで注目点を誘導
+・背景に斜めの太いカラー帯や放射線で"勢い"を演出
+・情報量は多めでも、視線誘導を明確にしてメッセージを即理解できる構成
+`,
+  puffy_3d: `■ デザインスタイル：ぷっくり3D
+・クレイ（粘土）風のぷっくりした3Dオブジェクトをアクセントに使う
+・パステル調2〜3色、太めの丸ゴシック、ソフトシャドウ
+・かわいく親しみやすいが、余白を確保して情報は読みやすく
+`,
+};
+
 export const getSlideDocPrompt = (
   serviceBody: string,
   toneVersion: ThumbnailPromptVersion = 'my_style'
@@ -294,52 +340,127 @@ ${bodyExcerpt}
 
 `;
 
-  const styles: Record<ThumbnailPromptVersion, string> = {
-    standard: `■ デザインスタイル：標準
-・プロフェッショナルで信頼感のあるビジネスデザイン
-・落ち着いたカラーパレット（ネイビー／チャコール＋ゴールドのアクセント）
-・洗練されたタイポグラフィ、余白を確保した大人な印象
-・装飾は最小限で、情報の伝達を最優先に
-`,
-    simple: `■ デザインスタイル：シンプル
-・丸みのあるやさしい印象のミニマル・ビジネスデザイン
-・ベースカラー＋アクセント1色に抑えたクリーンな配色
-・太めで読みやすいフォント、行間ゆったり
-・フレーム枠や楕円・角丸の図形で親しみやすく
-`,
-    watercolor: `■ デザインスタイル：水彩画
-・手書き風・柔らかいタッチ（水彩画風／色鉛筆風）
-・水彩のにじみを思わせるパステル配色
-・イラストエリアとテキストエリアを左右に分離した構成
-・温かみ・安心感のある穏やかなムード
-`,
-    pop: `■ デザインスタイル：ポップ＆フレンドリー
-・鮮やかな多色使い、ポップアートのような賑やかさ
-・文字に高コントラストな縁取り（白縁／黒縁）
-・ドットパターン・星・吹き出しなど漫符を適度に配置
-・楽しくワクワクする、初心者歓迎のフレンドリーな印象
-`,
-    my_style: `■ デザインスタイル：マイスタイル（参照モード）
-・リソースに添付された参考画像（サムネイル・アイコン）があれば、そのレイアウト・配色・トーン・世界観を忠実に踏襲すること
-・参考画像と同じトンマナで、新しいサービス内容に自然に差し替える（アイコンや装飾の配置スタイルもミラー）
-・参考画像がリソースに無い場合は、シンプル寄りの落ち着いたトンマナで作成すること
-`,
-    youtube: `■ デザインスタイル：YouTube風
-・人気YouTuberのサムネイル調で、一目で内容が伝わる強いビジュアルインパクト
-・極太ゴシック＋太い白縁・黒縁のダブルアウトラインで文字を浮き立たせる
-・赤・黄・青・ネオン系の高彩度配色、2〜3色の強い色面で画面を分割
-・矢印・吹き出し・稲妻・星・手書き風の丸囲みなどで注目点を誘導
-・背景に斜めの太いカラー帯や放射線で"勢い"を演出
-・情報量は多めでも、視線誘導を明確にしてメッセージを即理解できる構成
-`,
-    puffy_3d: `■ デザインスタイル：ぷっくり3D
-・クレイ（粘土）風のぷっくりした3Dオブジェクトをアクセントに使う
-・パステル調2〜3色、太めの丸ゴシック、ソフトシャドウ
-・かわいく親しみやすいが、余白を確保して情報は読みやすく
-`,
-  };
+  return commonBase + SLIDE_STYLE_DIRECTIVES[toneVersion];
+};
 
-  return commonBase + styles[toneVersion];
+// ChatGPTで1枚ずつ画像生成するための、スライドごとのプロンプトを作る。
+// ノウハウ図書館編集部の手法（1枚目で画風確定→同一スレッドで続けて一貫性維持）を踏襲。
+// ※ChatGPTはプロンプトに書いた内容しか知らないため、各スライドの中身はGeminiで本文から作る。
+const SLIDE_ROLE_LABELS: Record<string, string> = {
+  cover: '表紙',
+  problem: 'お悩み',
+  can_do: 'できること',
+  strength: '強み',
+  recommend: 'おすすめ',
+  flow: 'ご依頼の流れ',
+  voice: 'お客様の声',
+  cta: 'CTA',
+};
+
+export const generateSlideImagePrompts = async (
+  serviceBody: string,
+  toneVersion: ThumbnailPromptVersion = 'standard'
+): Promise<SlideImagePrompt[]> => {
+  const body = serviceBody?.trim();
+  if (!body) return [];
+  const apiKey = getApiKey();
+  const ai = new GoogleGenAI(apiKey ? { apiKey } : {});
+
+  const prompt = `
+あなたはプロのプレゼン資料の構成作家です。
+以下のサービス本文をもとに、ChatGPTの画像生成で「1枚ずつ」作るサービス紹介スライドの、各ページに実際に載せる中身を作成してください。
+
+【スライド構成（この順。各1枚）】
+- cover（表紙）: サービス名＋一言キャッチ
+- problem（こんなお悩みありませんか？）: ターゲットの悩みを3〜5点
+- can_do（このサービスでできること）: 提供価値・解決できることを3〜4点
+- strength（このサービスの強み）: 他と違う差別化ポイントを2〜3点
+- recommend（こんな方におすすめ）: 具体的なペルソナ像を3点
+- flow（ご依頼の流れ）: 依頼から納品までをステップ（1. → 2. → 3. …）で
+- voice（お客様の声）: 本文にレビュー・感想があれば2〜3件を抜粋。無ければこのスライドは配列に含めない
+- cta（行動喚起）: 申し込み・問い合わせを促す一言＋次のアクション
+
+【ルール】
+- 各スライドの body は、実際にスライドに載せる文言そのものにする（箇条書きは改行で区切る。ステップは「1. …」形式）。
+- 本文に書かれている情報だけを使う。創作・誇張はしない。価格・特典・所要時間など本文にあれば具体的に反映する。
+- 伝えたい内容は省略しすぎず、しっかり載せる（1スライドあたり箇条書き3〜5行程度を目安に、詰め込みすぎない）。
+- マークダウン記法（#、* など）は使わない。
+- voice（お客様の声）は、本文にレビュー・感想の記載が無ければ配列に含めないこと。
+
+【サービス本文】
+${body.slice(0, 4000)}
+`;
+
+  let slidesRaw: Array<{ role: string; title: string; body: string }> = [];
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-3.5-flash',
+      contents: prompt,
+      config: {
+        responseMimeType: 'application/json',
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            slides: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  role: { type: Type.STRING },
+                  title: { type: Type.STRING },
+                  body: { type: Type.STRING },
+                },
+                required: ['role', 'title', 'body'],
+              },
+            },
+          },
+          required: ['slides'],
+        },
+      },
+    });
+    const parsed = JSON.parse(response.text || '{}');
+    if (Array.isArray(parsed?.slides)) slidesRaw = parsed.slides;
+  } catch {
+    return [];
+  }
+
+  const total = slidesRaw.length;
+  const styleDirective = SLIDE_STYLE_DIRECTIVES[toneVersion];
+
+  return slidesRaw.map((s, i) => {
+    const title = String(s.title || '').trim();
+    const bodyText = String(s.body || '').trim();
+    let promptText: string;
+    if (i === 0) {
+      // 1枚目：画風・レイアウトをこの1枚で確定させる
+      promptText = `スキルマーケットのサービス紹介スライドを、これから1枚ずつ作ります（全${total}枚）。まずは1枚目です。
+この1枚で画風・配色・レイアウト・フォント・余白を確定してください。2枚目以降も、完全に同じトンマナ・同じテンプレートで作ります。
+
+${styleDirective}
+■ 全体ルール
+・横長 16:9
+・日本語。見出しは大きく、本文は読みやすい大きさで
+・伝えたい内容はしっかり載せる（詰め込みすぎず、省略しすぎず）
+・マークダウン記号（#、* など）は画像に出さない
+
+【1枚目：${title}】
+${bodyText}`;
+    } else {
+      // 2枚目以降：同一スレッドで続けて、テンプレートを固定
+      promptText = `${i + 1}枚目です。前のスライドと完全に同じ画風・配色・レイアウト・フォント・余白で作ってください（テンプレートを固定）。横長16:9・日本語。
+
+【${title}】
+${bodyText}`;
+    }
+    return {
+      no: i + 1,
+      role: s.role,
+      label: SLIDE_ROLE_LABELS[s.role] ?? `スライド${i + 1}`,
+      title,
+      body: bodyText,
+      prompt: promptText,
+    };
+  });
 };
 
 const getApiKey = (): string => {
