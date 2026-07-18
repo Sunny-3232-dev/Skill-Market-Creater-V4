@@ -541,8 +541,8 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
   // ---- 結果タブ ----
   const resultTabs = [
     posts.length > 0 && { id: 'promoter' as MenuId, label: `宣伝文 ${posts.length}本` },
-    patterns.length > 0 && { id: 'survey' as MenuId, label: 'アンケート 3案' },
     slideDocReady && { id: 'slidedoc' as MenuId, label: 'スライド資料' },
+    patterns.length > 0 && { id: 'survey' as MenuId, label: 'アンケート 3案' },
   ].filter(Boolean) as Array<{ id: MenuId; label: string }>;
 
   const hasResults = resultTabs.length > 0;
@@ -917,36 +917,67 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
               <div>
                 <div className="mb-5">
                   <h4 className="text-base font-bold text-stone-900">トンマナを選んで、1枚ずつのプロンプトを作る</h4>
-                  <p className="text-xs text-stone-500 mt-1">同じ ChatGPT のチャットに上から順に貼ると、画風のそろったスライドが1枚ずつ作れます。</p>
+                  <p className="text-xs text-stone-500 mt-1">ChatGPTの画像生成（GPT Image）用のプロンプトです。同じチャットに上から順に貼ると、画風のそろった紹介画像が1枚ずつ作れます。</p>
                 </div>
 
-                {/* トンマナ選択 */}
-                <div className="flex flex-wrap gap-2 mb-4">
-                  {SLIDE_DOC_VERSIONS.map(({ id, label }) => (
-                    <button
-                      key={id}
-                      type="button"
-                      onClick={() => setSlideVersion(id)}
-                      aria-pressed={slideVersion === id}
-                      className={`px-3.5 py-1.5 text-xs ${slideVersion === id ? 'chip-active' : 'chip'}`}
-                    >
-                      {label}
-                    </button>
-                  ))}
+                {/* トンマナ選択（サンプル画像ボタン） */}
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 mb-5">
+                  {SLIDE_DOC_VERSIONS.map(({ id, label }) => {
+                    const isActive = slideVersion === id;
+                    return (
+                      <button
+                        key={id}
+                        type="button"
+                        onClick={() => setSlideVersion(id)}
+                        aria-pressed={isActive}
+                        title={label}
+                        className={`relative rounded-xl border p-2 text-left transition-all ${
+                          isActive
+                            ? 'border-brand-400 ring-2 ring-brand-100 bg-brand-50/40'
+                            : 'border-stone-200 bg-white hover:border-brand-200'
+                        }`}
+                      >
+                        <PromptPreview version={id} badge="トンマナ見本" className="w-full rounded-lg border border-stone-100" />
+                        <div className="flex items-center gap-1.5 mt-2 px-0.5">
+                          <span className={`shrink-0 w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center ${
+                            isActive ? 'border-brand-500' : 'border-stone-300'
+                          }`}>
+                            {isActive && <span className="w-1.5 h-1.5 rounded-full bg-brand-500"></span>}
+                          </span>
+                          <span className="text-xs font-semibold text-stone-800 leading-tight">{label}</span>
+                        </div>
+                      </button>
+                    );
+                  })}
                 </div>
 
-                <button
-                  type="button"
-                  onClick={handleGenerateSlidePrompts}
-                  disabled={isSlideGenLoading}
-                  className="btn-primary px-6 py-2.5 text-xs mb-6"
-                >
-                  {isSlideGenLoading ? 'スライドを設計中…' : (slidePrompts.length > 0 ? 'このトンマナで作り直す' : '1枚ずつのプロンプトを作る')}
-                </button>
+                <div className="flex flex-wrap items-center gap-2 mb-6">
+                  <button
+                    type="button"
+                    onClick={handleGenerateSlidePrompts}
+                    disabled={isSlideGenLoading}
+                    className="btn-primary px-6 py-2.5 text-xs"
+                  >
+                    {isSlideGenLoading ? 'スライドを設計中…' : (slidePrompts.length > 0 ? 'このトンマナで作り直す' : '1枚ずつのプロンプトを作る')}
+                  </button>
+                  <a
+                    href="https://chatgpt.com/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      // PWAに吸われず、必ずブラウザの新しいタブで開く
+                      window.open('https://chatgpt.com/', '_blank', 'noopener,noreferrer');
+                    }}
+                    className="btn-dark px-4 py-2.5 text-xs"
+                  >
+                    ChatGPT を開く
+                  </a>
+                </div>
 
                 {slidePrompts.length > 0 && (
                   <>
-                    <p className="text-xs text-stone-500 mb-3 font-medium">上から順番に、同じ ChatGPT のチャットへ貼り付けてください（全{slidePrompts.length}枚）。</p>
+                    <p className="text-xs text-stone-500 mb-3 font-medium">上から順番に、同じ ChatGPT のチャットへ貼り付けて画像を生成してください（全{slidePrompts.length}枚）。</p>
                     <div className="space-y-3 mb-8">
                       {slidePrompts.map((slide) => {
                         const isCopied = copiedSlideNo === slide.no;
@@ -980,7 +1011,7 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
                     <div className="bg-stone-50 border border-stone-200/80 rounded-2xl p-6 mb-6">
                       <h4 className="text-sm font-bold text-stone-900 mb-3">ChatGPTで1枚ずつ作る手順</h4>
                       <ol className="text-xs text-stone-600 space-y-2 list-decimal list-inside leading-relaxed mb-4">
-                        <li>「ChatGPT を開く」ボタンから新しいチャットを開く（画像生成に対応したモデルを選択）</li>
+                        <li>「ChatGPT を開く」ボタンから新しいチャットを開く（画像生成／GPT Image に対応したモデルを選択）</li>
                         <li>参考にしたい画像（既存サムネ等）があれば、先に添付するとより狙い通りの画風になります</li>
                         <li><span className="font-semibold">1枚目のプロンプトをコピーして送信</span> → 画風・レイアウトが決まります</li>
                         <li><span className="font-semibold">同じチャットのまま</span>、2枚目以降を順番に送信（前の画風が自動で引き継がれます）</li>
