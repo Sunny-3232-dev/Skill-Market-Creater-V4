@@ -611,9 +611,43 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
               </button>
             </div>
 
+            {/* 対象の本文 — URL登録とセットなので直下に置く */}
+            <div className="mt-5 pt-5 border-t border-stone-100">
+              <label htmlFor="support-body" className="font-semibold text-stone-700 text-sm block mb-2">
+                対象の本文
+                <span className="text-xs text-stone-400 font-normal ml-2">出品ページを開いて本文をコピー → ここに貼り付け（口コミも一緒に貼るとGood）</span>
+              </label>
+              <textarea
+                id="support-body"
+                value={serviceBody}
+                onChange={(e) => handleBodyChange(e.target.value)}
+                className="field w-full p-5 min-h-[180px] text-base leading-relaxed"
+                placeholder="出品ページの本文をコピーして、ここに貼り付けてください。&#10;（上でサービスを登録している場合は「ページを開く」から本文をコピーできます）"
+              />
+              <div className="mt-3 flex flex-wrap items-center gap-3">
+                {selectedServiceId && (
+                  <button
+                    type="button"
+                    onClick={handleRegisterBody}
+                    disabled={!hasInput || isRegisteringBody}
+                    className="btn-dark px-5 py-2 text-xs shrink-0"
+                  >
+                    {isRegisteringBody ? 'サービス名を認識中…' : '登録する'}
+                  </button>
+                )}
+                {hasInput && (
+                  <p className="text-xs text-emerald-600 font-medium animate-in fade-in">
+                    {selectedServiceId
+                      ? '「登録する」でAIがサービス名を認識します（下のメニューはすぐ実行できます）'
+                      : '入力済み — 下のメニューを実行できます'}
+                  </p>
+                )}
+              </div>
+            </div>
+
             {registeredServices.length > 0 && (
               <>
-                <p className="text-xs text-stone-500 mt-4 mb-2 font-medium">改善したいサービスを選択してください</p>
+                <p className="text-xs text-stone-500 mt-5 pt-5 border-t border-stone-100 mb-2 font-medium">改善したいサービスを選択してください</p>
                 <div className="flex flex-col gap-2">
                   {registeredServices.map(sv => {
                     const isSelected = selectedServiceId === sv.id;
@@ -668,40 +702,6 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
                 </div>
               </>
             )}
-
-            {/* 対象の本文 — URLとセットで登録するので同じカード内に置く */}
-            <div className="mt-5 pt-5 border-t border-stone-100">
-            <label htmlFor="support-body" className="font-semibold text-stone-700 text-sm block mb-2">
-              対象の本文
-              <span className="text-xs text-stone-400 font-normal ml-2">出品ページを開いて本文をコピー → ここに貼り付け（口コミも一緒に貼るとGood）</span>
-            </label>
-          <textarea
-            id="support-body"
-            value={serviceBody}
-            onChange={(e) => handleBodyChange(e.target.value)}
-            className="field w-full p-5 min-h-[180px] text-base leading-relaxed"
-            placeholder="出品ページの本文をコピーして、ここに貼り付けてください。&#10;（上でサービスを登録している場合は「ページを開く」から本文をコピーできます）"
-          />
-          <div className="mt-3 flex flex-wrap items-center gap-3">
-            {selectedServiceId && (
-              <button
-                type="button"
-                onClick={handleRegisterBody}
-                disabled={!hasInput || isRegisteringBody}
-                className="btn-dark px-5 py-2 text-xs shrink-0"
-              >
-                {isRegisteringBody ? 'サービス名を認識中…' : '登録する'}
-              </button>
-            )}
-            {hasInput && (
-              <p className="text-xs text-emerald-600 font-medium animate-in fade-in">
-                {selectedServiceId
-                  ? '「登録する」でAIがサービス名を認識します（下のメニューはすぐ実行できます）'
-                  : '入力済み — 下のメニューを実行できます'}
-              </p>
-            )}
-          </div>
-            </div>
           </div>
         </div>
 
