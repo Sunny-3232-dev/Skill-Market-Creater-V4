@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
-import { generatePromotion, generateSurveyPatterns, getSlideDocPrompt, extractServiceTitle, generateSlideImagePrompts } from '../services/geminiService';
+import { generatePromotion, generateSurveyPatterns, getSlideDocPrompt, extractServiceTitle, generateSlideImagePrompts, buildSlideImagePromptText } from '../services/geminiService';
 import { extractWords } from '../utils/textProcessing';
 import { SkillIdea, SurveyPattern, SurveyQuestionDef, ThumbnailPromptVersion, SlideImagePrompt } from '../types';
 import { MegaphoneIcon, ClipboardListIcon, PresentationIcon, SparkleIcon } from './icons';
@@ -373,6 +373,9 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
         sv.id === selectedServiceId ? { ...sv, content: val } : sv
       ));
     }
+    // 本文が変わったら、生成済みの画像プロンプト（本文由来の中身）は古くなるためクリア。
+    // → 生成ボタンが再表示され、新しい本文で作り直せる（トンマナ切替では消えない）。
+    if (slidePrompts.length > 0) setSlidePrompts([]);
   };
 
   // 貼り付けた本文からGeminiでサービス名を認識し、カード（ラジオボタンの右）に確定表示する
@@ -411,16 +414,17 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
     setTimeout(scrollToResults, 100);
   };
 
-  // ChatGPTで1枚ずつ作るためのスライド別プロンプトを生成する
+  // ChatGPTで1枚ずつ作るための「画像ごとの中身」を生成する（トンマナ非依存）。
+  // トンマナはコピー時に差し込むだけなので、切り替えても作り直しは不要。
   const handleGenerateSlidePrompts = async () => {
     if (!hasInput) return;
     const keyReady = await ensureKeySet();
     if (!keyReady) return;
     setIsSlideGenLoading(true);
     try {
-      const data = await generateSlideImagePrompts(serviceBody, slideVersion);
+      const data = await generateSlideImagePrompts(serviceBody);
       if (data.length === 0) {
-        notify('スライドのプロンプトを生成できませんでした。本文を増やして再度お試しください。', 'error');
+        notify('画像プロンプトを生成できませんでした。本文を増やして再度お試しください。', 'error');
         return;
       }
       setSlidePrompts(data);
@@ -433,7 +437,9 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
   };
 
   const handleCopySlidePrompt = (slide: SlideImagePrompt) => {
-    navigator.clipboard.writeText(slide.prompt).then(() => {
+    // トンマナ（画風）はコピーのたびに現在の選択を差し込む。作り直し不要。
+    const text = buildSlideImagePromptText(slide, slideVersion, slidePrompts.length);
+    navigator.clipboard.writeText(text).then(() => {
       setCopiedSlideNo(slide.no);
       setTimeout(() => setCopiedSlideNo(prev => (prev === slide.no ? null : prev)), 2000);
     });
@@ -578,14 +584,14 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
           )}
         </div>
 
-        {/* あなたのサービス: URL登録＋対象選択（最大10件） */}
-        <div className="mb-8">
-          <SectionLabel label="あなたのサービス" />
+        {/* ① 登録済みサービス（台帳＝登録・一覧・閲覧） */}
+        <div className="mb-6">
+          <SectionLabel label="登録済みサービス" />
           <div className="card p-5">
             <div className="flex flex-wrap justify-between items-center gap-2 mb-2">
               <label htmlFor="register-url" className="text-sm font-semibold text-stone-700">
                 出品済みサービスをURLで登録
-                <span className="text-xs text-stone-400 font-normal ml-2">ページを開いて本文を貼り付けると各メニューで使えます</span>
+                <span className="text-xs text-stone-400 font-normal ml-2">登録しておくと各メニューの対象にできます</span>
               </label>
               <span className={`text-xs font-semibold ${registeredServices.length >= MAX_REGISTERED_SERVICES ? 'text-brand-600' : 'text-stone-400'}`}>
                 {registeredServices.length}/{MAX_REGISTERED_SERVICES}件
@@ -611,43 +617,10 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
               </button>
             </div>
 
-            {/* 対象の本文 — URL登録とセットなので直下に置く */}
-            <div className="mt-5 pt-5 border-t border-stone-100">
-              <label htmlFor="support-body" className="font-semibold text-stone-700 text-sm block mb-2">
-                対象の本文
-                <span className="text-xs text-stone-400 font-normal ml-2">出品ページを開いて本文をコピー → ここに貼り付け（口コミも一緒に貼るとGood）</span>
-              </label>
-              <textarea
-                id="support-body"
-                value={serviceBody}
-                onChange={(e) => handleBodyChange(e.target.value)}
-                className="field w-full p-5 min-h-[180px] text-base leading-relaxed"
-                placeholder="出品ページの本文をコピーして、ここに貼り付けてください。&#10;（上でサービスを登録している場合は「ページを開く」から本文をコピーできます）"
-              />
-              <div className="mt-3 flex flex-wrap items-center gap-3">
-                {selectedServiceId && (
-                  <button
-                    type="button"
-                    onClick={handleRegisterBody}
-                    disabled={!hasInput || isRegisteringBody}
-                    className="btn-dark px-5 py-2 text-xs shrink-0"
-                  >
-                    {isRegisteringBody ? 'サービス名を認識中…' : '登録する'}
-                  </button>
-                )}
-                {hasInput && (
-                  <p className="text-xs text-emerald-600 font-medium animate-in fade-in">
-                    {selectedServiceId
-                      ? '「登録する」でAIがサービス名を認識します（下のメニューはすぐ実行できます）'
-                      : '入力済み — 下のメニューを実行できます'}
-                  </p>
-                )}
-              </div>
-            </div>
-
-            {registeredServices.length > 0 && (
-              <>
-                <p className="text-xs text-stone-500 mt-5 pt-5 border-t border-stone-100 mb-2 font-medium">改善したいサービスを選択してください</p>
+            {/* 登録済み一覧（閲覧・選択） */}
+            {registeredServices.length > 0 ? (
+              <div className="mt-5 pt-5 border-t border-stone-100">
+                <p className="text-xs text-stone-500 mb-2 font-medium">改善したいサービスを選択してください</p>
                 <div className="flex flex-col gap-2">
                   {registeredServices.map(sv => {
                     const isSelected = selectedServiceId === sv.id;
@@ -700,8 +673,54 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
                     );
                   })}
                 </div>
-              </>
+              </div>
+            ) : (
+              <p className="text-xs text-stone-400 mt-4">
+                まだ登録がありません。URLを追加するか、下の「対象の本文」に貼り付ければそのまま使えます。
+              </p>
             )}
+          </div>
+        </div>
+
+        {/* ② 対象の本文（作業エリア＝各メニューの入力） */}
+        <div className="mb-8">
+          <SectionLabel label="対象の本文" />
+          <div className="card p-5">
+            <label htmlFor="support-body" className="font-semibold text-stone-700 text-sm block mb-2">
+              ここに本文を貼り付け
+              <span className="text-xs text-stone-400 font-normal ml-2">出品ページを開いて本文をコピー → 貼り付け（口コミも一緒に貼るとGood）</span>
+            </label>
+            <textarea
+              id="support-body"
+              value={serviceBody}
+              onChange={(e) => handleBodyChange(e.target.value)}
+              className="field w-full p-5 min-h-[180px] text-base leading-relaxed"
+              placeholder="出品ページの本文をコピーして、ここに貼り付けてください。&#10;（上で登録したサービスは「ページを開く」から本文をコピーできます）"
+            />
+            <div className="mt-3 flex flex-wrap items-center gap-3">
+              {selectedServiceId && (
+                <>
+                  <span className="text-xs text-stone-500">
+                    選択中：<span className="font-semibold text-stone-800">{registeredServices.find(sv => sv.id === selectedServiceId)?.title || '登録サービス'}</span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleRegisterBody}
+                    disabled={!hasInput || isRegisteringBody}
+                    className="btn-dark px-5 py-2 text-xs shrink-0"
+                  >
+                    {isRegisteringBody ? 'サービス名を認識中…' : 'この本文を保存'}
+                  </button>
+                </>
+              )}
+              {hasInput && (
+                <p className="text-xs text-emerald-600 font-medium animate-in fade-in">
+                  {selectedServiceId
+                    ? '「この本文を保存」でこのサービスに紐付け＆AIが名前を認識（メニューはすぐ実行できます）'
+                    : '入力済み — 下のメニューを実行できます'}
+                </p>
+              )}
+            </div>
           </div>
         </div>
 
@@ -951,15 +970,19 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
                   })}
                 </div>
 
+                <p className="text-[11px] text-stone-400 mb-4">選んだトンマナは、コピーするプロンプトに即反映されます（切り替えても作り直しは不要です）。</p>
+
                 <div className="flex flex-wrap items-center gap-2 mb-6">
-                  <button
-                    type="button"
-                    onClick={handleGenerateSlidePrompts}
-                    disabled={isSlideGenLoading}
-                    className="btn-primary px-6 py-2.5 text-xs"
-                  >
-                    {isSlideGenLoading ? 'スライドを設計中…' : (slidePrompts.length > 0 ? 'このトンマナで作り直す' : '1枚ずつのプロンプトを作る')}
-                  </button>
+                  {slidePrompts.length === 0 && (
+                    <button
+                      type="button"
+                      onClick={handleGenerateSlidePrompts}
+                      disabled={isSlideGenLoading}
+                      className="btn-primary px-6 py-2.5 text-xs"
+                    >
+                      {isSlideGenLoading ? '画像プロンプトを設計中…' : '1枚ずつのプロンプトを作る'}
+                    </button>
+                  )}
                   <a
                     href="https://chatgpt.com/"
                     target="_blank"

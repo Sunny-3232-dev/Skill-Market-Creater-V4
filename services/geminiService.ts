@@ -358,8 +358,7 @@ const SLIDE_ROLE_LABELS: Record<string, string> = {
 };
 
 export const generateSlideImagePrompts = async (
-  serviceBody: string,
-  toneVersion: ThumbnailPromptVersion = 'standard'
+  serviceBody: string
 ): Promise<SlideImagePrompt[]> => {
   const body = serviceBody?.trim();
   if (!body) return [];
@@ -425,16 +424,28 @@ ${body.slice(0, 4000)}
     return [];
   }
 
-  const total = slidesRaw.length;
-  const styleDirective = SLIDE_STYLE_DIRECTIVES[toneVersion];
+  // トンマナはコピー時に buildSlideImagePromptText で差し込むため、ここでは中身だけ返す。
+  return slidesRaw.map((s, i) => ({
+    no: i + 1,
+    role: s.role,
+    label: SLIDE_ROLE_LABELS[s.role] ?? `画像${i + 1}`,
+    title: String(s.title || '').trim(),
+    body: String(s.body || '').trim(),
+  }));
+};
 
-  return slidesRaw.map((s, i) => {
-    const title = String(s.title || '').trim();
-    const bodyText = String(s.body || '').trim();
-    let promptText: string;
-    if (i === 0) {
-      // 1枚目：画風・レイアウトをこの1枚で確定させる（プレゼン資料ではなく1枚の画像）
-      promptText = `ChatGPTの画像生成（GPT Image）で、スキルマーケットのサービス紹介画像を1枚ずつ作ります（全${total}枚）。まずは1枚目です。
+// 1枚分の中身＋選択中トンマナから、ChatGPTにそのまま貼れる画像生成プロンプトを組み立てる。
+// トンマナはここで差し込むだけなので、切り替えても中身の再生成（作り直し）は不要。
+export const buildSlideImagePromptText = (
+  slide: SlideImagePrompt,
+  toneVersion: ThumbnailPromptVersion,
+  total: number
+): string => {
+  const styleDirective = SLIDE_STYLE_DIRECTIVES[toneVersion];
+  const { no, title, body } = slide;
+  if (no === 1) {
+    // 1枚目：画風・レイアウトをこの1枚で確定させる（プレゼン資料ではなく1枚の画像）
+    return `ChatGPTの画像生成（GPT Image）で、スキルマーケットのサービス紹介画像を1枚ずつ作ります（全${total}枚）。まずは1枚目です。
 これはプレゼンのスライドやPowerPointではなく、文字を一緒にデザインした「1枚のグラフィック画像」です。画像を1枚だけ生成してください。
 この1枚でデザイン（画風・配色・レイアウト・フォント・余白）を確定します。2枚目以降も、まったく同じデザインテンプレートのまま、内容だけ差し替えて作ります。
 
@@ -447,24 +458,14 @@ ${styleDirective}
 
 【1枚目：${title}】
 （画像に入れる文字）
-${bodyText}`;
-    } else {
-      // 2枚目以降：同一スレッドで続けて、デザインテンプレートを固定
-      promptText = `続けて${i + 1}枚目の画像を1枚生成してください。前の画像とまったく同じデザイン（画風・配色・レイアウト・フォント・余白）のまま、内容だけ差し替えます。横長／landscape・日本語・1枚の画像（スライドやPowerPointにはしない）。
+${body}`;
+  }
+  // 2枚目以降：同一スレッドで続けて、デザインテンプレートを固定
+  return `続けて${no}枚目の画像を1枚生成してください。前の画像とまったく同じデザイン（画風・配色・レイアウト・フォント・余白）のまま、内容だけ差し替えます。横長／landscape・日本語・1枚の画像（スライドやPowerPointにはしない）。
 
 【${title}】
 （画像に入れる文字）
-${bodyText}`;
-    }
-    return {
-      no: i + 1,
-      role: s.role,
-      label: SLIDE_ROLE_LABELS[s.role] ?? `スライド${i + 1}`,
-      title,
-      body: bodyText,
-      prompt: promptText,
-    };
-  });
+${body}`;
 };
 
 const getApiKey = (): string => {
