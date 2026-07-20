@@ -358,9 +358,64 @@ const SLIDE_STYLE_DIRECTIVES: Record<ThumbnailPromptVersion, string> = {
 `,
 };
 
+// AIおまかせ用：サービス本文を解析し、「このサービス専用」のスライド資料トンマナ指定を作る。
+// 出力は SLIDE_STYLE_DIRECTIVES と同じ形式なので、そのまま commonBase に連結して使える。
+export const generateAutoSlideStyle = async (serviceBody: string): Promise<string> => {
+  const body = serviceBody?.trim();
+  if (!body) return '';
+  const apiKey = getApiKey();
+  const ai = new GoogleGenAI(apiKey ? { apiKey } : {});
+
+  const prompt = `
+あなたはプレゼン資料のアートディレクターです。
+以下のサービス本文を読み、「このサービス専用」のスライド資料デザイン指定（トンマナ）を作成してください。
+これは NotebookLM のスライド作成カスタマイズ欄に貼る文章の一部として使われます。
+
+【まず内部で分析する（分析結果そのものは出力しない）】
+・ジャンル・業種／主なターゲット層／価格帯とフォーマル度／伝えたい雰囲気
+
+【出力フォーマット】必ず次の形式・見出しで、日本語で出力すること。
+■ デザインスタイル：<このサービスに付けた短いスタイル名>
+・全体の方向性：1〜2行。業種やターゲットに触れ、なぜその方向かが伝わるように。
+・配色：ベースとアクセントを具体的な色名で2〜3色（例：ネイビー×ホワイト×ゴールド）。
+・書体：見出しと本文それぞれの方向性（例：見出しは太めのゴシック、本文は可読性重視の細め）。
+・図版・あしらい：このサービスに合うモチーフや装飾（例：チェックリスト、吹き出し、ステップ矢印、アイコン）。
+・避けること：このサービスの雰囲気に合わない表現を1行。
+
+【ルール】
+・本文に書かれた情報だけを根拠にする。創作・誇張はしない。
+・レイアウトを全スライド同じに固定する指示は書かない（版面はスライドの内容ごとに変える前提）。
+・マークダウン記法（#、* など）は使わない。箇条書きは「・」を使う。
+・出力は上記フォーマットのみ。前置き・後書き・説明文は一切書かない。
+
+【サービス本文】
+${body.slice(0, 4000)}
+`;
+
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-3.5-flash',
+      contents: prompt,
+    });
+    let text = (response.text || '').trim();
+    // 念のためコードフェンスやマークダウン見出しが混ざった場合は除去する
+    text = text.replace(/^```[a-zA-Z]*\n?/,'').replace(/```$/,'').trim();
+    text = text.replace(/^#+\s*/gm, '').trim();
+    if (!text.startsWith('■')) {
+      const idx = text.indexOf('■');
+      if (idx > 0) text = text.slice(idx).trim();
+    }
+    return text;
+  } catch {
+    return '';
+  }
+};
+
 export const getSlideDocPrompt = (
   serviceBody: string,
-  toneVersion: ThumbnailPromptVersion = 'my_style'
+  toneVersion: ThumbnailPromptVersion = 'my_style',
+  // ai_auto のとき、generateAutoSlideStyle が作ったサービス専用トンマナを差し込む
+  autoStyle?: string
 ): string => {
   const raw = serviceBody?.trim() || '';
   const bodyExcerpt = !raw
@@ -409,7 +464,11 @@ ${bodyExcerpt}
 
 `;
 
-  return commonBase + SLIDE_STYLE_DIRECTIVES[toneVersion];
+  // ai_auto は、このサービス専用に生成したトンマナがあればそれを優先（無ければ汎用の指定にフォールバック）
+  const directive = toneVersion === 'ai_auto' && autoStyle && autoStyle.trim()
+    ? `${autoStyle.trim()}\n`
+    : SLIDE_STYLE_DIRECTIVES[toneVersion];
+  return commonBase + directive;
 };
 
 const getApiKey = (): string => {

@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
-import { generatePromotion, generateSurveyPatterns, getSlideDocPrompt, extractServiceTitle } from '../services/geminiService';
+import { generatePromotion, generateSurveyPatterns, getSlideDocPrompt, extractServiceTitle, generateAutoSlideStyle } from '../services/geminiService';
 import { extractWords } from '../utils/textProcessing';
 import { SkillIdea, SurveyPattern, SurveyQuestionDef, ThumbnailPromptVersion } from '../types';
 import { MegaphoneIcon, ClipboardListIcon, PresentationIcon, SparkleIcon } from './icons';
@@ -153,11 +153,13 @@ interface ResultsBundle {
   showCode: boolean;
   slideDocReady: boolean;
   activeMenu: MenuId | null;
+  /** AIおまかせ：このサービス専用に生成したトンマナ指定（未生成なら空） */
+  autoStyleDirective: string;
 }
 
 const EMPTY_RESULTS: ResultsBundle = {
   posts: [], patterns: [], patternsOriginal: [], selectedPatternId: null,
-  showCode: false, slideDocReady: false, activeMenu: null,
+  showCode: false, slideDocReady: false, activeMenu: null, autoStyleDirective: '',
 };
 
 interface PersistedState {
@@ -169,6 +171,7 @@ interface PersistedState {
   selectedPatternId: SurveyPattern['id'] | null;
   showCode: boolean;
   slideDocReady: boolean;
+  autoStyleDirective: string;
   registeredServices: RegisteredService[];
   selectedServiceId: string | null;
   resultsByServiceId: Record<string, ResultsBundle>;
@@ -205,6 +208,9 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
   const [selectedPatternId, setSelectedPatternId] = useState<SurveyPattern['id'] | null>(init.selectedPatternId ?? null);
   const [showCode, setShowCode] = useState(init.showCode ?? false);
   const [slideDocReady, setSlideDocReady] = useState(init.slideDocReady ?? false);
+  // AIおまかせ：このサービス専用に生成したトンマナ指定
+  const [autoStyleDirective, setAutoStyleDirective] = useState<string>(init.autoStyleDirective ?? '');
+  const [isAutoStyleLoading, setIsAutoStyleLoading] = useState(false);
 
   // 出品済みサービスのURL登録
   const [registeredServices, setRegisteredServices] = useState<RegisteredService[]>(
@@ -250,13 +256,14 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
       const s: PersistedState = {
         serviceBody, activeMenu,
         posts, patterns, patternsOriginal, selectedPatternId, showCode, slideDocReady,
+        autoStyleDirective,
         registeredServices, selectedServiceId, resultsByServiceId,
       };
       localStorage.setItem(STORAGE_KEY, JSON.stringify(s));
     } catch (e) {
       console.warn('Failed to save support state', e);
     }
-  }, [serviceBody, activeMenu, posts, patterns, patternsOriginal, selectedPatternId, showCode, slideDocReady, registeredServices, selectedServiceId, resultsByServiceId]);
+  }, [serviceBody, activeMenu, posts, patterns, patternsOriginal, selectedPatternId, showCode, slideDocReady, autoStyleDirective, registeredServices, selectedServiceId, resultsByServiceId]);
 
   // ---- サービスごとの生成物を保存: 表示中の結果を選択中サービスのバケットへ同期 ----
   useEffect(() => {
@@ -265,9 +272,9 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
     if (loadedServiceRef.current !== selectedServiceId) return;
     setResultsByServiceId(prev => ({
       ...prev,
-      [selectedServiceId]: { posts, patterns, patternsOriginal, selectedPatternId, showCode, slideDocReady, activeMenu },
+      [selectedServiceId]: { posts, patterns, patternsOriginal, selectedPatternId, showCode, slideDocReady, activeMenu, autoStyleDirective },
     }));
-  }, [posts, patterns, patternsOriginal, selectedPatternId, showCode, slideDocReady, activeMenu, selectedServiceId]);
+  }, [posts, patterns, patternsOriginal, selectedPatternId, showCode, slideDocReady, activeMenu, autoStyleDirective, selectedServiceId]);
 
   // ---- アンケートカードのヘッダー高さ同期 ----
   const surveyHeaderRefs = useRef<(HTMLDivElement | null)[]>([]);
@@ -418,6 +425,7 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
     setSlideDocReady(false);
     setActiveMenu(null);
     setErrorMenu(null);
+    setAutoStyleDirective('');
   };
 
   // 保存済みバケットを画面（表示中の結果）に反映する
@@ -431,6 +439,7 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
     setSlideDocReady(r.slideDocReady ?? false);
     setActiveMenu(r.activeMenu ?? null);
     setErrorMenu(null);
+    setAutoStyleDirective(r.autoStyleDirective ?? '');
   };
 
   const handleSelectService = (sv: RegisteredService) => {
@@ -454,7 +463,7 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
     }
     // 内容が更新されたら、その本文由来の生成物（宣伝文・アンケート・スライド資料）は
     // 古くなるので初期化する。選択中サービスのバケットも保存effect経由で空になる。
-    const hasAnyResult = posts.length > 0 || patterns.length > 0 || slideDocReady || activeMenu !== null;
+    const hasAnyResult = posts.length > 0 || patterns.length > 0 || slideDocReady || activeMenu !== null || autoStyleDirective !== '';
     if (changed && hasAnyResult) resetGeneratedResults();
   };
 
@@ -514,12 +523,36 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
     notify('生成をキャンセルしました。');
   };
 
-  const handleCopySlideDocPrompt = (version: ThumbnailPromptVersion) => {
-    const prompt = getSlideDocPrompt(serviceBody, version);
-    navigator.clipboard.writeText(prompt).then(() => {
+  const handleCopySlideDocPrompt = async (version: ThumbnailPromptVersion) => {
+    // AIおまかせは、このサービス専用のトンマナを初回だけAIで設計してから使う（以降はキャッシュを再利用）
+    let auto = autoStyleDirective;
+    if (version === 'ai_auto' && !auto.trim()) {
+      const keyReady = await ensureKeySet();
+      if (!keyReady) return;
+      setIsAutoStyleLoading(true);
+      try {
+        auto = await generateAutoSlideStyle(serviceBody);
+        if (!auto.trim()) {
+          notify('トンマナを設計できませんでした。本文を増やして再度お試しください。', 'error');
+          return;
+        }
+        setAutoStyleDirective(auto);
+      } catch (error) {
+        onHandleApiError(error);
+        return;
+      } finally {
+        setIsAutoStyleLoading(false);
+      }
+    }
+    const prompt = getSlideDocPrompt(serviceBody, version, version === 'ai_auto' ? auto : undefined);
+    try {
+      await navigator.clipboard.writeText(prompt);
       setCopiedSlideDocVersion(version);
       setTimeout(() => setCopiedSlideDocVersion(null), 2000);
-    });
+    } catch {
+      // 生成待ちでユーザー操作の文脈が切れてコピーを拒否された場合の案内
+      notify('トンマナを設計しました。もう一度「コピー」を押してください。');
+    }
   };
 
   const handleGenerateCode = () => {
@@ -901,18 +934,28 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
                           <div className="flex-1 min-w-0">
                             <h4 className="text-sm font-semibold text-stone-900">{label}</h4>
                             <p className="text-xs text-stone-500 leading-relaxed mt-1">{description}</p>
+                            {isRecommended && (
+                              <p className="text-[11px] text-brand-600 font-medium mt-1.5">
+                                {autoStyleDirective
+                                  ? 'このサービス専用のトンマナを設計済みです。'
+                                  : 'コピー時に、この本文からAIが専用トンマナを設計します。'}
+                              </p>
+                            )}
                           </div>
                           <PromptPreview version={id} badge="トンマナ見本" className="w-[120px] shrink-0 rounded-lg border border-stone-100" />
                           <button
                             type="button"
                             onClick={() => handleCopySlideDocPrompt(id)}
+                            disabled={isRecommended && isAutoStyleLoading}
                             className={`text-xs font-semibold px-4 py-1.5 rounded-full transition-colors shrink-0 ${
                               isCopied
                                 ? 'bg-brand-50 text-brand-600'
                                 : 'bg-stone-900 text-white hover:bg-stone-700'
                             }`}
                           >
-                            {isCopied ? 'コピーしました' : 'コピー'}
+                            {isRecommended && isAutoStyleLoading
+                              ? 'AIが設計中…'
+                              : (isCopied ? 'コピーしました' : 'コピー')}
                           </button>
                         </div>
                       </div>
