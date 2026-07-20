@@ -210,7 +210,6 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
   const [slideDocReady, setSlideDocReady] = useState(init.slideDocReady ?? false);
   // AIおまかせ：このサービス専用に生成したトンマナ指定
   const [autoStyleDirective, setAutoStyleDirective] = useState<string>(init.autoStyleDirective ?? '');
-  const [isAutoStyleLoading, setIsAutoStyleLoading] = useState(false);
 
   // 出品済みサービスのURL登録
   const [registeredServices, setRegisteredServices] = useState<RegisteredService[]>(
@@ -508,12 +507,39 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
     }
   };
 
-  const handleRunSlideDoc = () => {
+  // 「作成する」を押したタイミングで、AIおまかせ用のサービス専用トンマナをここで設計しておく。
+  // コピー時は生成済みの結果を貼るだけにする。
+  const handleRunSlideDoc = async () => {
     if (!hasInput) return;
-    setSlideDocReady(true);
-    setCopiedSlideDocVersion(null);
-    setActiveMenu('slidedoc');
-    setTimeout(scrollToResults, 100);
+    const keyReady = await ensureKeySet();
+    if (!keyReady) return;
+
+    const token = ++runTokenRef.current;
+    setIsLoading(true);
+    setLoadingMenu('slidedoc');
+    setErrorMenu(null);
+    try {
+      const auto = await generateAutoSlideStyle(serviceBody);
+      if (token !== runTokenRef.current) return; // キャンセル済み
+      // 生成できなくても他のトンマナは使えるので、資料メニュー自体は開く（ai_autoは汎用指定にフォールバック）
+      setAutoStyleDirective(auto.trim());
+      if (!auto.trim()) {
+        notify('AIおまかせのトンマナを設計できませんでした。他のトンマナは利用できます。', 'error');
+      }
+      setSlideDocReady(true);
+      setCopiedSlideDocVersion(null);
+      setActiveMenu('slidedoc');
+      setTimeout(scrollToResults, 100);
+    } catch (error) {
+      if (token !== runTokenRef.current) return;
+      setErrorMenu('slidedoc');
+      onHandleApiError(error);
+    } finally {
+      if (token === runTokenRef.current) {
+        setIsLoading(false);
+        setLoadingMenu(null);
+      }
+    }
   };
 
   const handleCancelRun = () => {
@@ -523,36 +549,13 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
     notify('生成をキャンセルしました。');
   };
 
-  const handleCopySlideDocPrompt = async (version: ThumbnailPromptVersion) => {
-    // AIおまかせは、このサービス専用のトンマナを初回だけAIで設計してから使う（以降はキャッシュを再利用）
-    let auto = autoStyleDirective;
-    if (version === 'ai_auto' && !auto.trim()) {
-      const keyReady = await ensureKeySet();
-      if (!keyReady) return;
-      setIsAutoStyleLoading(true);
-      try {
-        auto = await generateAutoSlideStyle(serviceBody);
-        if (!auto.trim()) {
-          notify('トンマナを設計できませんでした。本文を増やして再度お試しください。', 'error');
-          return;
-        }
-        setAutoStyleDirective(auto);
-      } catch (error) {
-        onHandleApiError(error);
-        return;
-      } finally {
-        setIsAutoStyleLoading(false);
-      }
-    }
-    const prompt = getSlideDocPrompt(serviceBody, version, version === 'ai_auto' ? auto : undefined);
-    try {
-      await navigator.clipboard.writeText(prompt);
+  // コピーは生成済みの結果を貼るだけ（AIおまかせのトンマナは「作成する」時に設計済み）
+  const handleCopySlideDocPrompt = (version: ThumbnailPromptVersion) => {
+    const prompt = getSlideDocPrompt(serviceBody, version, version === 'ai_auto' ? autoStyleDirective : undefined);
+    navigator.clipboard.writeText(prompt).then(() => {
       setCopiedSlideDocVersion(version);
       setTimeout(() => setCopiedSlideDocVersion(null), 2000);
-    } catch {
-      // 生成待ちでユーザー操作の文脈が切れてコピーを拒否された場合の案内
-      notify('トンマナを設計しました。もう一度「コピー」を押してください。');
-    }
+    });
   };
 
   const handleGenerateCode = () => {
@@ -937,8 +940,8 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
                             {isRecommended && (
                               <p className="text-[11px] text-brand-600 font-medium mt-1.5">
                                 {autoStyleDirective
-                                  ? 'このサービス専用のトンマナを設計済みです。'
-                                  : 'コピー時に、この本文からAIが専用トンマナを設計します。'}
+                                  ? 'この本文をもとに、AIがこのサービス専用のトンマナを設計済みです。'
+                                  : '専用トンマナは未設計です。「再作成」で設計し直せます（今は汎用のおまかせ指定でコピーされます）。'}
                               </p>
                             )}
                           </div>
@@ -946,16 +949,13 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
                           <button
                             type="button"
                             onClick={() => handleCopySlideDocPrompt(id)}
-                            disabled={isRecommended && isAutoStyleLoading}
                             className={`text-xs font-semibold px-4 py-1.5 rounded-full transition-colors shrink-0 ${
                               isCopied
                                 ? 'bg-brand-50 text-brand-600'
                                 : 'bg-stone-900 text-white hover:bg-stone-700'
                             }`}
                           >
-                            {isRecommended && isAutoStyleLoading
-                              ? 'AIが設計中…'
-                              : (isCopied ? 'コピーしました' : 'コピー')}
+                            {isCopied ? 'コピーしました' : 'コピー'}
                           </button>
                         </div>
                       </div>
