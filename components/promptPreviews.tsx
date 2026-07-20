@@ -95,12 +95,59 @@ const AiAutoPreview = () => (
   </svg>
 );
 
+// 訴求バナー（ベネフィット型）：大見出し＋キャラクター＋3ベネフィットのバッジ構成を表す図
+const BenefitBannerPreview = () => (
+  <svg viewBox="0 0 600 400" xmlns="http://www.w3.org/2000/svg" className="block w-full h-full">
+    {/* 背景：斜めのカラー帯 */}
+    <rect width="600" height="400" fill="#eff6ff"/>
+    <polygon points="0,0 600,0 600,120 0,180" fill="#1e3a8a"/>
+    <polygon points="0,180 600,120 600,150 0,210" fill="#3b82f6" opacity="0.5"/>
+    {/* 上部：メイン見出し（最重要語を塗り箱で強調） */}
+    <rect x="40" y="30" width="86" height="40" rx="6" fill="#ef4444"/>
+    <text x="83" y="59" fontSize="24" fontWeight="900" fill="#ffffff" textAnchor="middle">現役</text>
+    <text x="140" y="60" fontSize="26" fontWeight="900" fill="#ffffff">プロが</text>
+    <text x="44" y="112" fontSize="30" fontWeight="900" fill="#1e3a8a" stroke="#ffffff" strokeWidth="5" paintOrder="stroke">全力でサポート！</text>
+    {/* 右：キャラクター（メガホン＋拳） */}
+    <g>
+      <circle cx="470" cy="215" r="26" fill="#fcd9b6"/>
+      <rect x="446" y="238" width="48" height="52" rx="10" fill="#1e3a8a"/>
+      <rect x="460" y="238" width="20" height="30" fill="#ffffff"/>
+      {/* 上げた拳 */}
+      <circle cx="516" cy="196" r="12" fill="#fcd9b6"/>
+      <rect x="508" y="200" width="10" height="40" rx="5" fill="#1e3a8a"/>
+      {/* メガホン */}
+      <polygon points="410,205 440,195 440,235 410,225" fill="#fbbf24"/>
+      <rect x="404" y="205" width="8" height="20" rx="2" fill="#f59e0b"/>
+      <path d="M392 200 l-8 -6 M390 215 l-10 0 M392 230 l-8 6" stroke="#f59e0b" strokeWidth="3" strokeLinecap="round"/>
+    </g>
+    {/* 下部：3つのベネフィットのバッジ */}
+    <g>
+      <circle cx="140" cy="330" r="46" fill="#fbbf24"/>
+      <text x="140" y="326" fontSize="13" fontWeight="800" fill="#1f2937" textAnchor="middle">強みを</text>
+      <text x="140" y="344" fontSize="13" fontWeight="800" fill="#1f2937" textAnchor="middle">活かす</text>
+      <circle cx="300" cy="330" r="46" fill="#1e3a8a"/>
+      <text x="300" y="326" fontSize="13" fontWeight="800" fill="#ffffff" textAnchor="middle">通過率</text>
+      <text x="300" y="344" fontSize="13" fontWeight="800" fill="#ffffff" textAnchor="middle">アップ</text>
+      <circle cx="460" cy="330" r="46" fill="#ffffff" stroke="#1e3a8a" strokeWidth="3"/>
+      <text x="460" y="326" fontSize="13" fontWeight="800" fill="#1e3a8a" textAnchor="middle">模擬</text>
+      <text x="460" y="344" fontSize="13" fontWeight="800" fill="#1e3a8a" textAnchor="middle">面接</text>
+    </g>
+  </svg>
+);
+
 export const PromptPreview: React.FC<{
   version: ThumbnailPromptVersion;
   className?: string;
   /** 画像左上に重ねるラベル。誤解防止のため「これはサンプル」と明示する */
   badge?: string;
 }> = ({ version, className = '', badge = '仕上がりイメージ' }) => {
+  if (version === 'benefit_banner') {
+    return (
+      <div className={`overflow-hidden aspect-[3/2] ${className}`} aria-hidden>
+        <BenefitBannerPreview />
+      </div>
+    );
+  }
   if (version === 'ai_auto') {
     return (
       <div className={`overflow-hidden aspect-[3/2] ${className}`} aria-hidden>

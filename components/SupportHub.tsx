@@ -577,7 +577,6 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
       description: 'リベシティの文化に合う「前向き・丁寧・押しつけない」つぶやきを生成。口コミがあれば自然に反映します。',
       highlight: '20本を一括生成',
       icon: <MegaphoneIcon />,
-      runLabel: '作成する',
       onRun: handleRunPromoter,
     },
     {
@@ -586,7 +585,6 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
       description: 'NotebookLMでスライド資料を作るためのプロンプトを用意。サービス画像としてそのまま使えます。',
       highlight: 'トンマナ8種から選択',
       icon: <PresentationIcon />,
-      runLabel: '表示する', // AIは呼ばずプロンプト一覧を表示するだけなので「実行」とは言わない
       onRun: handleRunSlideDoc,
     },
     {
@@ -595,7 +593,6 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
       description: '購入者の声を集めるGoogleフォームを自動設計。価格印象などもサービス情報から自動反映します。',
       highlight: 'フォーム3案を自動設計',
       icon: <ClipboardListIcon />,
-      runLabel: '作成する',
       onRun: handleRunSurvey,
     },
   ];
@@ -821,7 +818,7 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
                     disabled={!hasInput || isLoading}
                     className="btn-primary w-full mt-4 py-2.5 text-xs"
                   >
-                    {isBusy ? '生成中…' : menu.runLabel}
+                    {isBusy ? '生成中…' : (hasResult ? '再作成' : '作成する')}
                   </button>
                 </div>
               );
@@ -846,8 +843,8 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
           <div ref={resultRef} className="animate-in fade-in slide-in-from-bottom-4 duration-500 mb-8">
             <SectionLabel label="結果" />
 
-            {/* 結果タブ（複数の結果が並存する） */}
-            {resultTabs.length > 1 && (
+            {/* 結果タブ（1つだけでもラベルを出して、何の結果かを明示する） */}
+            {resultTabs.length > 0 && (
               <div className="flex flex-wrap gap-2 mb-6">
                 {resultTabs.map(tab => (
                   <button
