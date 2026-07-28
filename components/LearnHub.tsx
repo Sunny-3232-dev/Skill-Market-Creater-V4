@@ -1,7 +1,6 @@
 import React from 'react';
 import { MAGAZINE_ARTICLES, KNOWHOW_ARTICLES } from '../data/articles';
 import ArticleList from './support/ArticleList';
-import HandsonDeck from './learn/HandsonDeck';
 
 // 「前提・下敷き」となる読み物レイヤー。Creator/Supportと並ぶ第3の入口。
 const LearnHub: React.FC = () => {
@@ -18,7 +17,6 @@ const LearnHub: React.FC = () => {
         </div>
 
         <div className="space-y-10">
-          <HandsonDeck />
           <ArticleList
             title="学長に学ぶ、売る前の基本"
             subtitle="リベ大の両学長が「価格の決め方」「嫌われない宣伝のコツ」を解説。出品する前に押さえておきたい考え方です。"

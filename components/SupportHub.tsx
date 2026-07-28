@@ -9,6 +9,8 @@ import TweetCard, { TweetPost } from './support/TweetCard';
 import PatternCard from './support/PatternCard';
 import CodeViewer from './support/CodeViewer';
 import QuestionEditor from './support/QuestionEditor';
+import Deck from './learn/Deck';
+import { POLISH_SLIDES } from './learn/deckSlides';
 
 interface SupportHubProps {
   ensureKeySet: () => Promise<boolean>;
@@ -671,6 +673,15 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
               </button>
             )
           )}
+        </div>
+
+        {/* 出したあとに何をするかの読み物（作業の邪魔をしないよう既定は閉じる） */}
+        <div className="mb-6">
+          <Deck
+            slides={POLISH_SLIDES}
+            title="出品を磨く3つの型（読み物）"
+            description="サービス画像・アンケート・つぶやき。下のメニューを「なぜそう作るのか」から使えるようにまとめました。"
+          />
         </div>
 
         {/* ① 登録済みサービス（台帳＝登録・一覧・閲覧） */}

@@ -1,18 +1,200 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { DeckSlide } from './Deck';
 
 /**
- * 勉強会「スキルマーケットを磨こう」のハンズオン資料。
- * 文字サイズはコンテナ幅（cqw）基準なので、埋め込み表示でも全画面でも同じ見え方になる。
- * スライドの追加・修正は SLIDES 配列だけを編集すればよい。
+ * 作業画面に置く読み物スライドの中身。
+ * PUBLISH = STEP1（出品アイデアを作る）向け／POLISH = STEP2（広める・改善する）向け。
+ * 文字サイズはコンテナ幅基準なので、ここでは大きさを意識せず内容だけ書けばよい。
  */
 
-const SLIDES: { cover?: boolean; html: string }[] = [
+// ────────────────────────────────
+// STEP1：はじめての出品まで
+// ────────────────────────────────
+export const PUBLISH_SLIDES: DeckSlide[] = [
   {
     cover: true,
     html: `
-      <div class="d-label d-label-mute">ハンズオン資料</div>
-      <h1 class="d-h1">スキルマーケットを<br>磨こう</h1>
-      <div class="d-meta">出品したあとの「次の一手」を、3つだけ持ち帰る<br>サービス画像 ／ アンケート ／ つぶやき</div>`,
+      <div class="d-label d-label-mute">はじめての出品ガイド</div>
+      <h1 class="d-h1">スキルマーケットを<br>出そう</h1>
+      <div class="d-meta">港で準備ばかりしていても始まりません。<br>まずは小さな船でも、海に出てみましょう。</div>`,
+  },
+  {
+    html: `
+      <div class="d-label">ゴール</div>
+      <h2 class="d-h2">「あとは出航ボタンを<br>押すだけ」まで</h2>
+      <ul class="d-ul">
+        <li>出品するときの<b>コツ・考え方</b>がわかる</li>
+        <li>このツールの<b>使い方</b>がわかる</li>
+        <li><b>あとは出品するだけ</b>の状態まで準備が整う</li>
+      </ul>`,
+  },
+  {
+    html: `
+      <div class="d-label">そもそも</div>
+      <h2 class="d-h2">スキルマーケットとは</h2>
+      <div class="d-cols">
+        <div class="d-card"><div class="d-num">どんな場所</div><h3>リベ会員のマッチング</h3><p>オンラインで完結するサービスを、出したい人と頼みたい人がつながる場所。</p></div>
+        <div class="d-card"><div class="d-num">お金</div><h3>出品手数料は無料</h3><p>出すこと自体にお金はかかりません。</p></div>
+        <div class="d-card"><div class="d-num">だれが</div><h3>会員なら全員</h3><p>リベシティの会員であれば、誰でも今日から出品できます。</p></div>
+      </div>`,
+  },
+  {
+    html: `
+      <div class="d-label">出せない理由あるある</div>
+      <h2 class="d-h2">だいたい、この3つ</h2>
+      <ul class="d-ul">
+        <li>どんなサービスを出したらいいか<b>わからない</b></li>
+        <li>入力項目が多くて<b>文章の手が進まない</b></li>
+        <li>準備が万全じゃないから<b>ためらってしまう</b></li>
+      </ul>
+      <div class="d-note">1つめはAIが20個のアイデアを出します。2つめは文章もAIが書きます。<b>3つめだけが、考え方の話です。</b></div>`,
+  },
+  {
+    html: `
+      <div class="d-label">マインドセット</div>
+      <h2 class="d-h2"><span class="d-hl">60点</span>で出航する</h2>
+      <div class="d-fig">
+        <svg viewBox="0 0 1040 180" role="img" aria-label="60%地点で出航するという図">
+          <rect x="2" y="58" width="1036" height="34" rx="17" fill="#fff" stroke="#e7e5e4" stroke-width="2"/>
+          <rect x="4" y="60" width="620" height="30" rx="15" fill="#fff1f2"/>
+          <line x1="624" y1="30" x2="624" y2="120" stroke="#e11d48" stroke-width="3"/>
+          <text x="624" y="22" text-anchor="middle" font-size="27" font-weight="700" fill="#e11d48">60% ここで出航</text>
+          <text x="624" y="152" text-anchor="middle" font-size="20" fill="#6b6560">小回りが利く船。海の上で育てられる</text>
+          <text x="1032" y="152" text-anchor="end" font-size="20" fill="#a8a29e">100%＝永遠に来ない</text>
+        </svg>
+      </div>
+      <div class="d-note">学長もよく言っていますよね。「<b>早よ出しや〜</b>」って。</div>`,
+  },
+  {
+    html: `
+      <div class="d-label">なぜ60点でいいのか</div>
+      <h2 class="d-h2">変えられる<span class="d-hl">余白</span>を<br>残しておくため</h2>
+      <div class="d-lead">100％作り込むと、お客さんの声に応える余白がなくなります。<br>60％の船なら、海に出たあとで育てていける。</div>
+      <div class="d-note">このツールには<b>出したあとに磨く機能もそろっています。</b>だから、60点で大丈夫です。</div>`,
+  },
+  {
+    html: `
+      <div class="d-label">準備</div>
+      <h2 class="d-h2">スキルの棚卸しから</h2>
+      <ol class="d-ol">
+        <li>リベのプロフィールを<b>全選択してコピー</b>（Command + A → C）</li>
+        <li>そのまま入力欄に<b>貼り付ける</b></li>
+        <li>書ききれていない<b>好き・得意・経験</b>を追記</li>
+      </ol>
+      <div class="d-note">きれいに整えなくて大丈夫。<b>雑に貼り付けてOK</b>です。</div>`,
+  },
+  {
+    html: `
+      <div class="d-label">アイデア</div>
+      <h2 class="d-h2">AIが<span class="d-hl">20個</span>出します</h2>
+      <div class="d-cols">
+        <div class="d-card"><div class="d-num">最初の10個</div><h3>王道アイデア</h3><p>需要が安定していて、初心者でも参入しやすい手堅いもの。</p></div>
+        <div class="d-card"><div class="d-num">残りの10個</div><h3>ニッチ＆ユニーク</h3><p>「え、こんなの売れるの？」という、あなたの個性が強烈に活きるもの。</p></div>
+      </div>
+      <div class="d-note">どの強みが活きるか、誰のどんな困りごとを解決するかも一緒に出ます。<b>悩みすぎず、走りきるのがコツ。</b></div>`,
+  },
+  {
+    html: `
+      <div class="d-label">文章を整える</div>
+      <h2 class="d-h2">AI編集チャットで、<br><span class="d-hl">自分の言葉</span>に寄せる</h2>
+      <div class="d-split">
+        <div class="d-chat">
+          <span>もっと親しみやすい文体にして</span>
+          <span>もっと丁寧でプロフェッショナルに</span>
+          <span>初心者にもわかる言葉に言い換えて</span>
+          <span>絵文字を減らして落ち着いた印象に</span>
+        </div>
+        <div class="d-after">
+          クリックすると入力欄に入るので、<b>そのまま送っても、書き足して送ってもOK</b>。<br>
+          「〇〇の部分だけ短くして」のような細かい指示も通ります。
+        </div>
+      </div>
+      <div class="d-note">大事なのは、<b>AIが書いた平均的な文章のままにしないこと。</b>1か所変えるだけで自分の顔になります。</div>`,
+  },
+  {
+    html: `
+      <div class="d-label">価格</div>
+      <h2 class="d-h2">値付けはアート。<br>迷ったらモニターから</h2>
+      <div class="d-lead">初めての出品で正規価格はハードルが高いことも。<br>モニター価格でレビューを集めながら上げていく手があります。</div>
+      <div class="d-note"><b>価格モードを切り替えるだけ</b>で、①標準価格とモニター価格の併記 ②「先着○名限定」などの募集条件、が自動で付きます。</div>`,
+  },
+  {
+    html: `
+      <div class="d-label">入力</div>
+      <h2 class="d-h2">コピー → 貼り付けの<br>繰り返しだけ</h2>
+      <ol class="d-ol">
+        <li>出品ページのURLを右クリック →「<b>分割ビュー</b>」</li>
+        <li>左にツール、右に出品ページを<b>並べる</b></li>
+        <li>各項目の<b>コピーボタン</b>（または全文コピー）で貼っていく</li>
+      </ol>
+      <div class="d-note">細かい修正は後回し。<b>まず全項目を埋めることを優先</b>してください。</div>`,
+  },
+  {
+    html: `
+      <div class="d-label">サムネイル</div>
+      <h2 class="d-h2">トンマナを選んで、<br>プロンプトをコピー</h2>
+      <ul class="d-ul">
+        <li>標準・シンプル・水彩・ポップ・YouTube風など<b>8種類</b></li>
+        <li>迷ったら「<b>AIおまかせ</b>」。サービス専用のトンマナを設計します</li>
+        <li>貼り先は <b>ChatGPT か Gemini</b>。自分のアイコンを添付すれば自然に入ります</li>
+      </ul>
+      <div class="d-note">Geminiのときは2つだけ注意。<b>画像生成モード</b>を選ぶ／<b>「思考モード」</b>に切り替える。</div>`,
+  },
+  {
+    html: `
+      <div class="d-label">出航</div>
+      <h2 class="d-h2">「これ出していいのかな」<br>——<span class="d-hl">いいんです</span></h2>
+      <div class="d-lead">出品しても、全体に通知が飛ぶわけではありません。<br>そして一度出すと、脳みその使い方が変わります。</div>
+      <div class="d-flow"><span>何を出そう？</span><i>→</i><span>どうやって提供しよう？</span></div>
+      <div class="d-note">迷ったら<b>下書き保存</b>でもOK。それでも大きな前進です。</div>`,
+  },
+  {
+    html: `
+      <div class="d-label">おさらい</div>
+      <h2 class="d-h2">やることは、この5つだけ</h2>
+      <div class="d-fig">
+        <svg viewBox="0 0 1040 130" role="img" aria-label="5ステップのフロー">
+          <g stroke="#e7e5e4" stroke-width="2" fill="#fff">
+            <rect x="2" y="20" width="188" height="76" rx="12"/>
+            <rect x="214" y="20" width="188" height="76" rx="12"/>
+            <rect x="426" y="20" width="188" height="76" rx="12"/>
+            <rect x="638" y="20" width="188" height="76" rx="12"/>
+            <rect x="850" y="20" width="188" height="76" rx="12"/>
+          </g>
+          <g font-size="19" font-weight="700" fill="#e11d48" text-anchor="middle">
+            <text x="96" y="48">1</text><text x="308" y="48">2</text><text x="520" y="48">3</text><text x="732" y="48">4</text><text x="944" y="48">5</text>
+          </g>
+          <g font-size="25" font-weight="700" fill="#292524" text-anchor="middle">
+            <text x="96" y="78">アイデアを出す</text>
+            <text x="308" y="78">1つ選ぶ</text>
+            <text x="520" y="78">言葉を整える</text>
+            <text x="732" y="78">入力＋サムネ</text>
+            <text x="944" y="78">出航する</text>
+          </g>
+          <g stroke="#e11d48" stroke-width="2.5" fill="none">
+            <path d="M198 58 h8"/><path d="M410 58 h8"/><path d="M622 58 h8"/><path d="M834 58 h8"/>
+          </g>
+        </svg>
+      </div>
+      <div class="d-note">出したあとにやることは、STEP2「広める・改善する」にひととおり入っています。</div>`,
+  },
+  {
+    html: `
+      <div class="d-label">最後に</div>
+      <h2 class="d-h2">「いつか出そう」ではなく<br><span class="d-hl">今週出航する</span></h2>
+      <div class="d-lead">出せた方も、まだの方も。<br>次にやることを1つだけ決めてください。</div>`,
+  },
+];
+
+// ────────────────────────────────
+// STEP2：出したあとに磨く
+// ────────────────────────────────
+export const POLISH_SLIDES: DeckSlide[] = [
+  {
+    cover: true,
+    html: `
+      <div class="d-label d-label-mute">出したあとのガイド</div>
+      <h1 class="d-h1">出品を<br>磨こう</h1>
+      <div class="d-meta">出したあとの「次の一手」は3つだけ<br>サービス画像 ／ アンケート ／ つぶやき</div>`,
   },
   {
     html: `
@@ -40,7 +222,7 @@ const SLIDES: { cover?: boolean; html: string }[] = [
       <h2 class="d-h2">3つ全部でも、<br>1つに絞ってもOK</h2>
       <div class="d-lead">「ここがまだ磨けてないな」というところを1つ選んで、それをやりきる。それくらいがちょうどいいです。</div>
       <div class="d-flow"><span>サービス画像</span><i>→</i><span>アンケート</span><i>→</i><span>画像のつづき</span><i>→</i><span>つぶやき</span></div>
-      <div class="d-note">画像だけ<b>生成に時間がかかる</b>ので、先に走らせて、待っている間にアンケートを作ります。</div>`,
+      <div class="d-note">画像だけ<b>生成に時間がかかる</b>ので、先に走らせて、待っている間にアンケートを作るのがおすすめ。</div>`,
   },
   {
     html: `
@@ -48,8 +230,8 @@ const SLIDES: { cover?: boolean; html: string }[] = [
       <h2 class="d-h2">説明文を1回貼るだけで、<br>3つ全部が回ります</h2>
       <ol class="d-ol">
         <li>自分の出品ページを開いて、<b>説明文を全部コピー</b></li>
-        <li>この <b>サポートメニュー</b> を開く</li>
-        <li>真ん中の入力欄に<b>そのまま貼る</b></li>
+        <li>この画面の<b>「対象の本文」</b>に貼り付ける</li>
+        <li>あとは3つのメニューを順に押すだけ</li>
       </ol>
       <div class="d-note">お客さんの個人情報が入っている場合は、消してから貼ってください。</div>`,
   },
@@ -223,7 +405,7 @@ const SLIDES: { cover?: boolean; html: string }[] = [
             <text x="170" y="264">サービス画像</text>
             <text x="830" y="264">つぶやき</text>
           </g>
-          <g font-size="20" fill="#6b6560" text-anchor="middle">
+          <g font-size="19" fill="#6b6560" text-anchor="middle">
             <text x="500" y="70">申し込んだ理由・ひとこと感想</text>
             <text x="170" y="292">7枚目「お客様の声」になる</text>
             <text x="830" y="292">1行目の「悩み」になる</text>
@@ -248,204 +430,3 @@ const SLIDES: { cover?: boolean; html: string }[] = [
       <div class="d-note">迷ったら、いちばん効くのは<b>つぶやき</b>です。作った20本のうち1本、今日出す。それだけで動きが変わります。</div>`,
   },
 ];
-
-const DECK_CSS = `
-.deck-view { container-type: inline-size; }
-.deck-stage {
-  position: relative;
-  aspect-ratio: 16 / 9;
-  background: #fafaf9;
-  background-image:
-    radial-gradient(at 88% 4%, hsla(22,100%,72%,.13) 0, hsla(22,100%,72%,0) 46%),
-    radial-gradient(at 4% 96%, hsla(339,100%,60%,.10) 0, hsla(339,100%,60%,0) 46%);
-  color: #292524;
-  overflow: hidden;
-}
-.deck-inner {
-  position: absolute; inset: 0;
-  display: flex; flex-direction: column; justify-content: center;
-  padding: 6cqw 6cqw 7.5cqw;
-}
-.deck-inner.is-cover { justify-content: center; }
-@keyframes deckRise { from { opacity: 0; transform: translateY(1.2cqw); } to { opacity: 1; transform: none; } }
-.deck-inner > * { animation: deckRise .42s cubic-bezier(.2,.7,.3,1) both; }
-.deck-inner > *:nth-child(2) { animation-delay: .07s; }
-.deck-inner > *:nth-child(3) { animation-delay: .14s; }
-.deck-inner > *:nth-child(4) { animation-delay: .21s; }
-@media (prefers-reduced-motion: reduce) { .deck-inner > * { animation: none; } }
-
-.deck-stage .d-label { font-size: 1.75cqw; font-weight: 700; letter-spacing: .12em; color: #e11d48; margin-bottom: 1.6cqw; }
-.deck-stage .d-label-mute { color: #6b6560; }
-.deck-stage .d-h1 { font-size: 7.2cqw; font-weight: 700; line-height: 1.22; letter-spacing: -.02em; }
-.deck-stage .d-h2 { font-size: 5.2cqw; font-weight: 700; line-height: 1.32; letter-spacing: -.01em; }
-.deck-stage .d-meta { margin-top: 3cqw; font-size: 2.05cqw; color: #6b6560; line-height: 1.85; }
-.deck-stage .d-lead { margin-top: 1.8cqw; font-size: 2.45cqw; color: #6b6560; line-height: 1.75; }
-.deck-stage .d-note { margin-top: 2.2cqw; font-size: 2cqw; color: #6b6560; line-height: 1.8; }
-.deck-stage .d-note b, .deck-stage .d-lead b { color: #292524; font-weight: 700; }
-.deck-stage .d-hl { background: linear-gradient(transparent 60%, rgba(225,29,72,.17) 60%); padding: 0 .06em; }
-
-.deck-stage .d-ul, .deck-stage .d-ol { list-style: none; margin-top: 2.6cqw; padding: 0; }
-.deck-stage .d-ul li {
-  font-size: 2.7cqw; line-height: 1.6; padding: 1.1cqw 0 1.1cqw 1.3em;
-  position: relative; border-bottom: 1px solid #e7e5e4; font-weight: 500;
-}
-.deck-stage .d-ul li:last-child { border-bottom: none; }
-.deck-stage .d-ul li::before { content: "—"; position: absolute; left: 0; color: #e7e5e4; }
-.deck-stage .d-ol { counter-reset: dstep; }
-.deck-stage .d-ol li {
-  font-size: 2.6cqw; line-height: 1.6; padding: 1.1cqw 0 1.1cqw 2.1em;
-  position: relative; border-bottom: 1px solid #e7e5e4; font-weight: 500;
-}
-.deck-stage .d-ol li:last-child { border-bottom: none; }
-.deck-stage .d-ol li::before {
-  counter-increment: dstep; content: counter(dstep);
-  position: absolute; left: 0; top: 50%; transform: translateY(-50%);
-  font-size: .68em; font-weight: 700; color: #e11d48; background: #fff1f2;
-  width: 1.9em; height: 1.9em; border-radius: 999px;
-  display: flex; align-items: center; justify-content: center;
-}
-.deck-stage .d-ul b, .deck-stage .d-ol b { font-weight: 700; }
-
-.deck-stage .d-cols { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.8cqw; margin-top: 2.8cqw; }
-.deck-stage .d-card { background: #fff; border: 1px solid #e7e5e4; border-radius: 1.4cqw; padding: 2.4cqw; }
-.deck-stage .d-card .d-num { font-size: 1.55cqw; font-weight: 700; letter-spacing: .12em; color: #e11d48; margin-bottom: .7em; }
-.deck-stage .d-card h3 { font-size: 2.8cqw; font-weight: 700; line-height: 1.35; margin: 0 0 .45em; }
-.deck-stage .d-card p { font-size: 1.9cqw; color: #6b6560; line-height: 1.65; margin: 0; }
-
-.deck-stage .d-goal { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2.2cqw; margin-top: 3.2cqw; }
-.deck-stage .d-goal > div { background: #fff; border: 1px solid #e7e5e4; border-radius: 1.6cqw; padding: 2.6cqw; text-align: center; }
-.deck-stage .d-goal .d-n { font-size: 6.8cqw; font-weight: 700; color: #e11d48; line-height: 1; letter-spacing: -.03em; }
-.deck-stage .d-goal .d-n small { font-size: .38em; margin-left: .12em; }
-.deck-stage .d-goal .d-t { margin-top: .6em; font-size: 2.2cqw; font-weight: 700; }
-.deck-stage .d-goal .d-s { margin-top: .35em; font-size: 1.75cqw; color: #6b6560; }
-
-.deck-stage .d-slim { display: grid; grid-template-columns: repeat(2, 1fr); gap: .6cqw 4cqw; margin-top: 2.6cqw; }
-.deck-stage .d-slim > div {
-  display: flex; align-items: baseline; gap: .7em;
-  font-size: 2.5cqw; line-height: 1.45; padding: 1cqw 0;
-  border-bottom: 1px solid #e7e5e4; font-weight: 700;
-}
-.deck-stage .d-slim span { font-size: .6em; color: #e11d48; letter-spacing: .06em; flex-shrink: 0; }
-.deck-stage .d-slim em { font-style: normal; font-weight: 400; color: #6b6560; font-size: .7em; }
-
-.deck-stage .d-flow { display: flex; flex-wrap: wrap; align-items: center; gap: 1.2cqw; margin-top: 2.8cqw; font-size: 2.2cqw; font-weight: 700; }
-.deck-stage .d-flow span { background: #fff; border: 1px solid #e7e5e4; border-radius: 999px; padding: .5em 1.1em; }
-.deck-stage .d-flow i { color: #e7e5e4; font-style: normal; }
-
-.deck-stage .d-split { display: grid; grid-template-columns: 1fr 1fr; gap: 3cqw; align-items: start; margin-top: 2.6cqw; }
-.deck-stage .d-steps { list-style: none; padding: 0; margin: 0; }
-.deck-stage .d-steps li { display: flex; gap: .6em; align-items: baseline; padding: .8cqw 0; font-size: 2.35cqw; font-weight: 700; }
-.deck-stage .d-steps li b { color: #e11d48; font-size: .72em; min-width: 5.2em; display: inline-block; }
-.deck-stage .d-steps li i { font-style: normal; font-weight: 400; color: #6b6560; font-size: .78em; }
-.deck-stage .d-tweet { background: #fff; border: 1px solid #e7e5e4; border-radius: 1.6cqw; padding: 2.4cqw; font-size: 2.05cqw; line-height: 1.9; }
-.deck-stage .d-tweet span { display: block; margin-bottom: .45em; }
-.deck-stage .d-tweet .d-url { color: #6b6560; font-size: .85em; margin: .3em 0 0; }
-
-.deck-stage .d-fig { margin-top: 2.8cqw; }
-.deck-stage .d-fig svg { width: 100%; height: auto; display: block; }
-
-.deck-bar { position: absolute; left: 0; bottom: 0; height: .35cqw; background: #e11d48; transition: width .25s ease; }
-.deck-pager { position: absolute; right: 2.4cqw; bottom: 2.2cqw; font-size: 1.35cqw; color: #6b6560; letter-spacing: .1em; }
-`;
-
-const HandsonDeck: React.FC = () => {
-  const [index, setIndex] = useState(0);
-  const wrapRef = useRef<HTMLDivElement>(null);
-
-  // 連打しても取りこぼさないよう、直前の値からの相対移動で更新する
-  const step = useCallback((delta: number) => {
-    setIndex(prev => Math.max(0, Math.min(SLIDES.length - 1, prev + delta)));
-  }, []);
-
-  // 資料にフォーカスがあるときだけ矢印キーで送る（ページ全体のスクロールは奪わない）
-  const onKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { e.preventDefault(); step(1); }
-    if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') { e.preventDefault(); step(-1); }
-  };
-
-  const toggleFullscreen = () => {
-    const el = wrapRef.current;
-    if (!el) return;
-    if (document.fullscreenElement) document.exitFullscreen();
-    else el.requestFullscreen?.();
-  };
-
-  useEffect(() => {
-    const style = document.createElement('style');
-    style.textContent = DECK_CSS;
-    document.head.appendChild(style);
-    return () => { document.head.removeChild(style); };
-  }, []);
-
-  const slide = SLIDES[index];
-
-  return (
-    <section>
-      <div className="flex items-start gap-3 mb-4">
-        <span className="shrink-0 w-9 h-9 rounded-xl bg-brand-50 text-brand-500 flex items-center justify-center">
-          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8"/><path d="M12 17v4"/>
-          </svg>
-        </span>
-        <div className="min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <h3 className="text-base font-bold text-stone-900">出品を磨く3つの型（勉強会の資料）</h3>
-            <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full">全{SLIDES.length}枚</span>
-          </div>
-          <p className="text-xs text-stone-500 mt-1 leading-relaxed">
-            サービス画像・アンケート・つぶやき。各メニューを「なぜそう作るのか」から使えるようにまとめた資料です。いつでも見返せます。
-          </p>
-        </div>
-      </div>
-
-      <div
-        ref={wrapRef}
-        className="deck-view card overflow-hidden focus:outline-none focus:ring-2 focus:ring-brand-200"
-        tabIndex={0}
-        onKeyDown={onKeyDown}
-        role="group"
-        aria-label="勉強会の資料スライド"
-      >
-        <div className="deck-stage">
-          <div
-            key={index}
-            className={`deck-inner${slide.cover ? ' is-cover' : ''}`}
-            dangerouslySetInnerHTML={{ __html: slide.html }}
-          />
-          <div className="deck-bar" style={{ width: `${((index + 1) / SLIDES.length) * 100}%` }} />
-          <div className="deck-pager">{index + 1} / {SLIDES.length}</div>
-        </div>
-      </div>
-
-      <div className="flex items-center justify-between gap-3 mt-3">
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => step(-1)}
-            disabled={index === 0}
-            className="px-3.5 py-2 rounded-lg border border-stone-200 bg-white text-xs font-bold text-stone-600 hover:bg-stone-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-          >
-            ← 前へ
-          </button>
-          <button
-            type="button"
-            onClick={() => step(1)}
-            disabled={index === SLIDES.length - 1}
-            className="px-3.5 py-2 rounded-lg bg-stone-900 text-white text-xs font-bold hover:bg-stone-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-          >
-            次へ →
-          </button>
-        </div>
-        <button
-          type="button"
-          onClick={toggleFullscreen}
-          className="px-3.5 py-2 rounded-lg border border-stone-200 bg-white text-xs font-bold text-stone-500 hover:text-stone-700 hover:bg-stone-50 transition-colors"
-        >
-          ⛶ 大きく見る
-        </button>
-      </div>
-    </section>
-  );
-};
-
-export default HandsonDeck;
