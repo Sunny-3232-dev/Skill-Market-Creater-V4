@@ -20,8 +20,9 @@ interface DeckProps {
 }
 
 const DECK_CSS = `
-.deck-view { container-type: inline-size; }
 .deck-stage {
+  /* 文字サイズの基準は「スライド自身の幅」。全画面で高さに合わせて縮めても比率が崩れない */
+  container-type: inline-size;
   position: relative;
   aspect-ratio: 16 / 9;
   background: #fafaf9;
@@ -120,6 +121,12 @@ const DECK_CSS = `
 
 .deck-bar { position: absolute; left: 0; bottom: 0; height: .35cqw; background: #e11d48; transition: width .25s ease; }
 .deck-pager { position: absolute; right: 2.4cqw; bottom: 2.2cqw; font-size: 1.35cqw; color: #6b6560; letter-spacing: .1em; }
+
+/* 全画面：画面より横長のモニター(ウルトラワイド等)でも縦が見切れないよう、高さに合わせて中央に置く */
+.deck-view:fullscreen { display: flex; align-items: center; justify-content: center; background: #fafaf9; }
+.deck-view:fullscreen .deck-stage { width: min(100vw, calc(100vh * 16 / 9)); height: auto; }
+.deck-view:-webkit-full-screen { display: flex; align-items: center; justify-content: center; background: #fafaf9; }
+.deck-view:-webkit-full-screen .deck-stage { width: min(100vw, calc(100vh * 16 / 9)); height: auto; }
 `;
 
 let cssInjected = 0;
