@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>スキルマーケットを磨こう｜ハンズオン資料</title>
+<style>
+  :root {
+    --bg: #fafaf9;
+    --ink: #292524;
+    --sub: #6b6560;
+    --line: #e7e5e4;
+    --accent: #e11d48;
+    --accent-bg: #fff1f2;
+    --card: #ffffff;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    background: #f5f4f2;
+    color: var(--ink);
+    font-family: "Helvetica Neue", Arial, "Hiragino Kaku Gothic ProN", "Hiragino Sans", Meiryo, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    overflow: hidden;
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  /* 画面比に関係なく必ず収まる16:9のステージ。文字はこの幅(cqw)基準なのでどのモニターでも同じ見え方になる */
+  #frame {
+    position: relative;
+    width: min(100vw, calc(100vh * 16 / 9));
+    aspect-ratio: 16 / 9;
+    container-type: inline-size;
+    overflow: hidden;
+    background: var(--bg);
+    background-image:
+      radial-gradient(at 88% 4%, hsla(22,100%,72%,.13) 0, hsla(22,100%,72%,0) 46%),
+      radial-gradient(at 4% 96%, hsla(339,100%,60%,.10) 0, hsla(339,100%,60%,0) 46%);
+  }
+  #stage {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column; justify-content: center;
+    padding: 6cqw 6cqw 7.5cqw;
+  }
+
+  .label { font-size: 1.75cqw; font-weight: 700; letter-spacing: .12em; color: var(--accent); margin-bottom: 1.6cqw; }
+  h1 { font-size: 7.2cqw; font-weight: 700; line-height: 1.22; letter-spacing: -.02em; }
+  h2 { font-size: 5.2cqw; font-weight: 700; line-height: 1.32; letter-spacing: -.01em; }
+  .lead { font-size: 2.45cqw; color: var(--sub); line-height: 1.75; margin-top: 1.8cqw; }
+
+  ul { list-style: none; margin-top: 2.6cqw; }
+  li {
+    font-size: 2.7cqw; line-height: 1.55; padding: 1.1cqw 0 1.1cqw 1.3em;
+    position: relative; border-bottom: 1px solid var(--line); font-weight: 500;
+  }
+  li:last-child { border-bottom: none; }
+  li::before { content: "—"; position: absolute; left: 0; color: var(--line); }
+  ol { list-style: none; counter-reset: step; margin-top: 2.6cqw; }
+  ol li { padding-left: 2.1em; font-size: 2.6cqw; }
+  ol li::before {
+    counter-increment: step; content: counter(step);
+    font-size: .68em; font-weight: 700; color: var(--accent); background: var(--accent-bg);
+    width: 1.9em; height: 1.9em; border-radius: 999px;
+    display: flex; align-items: center; justify-content: center;
+    top: 50%; transform: translateY(-50%);
+  }
+
+  .cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(24cqw, 1fr)); gap: 1.8cqw; margin-top: 2.8cqw; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 1.4cqw; padding: 2.4cqw; }
+  .card .num { font-size: 1.55cqw; font-weight: 700; letter-spacing: .12em; color: var(--accent); margin-bottom: .7em; }
+  .card h3 { font-size: 2.8cqw; font-weight: 700; line-height: 1.35; margin-bottom: .45em; }
+  .card p { font-size: 1.9cqw; color: var(--sub); line-height: 1.65; }
+
+  .slim { display: grid; grid-template-columns: repeat(2, 1fr); gap: .6cqw 4cqw; margin-top: 2.6cqw; }
+  .slim div {
+    display: flex; align-items: baseline; gap: .7em;
+    font-size: 2.5cqw; line-height: 1.45; padding: 1cqw 0;
+    border-bottom: 1px solid var(--line); font-weight: 700;
+  }
+  .slim div span { font-size: .6em; font-weight: 700; color: var(--accent); letter-spacing: .06em; flex-shrink: 0; }
+  .slim div em { font-style: normal; font-weight: 400; color: var(--sub); font-size: .7em; }
+
+  .flow { display: flex; flex-wrap: wrap; align-items: center; gap: 1.2cqw; margin-top: 2.8cqw; font-size: 2.2cqw; font-weight: 700; }
+  .flow span { background: #fff; border: 1px solid var(--line); border-radius: 999px; padding: .5em 1.1em; }
+  .flow i { color: var(--line); font-style: normal; }
+
+  .note-row { margin-top: 2.2cqw; font-size: 2cqw; color: var(--sub); line-height: 1.75; }
+  .strong { color: var(--ink); font-weight: 700; }
+
+  .split { display: grid; grid-template-columns: 1fr 1fr; gap: 3cqw; align-items: start; margin-top: 2.1cqw; }
+  .steps4 { list-style: none; }
+  .steps4 li { border: none; padding: .8cqw 0; font-size: 2.35cqw; font-weight: 700; display: flex; gap: .6em; align-items: baseline; }
+  .steps4 li::before { content: none; }
+  .steps4 li b { color: var(--accent); font-size: .72em; letter-spacing: .04em; min-width: 5.2em; display: inline-block; }
+  .steps4 li i { font-style: normal; font-weight: 400; color: var(--sub); font-size: .78em; }
+
+  .tweet { background: #fff; border: 1px solid var(--line); border-radius: 1.6cqw; padding: 2.4cqw; font-size: 2.05cqw; line-height: 1.9; }
+  .tweet .u { display: block; margin-bottom: .45em; }
+  .tweet .url { display: block; color: var(--sub); font-size: .85em; margin-top: .3em; }
+
+  .chat { display: flex; flex-direction: column; gap: 1.2cqw; }
+  .chat span { background: #fff; border: 1px solid var(--line); border-radius: 999px; padding: .6em 1.2em; font-size: 2.05cqw; font-weight: 700; }
+  .after { background: #fff; border: 1px solid var(--line); border-radius: 1.6cqw; padding: 2.4cqw; font-size: 2.05cqw; line-height: 1.85; }
+  .after b { color: var(--accent); }
+
+  svg { width: 100%; height: auto; display: block; }
+  .figure { margin-top: 2.8cqw; }
+
+  @keyframes rise { from { opacity: 0; transform: translateY(1.2cqw); } to { opacity: 1; transform: none; } }
+  #stage > * { animation: rise .42s cubic-bezier(.2,.7,.3,1) both; }
+  #stage > *:nth-child(2) { animation-delay: .07s; }
+  #stage > *:nth-child(3) { animation-delay: .14s; }
+  #stage > *:nth-child(4) { animation-delay: .21s; }
+  @media (prefers-reduced-motion: reduce) { #stage > * { animation: none; } }
+
+  .hl { background: linear-gradient(transparent 60%, rgba(225,29,72,.17) 60%); padding: 0 .06em; }
+
+  .goal { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2.2cqw; margin-top: 3.2cqw; }
+  .goal > div { background: #fff; border: 1px solid var(--line); border-radius: 1.6cqw; padding: 2.6cqw; text-align: center; }
+  .goal .n { font-size: 6.8cqw; font-weight: 700; color: var(--accent); line-height: 1; letter-spacing: -.03em; }
+  .goal .n small { font-size: .38em; margin-left: .12em; letter-spacing: 0; }
+  .goal .t { margin-top: .6em; font-size: 2.2cqw; font-weight: 700; }
+  .goal .s { margin-top: .35em; font-size: 1.75cqw; color: var(--sub); }
+
+  .cover .label { color: var(--sub); }
+  .cover .meta { margin-top: 3cqw; font-size: 2.05cqw; color: var(--sub); line-height: 1.85; }
+
+  #bar { position: absolute; left: 0; bottom: 0; height: .35cqw; background: var(--accent); transition: width .25s ease; }
+  #pager { position: absolute; right: 2.4cqw; bottom: 2.2cqw; font-size: 1.35cqw; color: var(--sub); letter-spacing: .1em; }
+  #hint { position: absolute; left: 2.4cqw; bottom: 2.2cqw; font-size: 1.2cqw; color: #d6d3d1; }
+  @media print { body { overflow: visible; } #bar, #pager, #hint { display: none; } }
+</style>
+</head>
+<body>
+
+<div id="frame">
+  <div id="stage"></div>
+  <div id="bar"></div>
+  <div id="pager"></div>
+  <div id="hint">← → でめくる</div>
+</div>
+
+<script>
+const slides = [
+  {
+    cls: "cover",
+    html: `
+      <div class="label">2026.07.30 ハンズオン・60分</div>
+      <h1>スキルマーケットを<br>磨こう</h1>
+      <div class="meta">出品したあとの「次の一手」を、3つだけ持ち帰る会<br>進行: サニー ／ 助手: クマーさん</div>`
+  },
+  {
+    html: `
+      <div class="label">今日のゴール</div>
+      <h2>帰るときには、<br>これが手元にあります</h2>
+      <div class="goal">
+        <div><div class="n">7<small>枚</small></div><div class="t">サービス画像</div><div class="s">悩み・できること・流れ・声…</div></div>
+        <div><div class="n">1<small>つ</small></div><div class="t">アンケートのフォーム</div><div class="s">Googleフォームがそのまま完成</div></div>
+        <div><div class="n">20<small>本</small></div><div class="t">つぶやきのストック</div><div class="s">1本ずつ小出しにしていける</div></div>
+      </div>
+      <div class="note-row">作って終わりではなく、<span class="strong">持ち帰って明日から使えるもの</span>にします。</div>`
+  },
+  {
+    html: `
+      <div class="label">今日の前提</div>
+      <h2>すでに1つ以上<br>出品している方向けの会です</h2>
+      <div class="note-row">まだ出品していない方も大丈夫です。<span class="strong">出品の作り方はノウハウ図書館の記事にまとめてあります。</span>見ながら手を動かしてもらえれば、今日の時間で1つ作れます。</div>`
+  },
+  {
+    html: `
+      <div class="label">今日やること</div>
+      <h2>磨くところは、この3つ</h2>
+      <div class="cols">
+        <div class="card"><div class="num">1つめ</div><h3>サービス画像</h3><p>1枚目だけで買う人はいない。説明文は読まれない前提で、画像で答える。</p></div>
+        <div class="card"><div class="num">2つめ</div><h3>アンケート</h3><p>磨く材料は自分の頭の中ではなく、お客さんの中にしかない。</p></div>
+        <div class="card"><div class="num">3つめ</div><h3>つぶやき</h3><p>置いてあるだけでは見つからない。人が止まるのは「自分の悩み」が書いてあるとき。</p></div>
+      </div>`
+  },
+  {
+    html: `
+      <div class="label">今日の進め方</div>
+      <h2>3つ全部でも、<br>1つに絞ってもOK</h2>
+      <div class="lead">自分の商品で「ここがまだ磨けてないな」というところを1つ選んで、それをやりきる。それくらいがちょうどいいです。</div>
+      <div class="flow"><span>サービス画像</span><i>→</i><span>アンケート</span><i>→</i><span>画像のつづき</span><i>→</i><span>つぶやき</span></div>
+      <div class="note-row">画像だけ<span class="strong">生成に時間がかかる</span>ので、先に走らせて、待っている間にアンケートを作ります。</div>`
+  },
+  {
+    html: `
+      <div class="label">まず準備・2分</div>
+      <h2>説明文を1回貼るだけで、<br>3つ全部が回ります</h2>
+      <ol>
+        <li>自分の出品ページを開いて、<span class="strong">説明文を全部コピー</span></li>
+        <li>ツールの<span class="strong">「サポートメニュー」</span>を開く</li>
+        <li>真ん中の入力欄に<span class="strong">そのまま貼る</span></li>
+      </ol>
+      <div class="note-row">お客さんの個人情報が入っている場合は、消してから貼ってください。</div>`
+  },
+  {
+    html: `
+      <div class="label">1つめ ／ サービス画像</div>
+      <h2>1枚目は「顔」。2枚目からは<span class="hl">「答え」</span>。</h2>
+      <div class="figure">
+        <svg viewBox="0 0 1040 250" role="img" aria-label="1枚目が顔、2枚目以降が答えの図">
+          <rect x="2" y="12" width="300" height="215" rx="14" fill="#fff" stroke="#e11d48" stroke-width="2.5"/>
+          <circle cx="152" cy="92" r="30" fill="#fff1f2"/>
+          <rect x="82" y="142" width="140" height="12" rx="6" fill="#e7e5e4"/>
+          <rect x="102" y="166" width="100" height="10" rx="5" fill="#f0eeec"/>
+          <text x="152" y="205" text-anchor="middle" font-size="22" font-weight="700" fill="#e11d48">1枚目＝顔</text>
+
+          <g fill="#fff" stroke="#e7e5e4" stroke-width="2">
+            <rect x="336" y="12" width="164" height="215" rx="14"/>
+            <rect x="516" y="12" width="164" height="215" rx="14"/>
+            <rect x="696" y="12" width="164" height="215" rx="14"/>
+            <rect x="876" y="12" width="164" height="215" rx="14"/>
+          </g>
+          <g font-size="25" font-weight="700" fill="#292524" text-anchor="middle">
+            <text x="418" y="106">何をして</text><text x="418" y="134">くれるの？</text>
+            <text x="598" y="106">どういう</text><text x="598" y="134">流れ？</text>
+            <text x="778" y="106">他の人は</text><text x="778" y="134">どうだった？</text>
+            <text x="958" y="106">自分でも</text><text x="958" y="134">大丈夫？</text>
+          </g>
+          <g font-size="20" fill="#6b6560" text-anchor="middle">
+            <text x="418" y="205">2枚目</text><text x="598" y="205">3枚目</text><text x="778" y="205">4枚目</text><text x="958" y="205">5枚目</text>
+          </g>
+        </svg>
+      </div>
+      <div class="note-row">買う人が2枚目以降で確かめたいことは、だいたい決まっています。</div>`
+  },
+  {
+    html: `
+      <div class="label">1つめ ／ サービス画像</div>
+      <h2>「サービス資料を作る」で<br>7枚まとめて出ます</h2>
+      <div class="slim">
+        <div><span>01</span>こんなお悩みありませんか？</div>
+        <div><span>02</span>このサービスでできること</div>
+        <div><span>03</span>このサービスの強み</div>
+        <div><span>04</span>こんな方におすすめ</div>
+        <div><span>05</span>ご依頼の流れ</div>
+        <div><span>06</span>CTA（次にすること）</div>
+        <div><span>07</span>お客様の声<em>レビューがある人だけ</em></div>
+      </div>`
+  },
+  {
+    html: `
+      <div class="label">1つめ ／ 手を動かす</div>
+      <h2>トンマナを選んで、<br>NotebookLMで生成</h2>
+      <ol>
+        <li>「サービス資料を作る」→ トンマナを1つ選んで<span class="strong">コピー</span></li>
+        <li>「NotebookLM を開く」→ <span class="strong">新規ノートブック</span>を作成</li>
+        <li><span class="strong">ソースにサービスの説明文</span>を追加（統一感を出すなら参考画像も）</li>
+        <li>スタジオ → <span class="strong">スライド作成</span> → カスタマイズ欄に貼る</li>
+        <li>生成を実行 → <span class="strong">ここで一度放置</span>して、次のアンケートへ</li>
+      </ol>`
+  },
+  {
+    html: `
+      <div class="label">2つめ ／ アンケート</div>
+      <h2>磨く材料は、<br><span class="hl">お客さんの中</span>にしかない</h2>
+      <div class="lead">自分が「売り」だと思っていたところはどうでもよくて、<br>当たり前だと思ってやっていたことのほうが喜ばれていた。<br>——よくあります。</div>`
+  },
+  {
+    html: `
+      <div class="label">2つめ ／ アンケート</div>
+      <h2>聞くのは、この4つ</h2>
+      <ul>
+        <li><span class="strong">申し込んだ理由</span> — 何が刺さったか</li>
+        <li><span class="strong">決め手</span> — 最後の一押し。理由の焼き直しにしない</li>
+        <li><span class="strong">満足度と、物足りなかったところ</span> — 改善のネタ</li>
+        <li><span class="strong">ひとこと感想</span> — 出品ページとスライド7枚目に載る</li>
+      </ul>`
+  },
+  {
+    html: `
+      <div class="label">2つめ ／ アンケート</div>
+      <h2>聞く量は、相手との距離で決める</h2>
+      <div class="cols">
+        <div class="card"><div class="num">A ／ 2〜3分</div><h3>軽く</h3><p>関係性が浅い・単価が低いとき。答えてもらえないアンケートは0点。</p></div>
+        <div class="card"><div class="num">B ／ 3〜4分</div><h3>バランス</h3><p>ふつうの取引はここ。</p></div>
+        <div class="card"><div class="num">C ／ 4〜5分</div><h3>しっかり</h3><p>モニター・お知り合い・高単価。フィードバック前提なら堂々と多めに。</p></div>
+      </div>`
+  },
+  {
+    html: `
+      <div class="label">2つめ ／ 手を動かす</div>
+      <h2>コードを貼るだけで、<br>Googleフォームになります</h2>
+      <ol>
+        <li>A / B / C から1つ選んで <span class="strong">「コードを表示」→ コピー</span></li>
+        <li><span class="strong">script.google.com</span> →「新しいプロジェクト」</li>
+        <li>最初のコードを消して<span class="strong">貼り付け → 実行</span>（初回は権限を許可）</li>
+        <li>ログに出たURLを開くと<span class="strong">フォームが完成</span></li>
+      </ol>
+      <div class="note-row">ゼロから作るより、<span class="strong">できたものを削るほうが速い</span>です。</div>`
+  },
+  {
+    html: `
+      <div class="label">1つめのつづき</div>
+      <h2>スライドを、サービス画像にする</h2>
+      <div class="figure">
+        <svg viewBox="0 0 1040 150" role="img" aria-label="スライドからPDF、JPG、出品ページへの流れ">
+          <g stroke="#e7e5e4" stroke-width="2" fill="#fff">
+            <rect x="2" y="24" width="215" height="88" rx="12"/>
+            <rect x="277" y="24" width="215" height="88" rx="12"/>
+            <rect x="552" y="24" width="215" height="88" rx="12"/>
+            <rect x="827" y="24" width="211" height="88" rx="12"/>
+          </g>
+          <g font-size="27" font-weight="700" fill="#292524" text-anchor="middle">
+            <text x="110" y="66">スライド</text>
+            <text x="385" y="66">PDF</text>
+            <text x="660" y="66">JPG ×7枚</text>
+            <text x="932" y="66">出品ページ</text>
+          </g>
+          <g font-size="19" fill="#6b6560" text-anchor="middle">
+            <text x="110" y="94">NotebookLM</text>
+            <text x="385" y="94">ダウンロード</text>
+            <text x="660" y="94">I Love PDF</text>
+            <text x="932" y="94">サービス画像に追加</text>
+          </g>
+          <g stroke="#e11d48" stroke-width="2.5" fill="none">
+            <path d="M232 68 h30"/><path d="M252 61 l10 7 l-10 7"/>
+            <path d="M507 68 h30"/><path d="M527 61 l10 7 l-10 7"/>
+            <path d="M782 68 h30"/><path d="M802 61 l10 7 l-10 7"/>
+          </g>
+        </svg>
+      </div>
+      <div class="note-row">登録は持ち帰りでOK。<span class="strong">画像が手元にできていれば今日は勝ちです。</span></div>`
+  },
+  {
+    html: `
+      <div class="label">3つめ ／ つぶやき</div>
+      <h2>人が止まるのは、<br><span class="hl">自分の悩み</span>が<br>書かれているときだけ</h2>
+      <div class="note-row">「〇〇を始めました！」から書き始めると、読む側には関係のない話になってしまう。</div>`
+  },
+  {
+    html: `
+      <div class="label">3つめ ／ つぶやき</div>
+      <h2>4行の型</h2>
+      <div class="split">
+        <ul class="steps4">
+          <li><b>1. 悩み</b><i>よくある困りごと（1〜2文）</i></li>
+          <li><b>2. 軽い共感</b><i>押しつけず、やさしく（1文）</i></li>
+          <li><b>3. 解決方法</b><i>サービスの特徴を自然に</i></li>
+          <li><b>4. URL</b><i>注釈として置く</i></li>
+        </ul>
+        <div class="tweet">
+          <span class="u">スプレッドシートの関数、毎回ネットで調べ直して30分溶けていませんか。</span>
+          <span class="u">最初はみんなそうなので大丈夫です☺️</span>
+          <span class="u">よく使う型だけまとめて、そのまま動く形でお渡ししています。</span>
+          <span class="url">※必要な方へ：https://skill.libecity.com/...</span>
+        </div>
+      </div>
+      <div class="note-row">共感は<span class="strong">軽く</span>／<span class="strong">「詳細はこちら」は使わない</span>／3行合わせて<span class="strong">125文字</span>まで</div>`
+  },
+  {
+    html: `
+      <div class="label">まとめ</div>
+      <h2>3つは、1周でつながる</h2>
+      <div class="figure">
+        <svg viewBox="0 0 1000 330" role="img" aria-label="アンケートの声が画像とつぶやきに回る循環図">
+          <g fill="#fff" stroke="#e7e5e4" stroke-width="2">
+            <rect x="360" y="6" width="280" height="82" rx="16"/>
+            <rect x="20" y="228" width="300" height="82" rx="16"/>
+            <rect x="680" y="228" width="300" height="82" rx="16"/>
+          </g>
+          <g font-size="29" font-weight="700" fill="#292524" text-anchor="middle">
+            <text x="500" y="42">アンケートの声</text>
+            <text x="170" y="264">サービス画像</text>
+            <text x="830" y="264">つぶやき</text>
+          </g>
+          <g font-size="20" fill="#6b6560" text-anchor="middle">
+            <text x="500" y="70">申し込んだ理由・ひとこと感想</text>
+            <text x="170" y="292">7枚目「お客様の声」になる</text>
+            <text x="830" y="292">1行目の「悩み」になる</text>
+          </g>
+          <g stroke="#e11d48" stroke-width="2.5" fill="none">
+            <path d="M370 78 C250 110 190 160 172 218"/>
+            <path d="M164 205 l8 16 l16 -6"/>
+            <path d="M322 272 C430 300 560 300 700 268"/>
+            <path d="M684 265 L700 268 L687 278"/>
+            <path d="M828 218 C812 160 750 110 632 78"/>
+            <path d="M645 90 l-14 -12 l11 -12"/>
+          </g>
+        </svg>
+      </div>
+      <div class="note-row">1周回すと、放っておいても良くなっていく状態になります。</div>`
+  },
+  {
+    html: `
+      <div class="label">最後に</div>
+      <h2>今日中にやるものを、<br><span class="hl">1つだけ</span>決めて帰る</h2>
+      <div class="lead">3つ全部やろうとすると、だいたい何も残りません。1つだけ。</div>
+      <div class="note-row">今日のアンケートにご協力ください。<span class="strong">この資料でお話しした型で作ってあります</span>ので、そういう目でも見てみてください。</div>`
+  }
+];
+
+const stage = document.getElementById("stage");
+const bar = document.getElementById("bar");
+const pager = document.getElementById("pager");
+let i = 0;
+
+function render() {
+  const s = slides[i];
+  stage.className = s.cls || "";
+  stage.innerHTML = s.html;
+  bar.style.width = ((i + 1) / slides.length * 100) + "%";
+  pager.textContent = (i + 1) + " / " + slides.length;
+  location.hash = i + 1;
+}
+function go(n) {
+  i = Math.max(0, Math.min(slides.length - 1, n));
+  render();
+}
+
+document.addEventListener("keydown", e => {
+  if (["ArrowRight", "ArrowDown", " ", "PageDown"].includes(e.key)) { e.preventDefault(); go(i + 1); }
+  if (["ArrowLeft", "ArrowUp", "PageUp"].includes(e.key)) { e.preventDefault(); go(i - 1); }
+  if (e.key === "Home") go(0);
+  if (e.key === "End") go(slides.length - 1);
+});
+document.addEventListener("click", e => {
+  go(e.clientX < window.innerWidth * 0.25 ? i - 1 : i + 1);
+});
+let tx = 0;
+document.addEventListener("touchstart", e => tx = e.changedTouches[0].clientX, { passive: true });
+document.addEventListener("touchend", e => {
+  const d = e.changedTouches[0].clientX - tx;
+  if (Math.abs(d) > 50) go(d < 0 ? i + 1 : i - 1);
+}, { passive: true });
+
+const start = parseInt(location.hash.replace("#", ""), 10);
+go(isNaN(start) ? 0 : start - 1);
+</script>
+</body>
+</html>

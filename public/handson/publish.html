@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>スキルマーケットを出そう｜ハンズオン資料</title>
+<style>
+  :root {
+    --bg: #fafaf9;
+    --ink: #292524;
+    --sub: #6b6560;
+    --line: #e7e5e4;
+    --accent: #e11d48;
+    --accent-bg: #fff1f2;
+    --card: #ffffff;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    background: #f5f4f2;
+    color: var(--ink);
+    font-family: "Helvetica Neue", Arial, "Hiragino Kaku Gothic ProN", "Hiragino Sans", Meiryo, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    overflow: hidden;
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  /* 画面比に関係なく必ず収まる16:9のステージ。文字はこの幅(cqw)基準なのでどのモニターでも同じ見え方になる */
+  #frame {
+    position: relative;
+    width: min(100vw, calc(100vh * 16 / 9));
+    aspect-ratio: 16 / 9;
+    container-type: inline-size;
+    overflow: hidden;
+    background: var(--bg);
+    background-image:
+      radial-gradient(at 88% 4%, hsla(22,100%,72%,.13) 0, hsla(22,100%,72%,0) 46%),
+      radial-gradient(at 4% 96%, hsla(339,100%,60%,.10) 0, hsla(339,100%,60%,0) 46%);
+  }
+  #stage {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column; justify-content: center;
+    padding: 6cqw 6cqw 7.5cqw;
+  }
+
+  .label { font-size: 1.75cqw; font-weight: 700; letter-spacing: .12em; color: var(--accent); margin-bottom: 1.6cqw; }
+  h1 { font-size: 7.2cqw; font-weight: 700; line-height: 1.22; letter-spacing: -.02em; }
+  h2 { font-size: 5.2cqw; font-weight: 700; line-height: 1.32; letter-spacing: -.01em; }
+  .lead { font-size: 2.45cqw; color: var(--sub); line-height: 1.75; margin-top: 1.8cqw; }
+
+  ul { list-style: none; margin-top: 2.6cqw; }
+  li {
+    font-size: 2.7cqw; line-height: 1.55; padding: 1.1cqw 0 1.1cqw 1.3em;
+    position: relative; border-bottom: 1px solid var(--line); font-weight: 500;
+  }
+  li:last-child { border-bottom: none; }
+  li::before { content: "—"; position: absolute; left: 0; color: var(--line); }
+  ol { list-style: none; counter-reset: step; margin-top: 2.6cqw; }
+  ol li { padding-left: 2.1em; font-size: 2.6cqw; }
+  ol li::before {
+    counter-increment: step; content: counter(step);
+    font-size: .68em; font-weight: 700; color: var(--accent); background: var(--accent-bg);
+    width: 1.9em; height: 1.9em; border-radius: 999px;
+    display: flex; align-items: center; justify-content: center;
+    top: 50%; transform: translateY(-50%);
+  }
+
+  .cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(24cqw, 1fr)); gap: 1.8cqw; margin-top: 2.8cqw; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 1.4cqw; padding: 2.4cqw; }
+  .card .num { font-size: 1.55cqw; font-weight: 700; letter-spacing: .12em; color: var(--accent); margin-bottom: .7em; }
+  .card h3 { font-size: 2.8cqw; font-weight: 700; line-height: 1.35; margin-bottom: .45em; }
+  .card p { font-size: 1.9cqw; color: var(--sub); line-height: 1.65; }
+
+  .slim { display: grid; grid-template-columns: repeat(2, 1fr); gap: .6cqw 4cqw; margin-top: 2.6cqw; }
+  .slim div {
+    display: flex; align-items: baseline; gap: .7em;
+    font-size: 2.5cqw; line-height: 1.45; padding: 1cqw 0;
+    border-bottom: 1px solid var(--line); font-weight: 700;
+  }
+  .slim div span { font-size: .6em; font-weight: 700; color: var(--accent); letter-spacing: .06em; flex-shrink: 0; }
+  .slim div em { font-style: normal; font-weight: 400; color: var(--sub); font-size: .7em; }
+
+  .flow { display: flex; flex-wrap: wrap; align-items: center; gap: 1.2cqw; margin-top: 2.8cqw; font-size: 2.2cqw; font-weight: 700; }
+  .flow span { background: #fff; border: 1px solid var(--line); border-radius: 999px; padding: .5em 1.1em; }
+  .flow i { color: var(--line); font-style: normal; }
+
+  .note-row { margin-top: 2.2cqw; font-size: 2cqw; color: var(--sub); line-height: 1.75; }
+  .strong { color: var(--ink); font-weight: 700; }
+
+  .split { display: grid; grid-template-columns: 1fr 1fr; gap: 3cqw; align-items: start; margin-top: 2.1cqw; }
+  .steps4 { list-style: none; }
+  .steps4 li { border: none; padding: .8cqw 0; font-size: 2.35cqw; font-weight: 700; display: flex; gap: .6em; align-items: baseline; }
+  .steps4 li::before { content: none; }
+  .steps4 li b { color: var(--accent); font-size: .72em; letter-spacing: .04em; min-width: 5.2em; display: inline-block; }
+  .steps4 li i { font-style: normal; font-weight: 400; color: var(--sub); font-size: .78em; }
+
+  .tweet { background: #fff; border: 1px solid var(--line); border-radius: 1.6cqw; padding: 2.4cqw; font-size: 2.05cqw; line-height: 1.9; }
+  .tweet .u { display: block; margin-bottom: .45em; }
+  .tweet .url { display: block; color: var(--sub); font-size: .85em; margin-top: .3em; }
+
+  .chat { display: flex; flex-direction: column; gap: 1.2cqw; }
+  .chat span { background: #fff; border: 1px solid var(--line); border-radius: 999px; padding: .6em 1.2em; font-size: 2.05cqw; font-weight: 700; }
+  .after { background: #fff; border: 1px solid var(--line); border-radius: 1.6cqw; padding: 2.4cqw; font-size: 2.05cqw; line-height: 1.85; }
+  .after b { color: var(--accent); }
+
+  svg { width: 100%; height: auto; display: block; }
+  .figure { margin-top: 2.8cqw; }
+
+  @keyframes rise { from { opacity: 0; transform: translateY(1.2cqw); } to { opacity: 1; transform: none; } }
+  #stage > * { animation: rise .42s cubic-bezier(.2,.7,.3,1) both; }
+  #stage > *:nth-child(2) { animation-delay: .07s; }
+  #stage > *:nth-child(3) { animation-delay: .14s; }
+  #stage > *:nth-child(4) { animation-delay: .21s; }
+  @media (prefers-reduced-motion: reduce) { #stage > * { animation: none; } }
+
+  .hl { background: linear-gradient(transparent 60%, rgba(225,29,72,.17) 60%); padding: 0 .06em; }
+
+  .goal { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2.2cqw; margin-top: 3.2cqw; }
+  .goal > div { background: #fff; border: 1px solid var(--line); border-radius: 1.6cqw; padding: 2.6cqw; text-align: center; }
+  .goal .n { font-size: 6.8cqw; font-weight: 700; color: var(--accent); line-height: 1; letter-spacing: -.03em; }
+  .goal .n small { font-size: .38em; margin-left: .12em; letter-spacing: 0; }
+  .goal .t { margin-top: .6em; font-size: 2.2cqw; font-weight: 700; }
+  .goal .s { margin-top: .35em; font-size: 1.75cqw; color: var(--sub); }
+
+  .cover .label { color: var(--sub); }
+  .cover .meta { margin-top: 3cqw; font-size: 2.05cqw; color: var(--sub); line-height: 1.85; }
+
+  #bar { position: absolute; left: 0; bottom: 0; height: .35cqw; background: var(--accent); transition: width .25s ease; }
+  #pager { position: absolute; right: 2.4cqw; bottom: 2.2cqw; font-size: 1.35cqw; color: var(--sub); letter-spacing: .1em; }
+  #hint { position: absolute; left: 2.4cqw; bottom: 2.2cqw; font-size: 1.2cqw; color: #d6d3d1; }
+  @media print { body { overflow: visible; } #bar, #pager, #hint { display: none; } }
+</style>
+</head>
+<body>
+
+<div id="frame">
+  <div id="stage"></div>
+  <div id="bar"></div>
+  <div id="pager"></div>
+  <div id="hint">← → でめくる</div>
+</div>
+
+<script>
+const slides = [
+  {
+    cls: "cover",
+    html: `
+      <div class="label">ハンズオン・60分</div>
+      <h1>スキルマーケットを<br>出そう</h1>
+      <div class="meta">サニー号で、スキルマーケットへいざ出航！<br>進行: サニー ／ サポート: クマーさん</div>`
+  },
+  {
+    html: `
+      <div class="label">今日のゴール</div>
+      <h2>「あとは出航ボタンを<br>押すだけ」まで</h2>
+      <ul>
+        <li>出品するときの<span class="strong">コツ・考え方</span>がわかる</li>
+        <li>今日紹介する<span class="strong">ツールの使い方</span>がわかる</li>
+        <li><span class="strong">あとは出品するだけ</span>の状態まで準備が整っている</li>
+      </ul>
+      <div class="note-row">できる方は今日そのまま出航まで。PCでの参加がおすすめです。</div>`
+  },
+  {
+    html: `
+      <div class="label">そもそも</div>
+      <h2>スキルマーケットとは</h2>
+      <div class="cols">
+        <div class="card"><div class="num">どんな場所</div><h3>リベ会員のマッチング</h3><p>オンライン上で完結するサービスを、出したい人と頼みたい人がつながる場所。</p></div>
+        <div class="card"><div class="num">お金</div><h3>出品手数料は無料</h3><p>ココナラなどと違って、出すこと自体にお金はかかりません。</p></div>
+        <div class="card"><div class="num">だれが</div><h3>会員なら全員</h3><p>リベシティの会員であれば、誰でも今日から出品できます。</p></div>
+      </div>`
+  },
+  {
+    html: `
+      <div class="label">出せない理由あるある</div>
+      <h2>だいたい、この3つ</h2>
+      <ul>
+        <li>自分がどんなサービスを出したらいいか<span class="strong">わからない</span></li>
+        <li>入力項目が多くて<span class="strong">文章の手が進まない</span></li>
+        <li>準備が万全じゃないから<span class="strong">ためらってしまう</span></li>
+      </ul>
+      <div class="note-row">全部わかります。僕もそうでした。……<span class="strong">今日はこの3つとも、全部つぶします。</span></div>`
+  },
+  {
+    html: `
+      <div class="label">マインドセット</div>
+      <h2><span class="hl">60点</span>で出航する</h2>
+      <div class="figure">
+        <svg viewBox="0 0 1040 180" role="img" aria-label="60%地点で出航するという図">
+          <rect x="2" y="58" width="1036" height="34" rx="17" fill="#fff" stroke="#e7e5e4" stroke-width="2"/>
+          <rect x="4" y="60" width="620" height="30" rx="15" fill="#fff1f2"/>
+          <line x1="624" y1="30" x2="624" y2="120" stroke="#e11d48" stroke-width="3"/>
+          <text x="624" y="22" text-anchor="middle" font-size="27" font-weight="700" fill="#e11d48">60% ここで出航</text>
+          <text x="624" y="152" text-anchor="middle" font-size="20" fill="#6b6560">小回りが利く船。海の上で育てられる</text>
+          <text x="1032" y="152" text-anchor="end" font-size="20" fill="#a8a29e">100%＝永遠に来ない</text>
+        </svg>
+      </div>
+      <div class="note-row">学長もよく言ってますよね。「<span class="strong">早よ出しや〜</span>」って。</div>`
+  },
+  {
+    html: `
+      <div class="label">なぜ60点でいいのか</div>
+      <h2>変えられる<span class="hl">余白</span>を<br>残しておくため</h2>
+      <div class="lead">100％ガチガチに作り込むと、お客さんの声に応える余白がなくなります。<br>60％の船なら、海に出たあとで育てていける。</div>
+      <div class="note-row">しかもこのツールは、<span class="strong">出したあとに磨く機能もそろっています。</span>だから今日は、本当に60点で大丈夫です。</div>`
+  },
+  {
+    html: `
+      <div class="label">今日使うもの</div>
+      <h2>ツールは2つだけ</h2>
+      <div class="cols">
+        <div class="card"><div class="num">STEP 1</div><h3>スキルの種シート</h3><p>自分のプロフィールと、好き・得意・経験を整理するスプレッドシート。</p></div>
+        <div class="card"><div class="num">STEP 2</div><h3>Skill Market Creator Pro</h3><p>棚卸しした内容を入れると、アイデアも出品テキストも作ってくれるAIツール。</p></div>
+      </div>`
+  },
+  {
+    html: `
+      <div class="label">ツールの入口</div>
+      <h2>3つ並んでいますが、<br>今日は<span class="hl">いちばん上</span>だけ</h2>
+      <div class="slim">
+        <div><span>今日</span>出品アイデアを作る<em>ここだけ使います</em></div>
+        <div><span>あとで</span>広める・改善する<em>出したあとに使う</em></div>
+        <div><span>いつでも</span>売れる人の考え方を学ぶ<em>迷ったら読む</em></div>
+      </div>
+      <div class="note-row">今日の流れは、ノウハウ図書館の記事にもまとめてあります。あとでゆっくり見返せます。</div>`
+  },
+  {
+    html: `
+      <div class="label">STEP 1 ／ 10分</div>
+      <h2>スキルの棚卸し</h2>
+      <ol>
+        <li>シートを<span class="strong">コピー</span>する</li>
+        <li>リベのプロフィールを<span class="strong">全選択してそのまま貼る</span>（Command + A → C）</li>
+        <li>書ききれていない<span class="strong">好き・得意・経験</span>を追記</li>
+      </ol>
+      <div class="note-row">きれいに整えなくて大丈夫。<span class="strong">雑に貼り付けてOK</span>です。最終的にはテキストにするだけなので。</div>`
+  },
+  {
+    html: `
+      <div class="label">STEP 2 ／ アイデア</div>
+      <h2>AIが<span class="hl">20個</span>出してくれます</h2>
+      <div class="cols">
+        <div class="card"><div class="num">最初の10個</div><h3>王道アイデア</h3><p>需要が安定していて、初心者でも参入しやすい手堅いもの。</p></div>
+        <div class="card"><div class="num">残りの10個</div><h3>ニッチ＆ユニーク</h3><p>「え、こんなの売れるの？」という、あなたの個性が強烈に活きるもの。</p></div>
+      </div>
+      <div class="note-row">どの強みが活きるか、誰のどんな困りごとを解決するかも一緒に出ます。<span class="strong">悩みすぎず、走りきるのが今日のコツ。</span></div>`
+  },
+  {
+    html: `
+      <div class="label">STEP 2 ／ 文章を整える</div>
+      <h2>AI編集チャットで、<br><span class="hl">自分の言葉</span>に寄せる</h2>
+      <div class="split">
+        <div class="chat">
+          <span>もっと親しみやすい文体にして</span>
+          <span>もっと丁寧でプロフェッショナルに</span>
+          <span>初心者にもわかる言葉に言い換えて</span>
+          <span>絵文字を減らして落ち着いた印象に</span>
+        </div>
+        <div class="after">
+          クリックすると入力欄に入るので、<b>そのまま送っても、書き足して送ってもOK</b>。<br>
+          「〇〇の部分だけ短くして」のような細かい指示も通ります。
+        </div>
+      </div>
+      <div class="note-row"><span class="strong">AIが書いた平均的な文章のままにしないこと。</span>1か所変えるだけで自分の顔になります。</div>`
+  },
+  {
+    html: `
+      <div class="label">STEP 2 ／ 価格</div>
+      <h2>値付けはアート。<br>迷ったらモニターから</h2>
+      <div class="lead">初めての出品で正規価格はハードルが高いことも。<br>モニター価格でレビューを集めながら上げていく手があります。</div>
+      <div class="note-row">ツールで<span class="strong">価格モードを切り替えるだけ</span>で、①標準価格とモニター価格の併記 ②「先着○名限定」などの募集条件、が自動で付きます。</div>`
+  },
+  {
+    html: `
+      <div class="label">STEP 2 ／ 入力</div>
+      <h2>コピー → 貼り付けの<br>繰り返しだけ</h2>
+      <ol>
+        <li>出品ページのURLを右クリック →「<span class="strong">分割ビュー</span>」</li>
+        <li>左にツール、右に出品ページを<span class="strong">並べる</span></li>
+        <li>各項目の<span class="strong">コピーボタン</span>（または全文コピー）で貼っていく</li>
+      </ol>
+      <div class="note-row">細かい文章の修正は後回し。<span class="strong">まず全項目を埋めることを優先</span>してください。</div>`
+  },
+  {
+    html: `
+      <div class="label">STEP 2 ／ サムネイル</div>
+      <h2>トンマナを選んで、<br>プロンプトをコピー</h2>
+      <ul>
+        <li>標準・シンプル・水彩・ポップ・YouTube風など<span class="strong">8種類</span></li>
+        <li>迷ったら「<span class="strong">AIおまかせ</span>」。サービス専用のトンマナを設計してくれます</li>
+        <li>貼り先は <span class="strong">ChatGPT か Gemini</span>。自分のアイコンを添付すれば自然に入ります</li>
+      </ul>
+      <div class="note-row">Geminiを使うときの注意は2つだけ。<span class="strong">画像生成モード</span>を選ぶ／<span class="strong">「思考モード」</span>に切り替える。</div>`
+  },
+  {
+    html: `
+      <div class="label">出航</div>
+      <h2>「これ出していいのかな」<br>——<span class="hl">いいんです</span></h2>
+      <div class="lead">出品しても、全体に通知が飛ぶわけではありません。<br>そして一度出すと、脳みその使い方が変わります。</div>
+      <div class="flow"><span>何を出そう？</span><i>→</i><span>どうやって提供しよう？</span></div>
+      <div class="note-row">迷ったら<span class="strong">下書き保存</span>でもOK。それでも今日は大きな前進です。</div>`
+  },
+  {
+    html: `
+      <div class="label">おさらい</div>
+      <h2>やることは、この5つだけ</h2>
+      <div class="figure">
+        <svg viewBox="0 0 1040 130" role="img" aria-label="5ステップのフロー">
+          <g stroke="#e7e5e4" stroke-width="2" fill="#fff">
+            <rect x="2" y="20" width="188" height="76" rx="12"/>
+            <rect x="214" y="20" width="188" height="76" rx="12"/>
+            <rect x="426" y="20" width="188" height="76" rx="12"/>
+            <rect x="638" y="20" width="188" height="76" rx="12"/>
+            <rect x="850" y="20" width="188" height="76" rx="12"/>
+          </g>
+          <g font-size="17" font-weight="700" fill="#e11d48" text-anchor="middle">
+            <text x="96" y="46">1</text><text x="308" y="46">2</text><text x="520" y="46">3</text><text x="732" y="46">4</text><text x="944" y="46">5</text>
+          </g>
+          <g font-size="23" font-weight="700" fill="#292524" text-anchor="middle">
+            <text x="96" y="76">アイデアを出す</text>
+            <text x="308" y="76">1つ選ぶ</text>
+            <text x="520" y="76">言葉を整える</text>
+            <text x="732" y="76">入力＋サムネ</text>
+            <text x="944" y="76">出航する</text>
+          </g>
+          <g stroke="#e11d48" stroke-width="2.5" fill="none">
+            <path d="M198 58 h8"/><path d="M410 58 h8"/><path d="M622 58 h8"/><path d="M834 58 h8"/>
+          </g>
+        </svg>
+      </div>
+      <div class="note-row">今日できなかったところは、ノウハウ図書館の記事を見ながら後日でも大丈夫です。</div>`
+  },
+  {
+    html: `
+      <div class="label">出したあとのこと</div>
+      <h2>「出したけど動きがないな」<br>——そのときは</h2>
+      <div class="slim">
+        <div><span>広める</span>宣伝のつぶやきを20本つくる</div>
+        <div><span>集める</span>購入者アンケートをフォームまで一気に</div>
+        <div><span>見せる</span>サービス紹介の資料（画像）をつくる</div>
+        <div><span>学ぶ</span>価格・宣伝・改善のヒント集を読む</div>
+      </div>
+      <div class="note-row">ツールの「広める・改善する」と「売れる人の考え方を学ぶ」に、ぜんぶ入っています。</div>`
+  },
+  {
+    html: `
+      <div class="label">最後に</div>
+      <h2>「いつか出そう」ではなく<br><span class="hl">今週出航する</span></h2>
+      <div class="lead">今日出せた方も、まだの方も。<br>次にやることを1つだけ決めて帰ってください。</div>
+      <div class="note-row">アンケートと宿題フォームをチャットに流します。今日はありがとうございました！</div>`
+  }
+];
+
+const stage = document.getElementById("stage");
+const bar = document.getElementById("bar");
+const pager = document.getElementById("pager");
+let i = 0;
+
+function render() {
+  const s = slides[i];
+  stage.className = s.cls || "";
+  stage.innerHTML = s.html;
+  bar.style.width = ((i + 1) / slides.length * 100) + "%";
+  pager.textContent = (i + 1) + " / " + slides.length;
+  location.hash = i + 1;
+}
+function go(n) { i = Math.max(0, Math.min(slides.length - 1, n)); render(); }
+
+document.addEventListener("keydown", e => {
+  if (["ArrowRight", "ArrowDown", " ", "PageDown"].includes(e.key)) { e.preventDefault(); go(i + 1); }
+  if (["ArrowLeft", "ArrowUp", "PageUp"].includes(e.key)) { e.preventDefault(); go(i - 1); }
+  if (e.key === "Home") go(0);
+  if (e.key === "End") go(slides.length - 1);
+});
+document.addEventListener("click", e => { go(e.clientX < window.innerWidth * 0.25 ? i - 1 : i + 1); });
+let tx = 0;
+document.addEventListener("touchstart", e => tx = e.changedTouches[0].clientX, { passive: true });
+document.addEventListener("touchend", e => {
+  const d = e.changedTouches[0].clientX - tx;
+  if (Math.abs(d) > 50) go(d < 0 ? i + 1 : i - 1);
+}, { passive: true });
+
+const start = parseInt(location.hash.replace("#", ""), 10);
+go(isNaN(start) ? 0 : start - 1);
+</script>
+</body>
+</html>
