@@ -50,3 +50,13 @@ export interface SurveyPattern {
 
 // Thumbnail Prompt Version
 export type ThumbnailPromptVersion = 'ai_auto' | 'standard' | 'simple' | 'watercolor' | 'pop' | 'my_style' | 'youtube' | 'puffy_3d' | 'benefit_banner';
+
+// ChatGPTで1枚ずつ画像生成するための、1枚分の中身（トンマナ・レイアウト非依存）。
+// トンマナ（共通デザイン仕様）と役割別レイアウトはコピー時に buildSlideImagePromptText で差し込む。
+export interface SlideImagePrompt {
+  no: number;    // 1始まりの通し番号
+  role: string;  // cover / problem / can_do / strength / recommend / flow / voice / cta
+  label: string; // カード見出し用の短いタグ（表紙 / お悩み など）
+  title: string; // この画像の見出し
+  body: string;  // この画像に描き込む文言（改行区切り）
+}

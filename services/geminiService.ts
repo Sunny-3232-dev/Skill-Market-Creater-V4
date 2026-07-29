@@ -1,6 +1,6 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
-import { UserInput, SkillIdea, SurveyPattern, ThumbnailPromptVersion } from "../types";
+import { UserInput, SkillIdea, SurveyPattern, ThumbnailPromptVersion, SlideImagePrompt } from "../types";
 
 const generateUniqueId = (): string => {
   return crypto.randomUUID();
@@ -469,6 +469,144 @@ ${bodyExcerpt}
     ? `${autoStyle.trim()}\n`
     : SLIDE_STYLE_DIRECTIVES[toneVersion];
   return commonBase + directive;
+};
+
+// ===== ChatGPTで「1枚ずつ」画像生成するための構成生成＋プロンプト組み立て =====
+
+const SLIDE_ROLE_LABELS: Record<string, string> = {
+  cover: '表紙', problem: 'お悩み', can_do: 'できること', strength: '強み',
+  recommend: 'おすすめ', flow: 'ご依頼の流れ', voice: 'お客様の声', cta: 'CTA',
+};
+
+// 役割ごとの「適したレイアウト」。トンマナ（画風）は共通のまま、版面だけページ内容に最適化させる。
+const SLIDE_ROLE_LAYOUTS: Record<string, string> = {
+  cover: 'ヒーロー型。サービス名とキャッチを大きく置き、目玉（一番の売り）が伝わる主役ビジュアルを大きく配置する。',
+  problem: '共感型。悩みを3〜5個、チェックマークや吹き出しで縦に並べる。',
+  can_do: '提供価値をアイコン付きカードで横並び／格子に並べる。',
+  strength: '差別化ポイントを2〜3個、数字やビフォーアフターで強調する。',
+  recommend: 'ペルソナ像を3枚、人物アイコン＋一言で横並びにする。',
+  flow: 'ステップ図。1→2→3…を矢印でつなぐ横または縦のフロー。',
+  voice: '利用者の声を引用カード（吹き出し）で2〜3件。星や名前を添える。',
+  cta: '行動喚起型。ボタン風の要素と申込先を大きく、余白広めのシンプル構成にする。',
+};
+
+// サービス本文から、ChatGPTで1枚ずつ作る各画像の「中身」を生成する（トンマナ・レイアウト非依存）。
+export const generateSlideImageContents = async (serviceBody: string): Promise<SlideImagePrompt[]> => {
+  const body = serviceBody?.trim();
+  if (!body) return [];
+  const apiKey = getApiKey();
+  const ai = new GoogleGenAI(apiKey ? { apiKey } : {});
+
+  const prompt = `
+あなたはSNS・スキルマーケット向けの「サービス紹介画像」を設計するアートディレクターです。
+以下のサービス本文をもとに、ChatGPTの画像生成（GPT Image）で「1枚ずつ」作るサービス紹介画像の、各枚に文字として描き込む中身を作成してください。
+※これはプレゼン資料（PowerPoint／スライド）ではなく、文字を一緒にデザインした画像を1枚ずつ生成する用途です。
+
+【画像の構成（この順。各1枚の画像）】
+- cover（表紙）: サービス名＋一言キャッチ＋目玉（一番の売り）
+- problem（こんなお悩みありませんか？）: ターゲットの悩みを3〜5点
+- can_do（このサービスでできること）: 提供価値・解決できることを3〜4点
+- strength（このサービスの強み）: 他と違う差別化ポイントを2〜3点
+- recommend（こんな方におすすめ）: 具体的なペルソナ像を3点
+- flow（ご依頼の流れ）: 依頼から納品までをステップ（1. → 2. → 3. …）で
+- voice（お客様の声）: 本文にレビュー・感想があれば2〜3件を抜粋。無ければこの画像は配列に含めない
+- cta（行動喚起）: 申し込み・問い合わせを促す一言＋次のアクション
+
+【ルール】
+- 各画像の body は、その画像に文字として描き込む文言そのものにする（箇条書きは改行で区切る。ステップは「1. …」形式）。
+- 本文に書かれている情報だけを使う。創作・誇張はしない。価格・特典・所要時間など本文にあれば具体的に反映する。
+- 省略しすぎず、しっかり載せる（1枚あたり箇条書き3〜5行程度を目安に、詰め込みすぎない）。
+- マークダウン記法（#、* など）は使わない。
+- voice は、本文にレビュー・感想の記載が無ければ配列に含めないこと。
+
+【サービス本文】
+${body.slice(0, 4000)}
+`;
+
+  let slidesRaw: Array<{ role: string; title: string; body: string }> = [];
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-3.5-flash',
+      contents: prompt,
+      config: {
+        responseMimeType: 'application/json',
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            slides: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  role: { type: Type.STRING },
+                  title: { type: Type.STRING },
+                  body: { type: Type.STRING },
+                },
+                required: ['role', 'title', 'body'],
+              },
+            },
+          },
+          required: ['slides'],
+        },
+      },
+    });
+    const parsed = JSON.parse(response.text || '{}');
+    if (Array.isArray(parsed?.slides)) slidesRaw = parsed.slides;
+  } catch {
+    return [];
+  }
+
+  return slidesRaw.map((s, i) => ({
+    no: i + 1,
+    role: s.role,
+    label: SLIDE_ROLE_LABELS[s.role] ?? `画像${i + 1}`,
+    title: String(s.title || '').trim(),
+    body: String(s.body || '').trim(),
+  }));
+};
+
+// 1枚分の中身＋選択トンマナから、ChatGPTにそのまま貼れる画像生成プロンプトを組み立てる。
+// ★改善点：共通デザイン仕様（画風・配色・書体・世界観）は毎回明記して統一する一方、
+//   レイアウト構成は各ページの役割に最適化させ、「前と同じ版面のコピー」を明確に禁止する。
+export const buildSlideImagePromptText = (
+  slide: SlideImagePrompt,
+  toneVersion: ThumbnailPromptVersion,
+  total: number,
+  // ai_auto のとき、generateAutoSlideStyle が作ったサービス専用トンマナを差し込む
+  autoStyle?: string
+): string => {
+  const designSpec = (toneVersion === 'ai_auto' && autoStyle && autoStyle.trim())
+    ? autoStyle.trim()
+    : SLIDE_STYLE_DIRECTIVES[toneVersion];
+  const roleLabel = SLIDE_ROLE_LABELS[slide.role] ?? `${slide.no}枚目`;
+  const layout = SLIDE_ROLE_LAYOUTS[slide.role] ?? 'このページの内容に合った、読みやすいレイアウトにする。';
+
+  const commonBlock = `■ 全画像で共通のデザイン仕様（毎回この仕様どおりに作り、画風・配色・書体・世界観は全画像で必ず統一する）
+${designSpec}
+
+■ 画像ルール
+・出力は1枚の画像（横長／landscape）。プレゼン資料・PowerPoint・複数ページにはしない。
+・レイアウト構成は「このページの役割」に最適化する。前の画像と同じ版面のコピーにはしない（共通に保つのは画風・配色・書体・世界観だけ）。
+・文字はすべて日本語で、画像内にくっきり読めるように描く。下に指定した文言だけを正確に入れ、誤字なく、勝手に文章を足さない。
+・マークダウン記号（#、* など）は画像に出さない。`;
+
+  const pageBlock = `■ このページ（${slide.no}枚目：${roleLabel}）
+・レイアウト：${layout}
+（画像に入れる文字）
+${slide.body}`;
+
+  if (slide.no === 1) {
+    return `ChatGPTの画像生成（GPT Image）で、サービス紹介画像を1枚ずつ作ります（全${total}枚）。まず1枚目です。これは「1枚のグラフィック画像」です。
+
+${commonBlock}
+
+${pageBlock}`;
+  }
+  return `続けて${slide.no}枚目の画像を1枚作ってください。前の画像とデザイン仕様（画風・配色・書体・世界観）は必ず同じに保ちますが、レイアウト構成はこのページの内容に合わせて変えます（前と同じ版面のコピーにはしない）。
+
+${commonBlock}
+
+${pageBlock}`;
 };
 
 const getApiKey = (): string => {
