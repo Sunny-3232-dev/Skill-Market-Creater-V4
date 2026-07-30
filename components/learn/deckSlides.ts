@@ -6,6 +6,48 @@ import { DeckSlide } from './Deck';
  * 文字サイズはコンテナ幅基準なので、ここでは大きさを意識せず内容だけ書けばよい。
  */
 
+// STEP2「磨く」の全体像フライホイール（先頭の「全体像」と末尾の「まとめ」で共有）。
+// h2＋図＋凡例までを持ち、ラベル（全体像／まとめ）だけ呼び出し側で付ける。
+const FLYWHEEL_BODY = `
+      <h2 class="d-h2">ぜんぶ、<span class="d-hl">ぐるぐる</span>回っていく</h2>
+      <div class="d-fig">
+        <svg viewBox="0 0 1000 384" role="img" aria-label="サービスが育つ循環図。サービス内容・価格、サービス画像、つぶやき、オフ会参加、オフ会主催、ノウハウ図書館、サービス提供、アンケートが時計回りにつながり、うち4か所（サービス内容・価格＝STEP1、サービス画像・つぶやき・アンケート＝磨く）をこのツールで作れる">
+          <ellipse cx="500" cy="190" rx="395" ry="155" fill="none" stroke="#fde2e4" stroke-width="12"/>
+          <g fill="#e11d48">
+            <path d="M-7 -9 L11 0 L-7 9 Z" transform="translate(651,47) rotate(9)"/>
+            <path d="M-7 -9 L11 0 L-7 9 Z" transform="translate(865,249) rotate(137)"/>
+            <path d="M-7 -9 L11 0 L-7 9 Z" transform="translate(349,333) rotate(189)"/>
+            <path d="M-7 -9 L11 0 L-7 9 Z" transform="translate(135,131) rotate(-43)"/>
+          </g>
+          <circle cx="500" cy="190" r="58" fill="#fff" stroke="#fecdd3" stroke-width="2"/>
+          <g text-anchor="middle" fill="#e11d48" font-weight="700" font-size="22">
+            <text x="500" y="184">回すほど</text>
+            <text x="500" y="212">良くなる</text>
+          </g>
+          <g>
+            <rect x="400" y="12" width="200" height="46" rx="23" fill="#f97316"/>
+            <text x="500" y="42" text-anchor="middle" font-size="20" font-weight="700" fill="#fff">サービス内容・価格</text>
+            <rect x="470" y="1" width="60" height="21" rx="10.5" fill="#ea580c"/>
+            <text x="500" y="16" text-anchor="middle" font-size="12" font-weight="700" fill="#fff">STEP1</text>
+            <rect x="703" y="57" width="152" height="46" rx="23" fill="#f43f5e"/>
+            <text x="779" y="87" text-anchor="middle" font-size="22" font-weight="700" fill="#fff">サービス画像</text>
+            <rect x="835" y="167" width="120" height="46" rx="23" fill="#f43f5e"/>
+            <text x="895" y="197" text-anchor="middle" font-size="22" font-weight="700" fill="#fff">つぶやき</text>
+            <rect x="704" y="277" width="150" height="46" rx="23" fill="#fff" stroke="#e7e5e4" stroke-width="2"/>
+            <text x="779" y="307" text-anchor="middle" font-size="22" font-weight="700" fill="#292524">オフ会参加</text>
+            <rect x="425" y="322" width="150" height="46" rx="23" fill="#fff" stroke="#e7e5e4" stroke-width="2"/>
+            <text x="500" y="352" text-anchor="middle" font-size="22" font-weight="700" fill="#292524">オフ会主催</text>
+            <rect x="133" y="277" width="176" height="46" rx="23" fill="#fff" stroke="#e7e5e4" stroke-width="2"/>
+            <text x="221" y="307" text-anchor="middle" font-size="21" font-weight="700" fill="#292524">ノウハウ図書館</text>
+            <rect x="29" y="167" width="152" height="46" rx="23" fill="#fff" stroke="#e7e5e4" stroke-width="2"/>
+            <text x="105" y="197" text-anchor="middle" font-size="22" font-weight="700" fill="#292524">サービス提供</text>
+            <rect x="146" y="57" width="150" height="46" rx="23" fill="#f43f5e"/>
+            <text x="221" y="87" text-anchor="middle" font-size="22" font-weight="700" fill="#fff">アンケート</text>
+          </g>
+        </svg>
+      </div>
+      <div class="d-note"><span style="display:inline-block;width:14px;height:14px;border-radius:4px;background:#f97316;vertical-align:-2px;margin-right:5px"></span><b>つくる</b>（STEP1）　<span style="display:inline-block;width:14px;height:14px;border-radius:4px;background:#f43f5e;vertical-align:-2px;margin:0 5px 0 8px"></span><b>みがく</b>（サービス画像・つぶやき・アンケート）＝このツールが助ける4か所。あとは時計回りに回すほど、放っておいても良くなっていきます。</div>`;
+
 // ────────────────────────────────
 // STEP1：はじめての出品まで
 // ────────────────────────────────
@@ -195,6 +237,10 @@ export const POLISH_SLIDES: DeckSlide[] = [
       <div class="d-label d-label-mute">出したあとのガイド</div>
       <h1 class="d-h1">出品を<br>磨こう</h1>
       <div class="d-meta">出したあとの「次の一手」は3つだけ<br>サービス画像 ／ アンケート ／ つぶやき</div>`,
+  },
+  {
+    html: `
+      <div class="d-label">全体像</div>${FLYWHEEL_BODY}`,
   },
   {
     html: `
@@ -391,42 +437,6 @@ export const POLISH_SLIDES: DeckSlide[] = [
   },
   {
     html: `
-      <div class="d-label">まとめ</div>
-      <h2 class="d-h2">3つは、1周でつながる</h2>
-      <div class="d-fig">
-        <svg viewBox="0 0 1000 330" role="img" aria-label="アンケートの声が画像とつぶやきに回る循環図">
-          <g fill="#fff" stroke="#e7e5e4" stroke-width="2">
-            <rect x="360" y="6" width="280" height="82" rx="16"/>
-            <rect x="20" y="228" width="300" height="82" rx="16"/>
-            <rect x="680" y="228" width="300" height="82" rx="16"/>
-          </g>
-          <g font-size="29" font-weight="700" fill="#292524" text-anchor="middle">
-            <text x="500" y="42">アンケートの声</text>
-            <text x="170" y="264">サービス画像</text>
-            <text x="830" y="264">つぶやき</text>
-          </g>
-          <g font-size="19" fill="#6b6560" text-anchor="middle">
-            <text x="500" y="70">申し込んだ理由・ひとこと感想</text>
-            <text x="170" y="292">7枚目「お客様の声」になる</text>
-            <text x="830" y="292">1行目の「悩み」になる</text>
-          </g>
-          <g stroke="#e11d48" stroke-width="2.5" fill="none">
-            <path d="M370 78 C250 110 190 160 172 218"/>
-            <path d="M164 205 l8 16 l16 -6"/>
-            <path d="M322 272 C430 300 560 300 700 268"/>
-            <path d="M684 265 L700 268 L687 278"/>
-            <path d="M828 218 C812 160 750 110 632 78"/>
-            <path d="M645 90 l-14 -12 l11 -12"/>
-          </g>
-        </svg>
-      </div>
-      <div class="d-note">1周回すと、放っておいても良くなっていく状態になります。</div>`,
-  },
-  {
-    html: `
-      <div class="d-label">最後に</div>
-      <h2 class="d-h2">やるものを、<br><span class="d-hl">1つだけ</span>決める</h2>
-      <div class="d-lead">3つ全部やろうとすると、だいたい何も残りません。1つだけ。</div>
-      <div class="d-note">迷ったら、いちばん効くのは<b>つぶやき</b>です。作った20本のうち1本、今日出す。それだけで動きが変わります。</div>`,
+      <div class="d-label">まとめ</div>${FLYWHEEL_BODY}`,
   },
 ];
