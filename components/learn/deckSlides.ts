@@ -9,9 +9,9 @@ import { DeckSlide } from './Deck';
 // STEP2「磨く」の全体像フライホイール（先頭の「全体像」と末尾の「まとめ」で共有）。
 // h2＋図＋凡例までを持ち、ラベル（全体像／まとめ）だけ呼び出し側で付ける。
 const FLYWHEEL_BODY = `
-      <h2 class="d-h2">ぜんぶ、<span class="d-hl">ぐるぐる</span>回っていく</h2>
-      <div class="d-fig" style="width:66cqw;margin-left:auto;margin-right:auto">
-        <svg viewBox="0 0 1000 428" role="img" aria-label="サービスが育つ循環図。サービス内容・価格、サービス画像、つぶやき、オフ会参加、オフ会主催、ノウハウ図書館、サービス提供、アンケートが時計回りにつながり、うち4か所（サービス内容・価格＝STEP1、サービス画像・つぶやき・アンケート＝磨く）をこのツールで作れる">
+      <h2 class="d-h2" style="font-size:4.4cqw">ぜんぶ、<span class="d-hl">ぐるぐる</span>回っていく</h2>
+      <div class="d-fig" style="margin-top:.6cqw;margin-bottom:-2.5cqw">
+        <svg viewBox="0 0 1000 402" role="img" aria-label="サービスが育つ循環図。サービス内容・価格、サービス画像、つぶやき、オフ会参加、オフ会主催、ノウハウ図書館、サービス提供、アンケートがつながり、うち4か所（サービス内容・価格＝STEP1、サービス画像・つぶやき・アンケート＝磨く）をこのツールで作れる">
           <ellipse cx="500" cy="190" rx="395" ry="155" fill="none" stroke="#fde2e4" stroke-width="12"/>
           <g fill="#e11d48">
             <path d="M-7 -9 L11 0 L-7 9 Z" transform="translate(651,47) rotate(9)"/>
@@ -46,10 +46,10 @@ const FLYWHEEL_BODY = `
           </g>
           <!-- 凡例（スライドの縦圧縮のためHTMLではなくSVG内に描く） -->
           <g>
-            <rect x="86" y="398" width="20" height="20" rx="5" fill="#f97316"/>
-            <text x="114" y="415" font-size="19" font-weight="700" fill="#292524">つくる（STEP1）</text>
-            <rect x="312" y="398" width="20" height="20" rx="5" fill="#f43f5e"/>
-            <text x="340" y="415" font-size="19" fill="#57534e"><tspan font-weight="700" fill="#292524">みがく</tspan>（サービス画像・つぶやき・アンケート）＝このツールが助ける4か所</text>
+            <rect x="86" y="384" width="20" height="20" rx="5" fill="#f97316"/>
+            <text x="114" y="400" font-size="21" font-weight="700" fill="#292524">つくる（STEP1）</text>
+            <rect x="312" y="384" width="20" height="20" rx="5" fill="#f43f5e"/>
+            <text x="340" y="400" font-size="21" fill="#57534e"><tspan font-weight="700" fill="#292524">みがく</tspan>（画像・つぶやき・アンケート）＝このツールが助ける4か所</text>
           </g>
         </svg>
       </div>`;
@@ -241,12 +241,12 @@ export const POLISH_SLIDES: DeckSlide[] = [
     cover: true,
     html: `
       <div class="d-label d-label-mute">出したあとのガイド</div>
-      <h1 class="d-h1">出品を<br>磨こう</h1>
+      <h1 class="d-h1">スキルマーケットを<br>磨こう</h1>
       <div class="d-meta">出したあとも、ぐるぐる回して育てていく。<br>まず手を動かすのは、磨く3つ ＝ サービス画像 ／ アンケート ／ つぶやき</div>`,
   },
   {
     html: `
-      <div class="d-label">全体像</div>${FLYWHEEL_BODY}`,
+      <div class="d-label" style="margin-bottom:.4cqw">全体像</div>${FLYWHEEL_BODY}`,
   },
   {
     html: `
@@ -443,6 +443,6 @@ export const POLISH_SLIDES: DeckSlide[] = [
   },
   {
     html: `
-      <div class="d-label">まとめ</div>${FLYWHEEL_BODY}`,
+      <div class="d-label" style="margin-bottom:.4cqw">まとめ</div>${FLYWHEEL_BODY}`,
   },
 ];
