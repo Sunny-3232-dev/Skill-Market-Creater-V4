@@ -236,7 +236,7 @@ export const POLISH_SLIDES: DeckSlide[] = [
     html: `
       <div class="d-label d-label-mute">出したあとのガイド</div>
       <h1 class="d-h1">出品を<br>磨こう</h1>
-      <div class="d-meta">出したあとの「次の一手」は3つだけ<br>サービス画像 ／ アンケート ／ つぶやき</div>`,
+      <div class="d-meta">出したあとも、ぐるぐる回して育てていく。<br>まず手を動かすのは、磨く3つ ＝ サービス画像 ／ アンケート ／ つぶやき</div>`,
   },
   {
     html: `
