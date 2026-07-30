@@ -115,6 +115,17 @@
       bg-brand-500 text-white border border-transparent;
   }
 
+  /* --- セグメント選択（結果タブ・作り方トグル等のナビ選択）。
+     主機能ボタン（ブランドグラデ）と色をぶつけないよう、選択中は中立のダークにする --- */
+  .seg {
+    @apply rounded-full font-semibold transition-colors cursor-pointer
+      bg-white text-stone-500 border border-stone-200 hover:border-stone-300 hover:text-stone-700;
+  }
+  .seg-active {
+    @apply rounded-full font-semibold transition-colors cursor-pointer
+      bg-stone-900 text-white border border-transparent;
+  }
+
   /* --- 入力欄 --- */
   .field {
     @apply bg-stone-50 border border-stone-200 rounded-2xl outline-none transition-colors

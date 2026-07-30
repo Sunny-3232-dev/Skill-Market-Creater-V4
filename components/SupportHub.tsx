@@ -947,7 +947,7 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
                     key={tab.id}
                     onClick={() => setActiveMenu(tab.id)}
                     aria-pressed={shownMenu === tab.id}
-                    className={`px-4 py-2 ${shownMenu === tab.id ? 'chip-active' : 'chip'}`}
+                    className={`px-4 py-2 text-xs ${shownMenu === tab.id ? 'seg-active' : 'seg'}`}
                   >
                     {tab.label}
                   </button>
@@ -987,8 +987,8 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
 
                 {/* 作り方の切り替え */}
                 <div className="flex flex-wrap gap-2 mb-6">
-                  <button type="button" onClick={() => setSlideMode('notebooklm')} aria-pressed={slideMode === 'notebooklm'} className={`px-4 py-2 text-xs ${slideMode === 'notebooklm' ? 'chip-active' : 'chip'}`}>NotebookLMで一括</button>
-                  <button type="button" onClick={() => setSlideMode('chatgpt')} aria-pressed={slideMode === 'chatgpt'} className={`px-4 py-2 text-xs ${slideMode === 'chatgpt' ? 'chip-active' : 'chip'}`}>ChatGPTで1枚ずつ</button>
+                  <button type="button" onClick={() => setSlideMode('notebooklm')} aria-pressed={slideMode === 'notebooklm'} className={`px-4 py-2 text-xs ${slideMode === 'notebooklm' ? 'seg-active' : 'seg'}`}>NotebookLMで一括</button>
+                  <button type="button" onClick={() => setSlideMode('chatgpt')} aria-pressed={slideMode === 'chatgpt'} className={`px-4 py-2 text-xs ${slideMode === 'chatgpt' ? 'seg-active' : 'seg'}`}>ChatGPTで1枚ずつ</button>
                 </div>
 
                 {slideMode === 'notebooklm' && (
