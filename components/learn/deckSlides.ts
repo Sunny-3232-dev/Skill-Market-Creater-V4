@@ -10,8 +10,8 @@ import { DeckSlide } from './Deck';
 // h2＋図＋凡例までを持ち、ラベル（全体像／まとめ）だけ呼び出し側で付ける。
 const FLYWHEEL_BODY = `
       <h2 class="d-h2">ぜんぶ、<span class="d-hl">ぐるぐる</span>回っていく</h2>
-      <div class="d-fig">
-        <svg viewBox="0 0 1000 384" role="img" aria-label="サービスが育つ循環図。サービス内容・価格、サービス画像、つぶやき、オフ会参加、オフ会主催、ノウハウ図書館、サービス提供、アンケートが時計回りにつながり、うち4か所（サービス内容・価格＝STEP1、サービス画像・つぶやき・アンケート＝磨く）をこのツールで作れる">
+      <div class="d-fig" style="width:66cqw;margin-left:auto;margin-right:auto">
+        <svg viewBox="0 0 1000 428" role="img" aria-label="サービスが育つ循環図。サービス内容・価格、サービス画像、つぶやき、オフ会参加、オフ会主催、ノウハウ図書館、サービス提供、アンケートが時計回りにつながり、うち4か所（サービス内容・価格＝STEP1、サービス画像・つぶやき・アンケート＝磨く）をこのツールで作れる">
           <ellipse cx="500" cy="190" rx="395" ry="155" fill="none" stroke="#fde2e4" stroke-width="12"/>
           <g fill="#e11d48">
             <path d="M-7 -9 L11 0 L-7 9 Z" transform="translate(651,47) rotate(9)"/>
@@ -44,9 +44,15 @@ const FLYWHEEL_BODY = `
             <rect x="146" y="57" width="150" height="46" rx="23" fill="#f43f5e"/>
             <text x="221" y="87" text-anchor="middle" font-size="22" font-weight="700" fill="#fff">アンケート</text>
           </g>
+          <!-- 凡例（スライドの縦圧縮のためHTMLではなくSVG内に描く） -->
+          <g>
+            <rect x="86" y="398" width="20" height="20" rx="5" fill="#f97316"/>
+            <text x="114" y="415" font-size="19" font-weight="700" fill="#292524">つくる（STEP1）</text>
+            <rect x="312" y="398" width="20" height="20" rx="5" fill="#f43f5e"/>
+            <text x="340" y="415" font-size="19" fill="#57534e"><tspan font-weight="700" fill="#292524">みがく</tspan>（サービス画像・つぶやき・アンケート）＝このツールが助ける4か所</text>
+          </g>
         </svg>
-      </div>
-      <div class="d-note"><span style="display:inline-block;width:14px;height:14px;border-radius:4px;background:#f97316;vertical-align:-2px;margin-right:5px"></span><b>つくる</b>（STEP1）　<span style="display:inline-block;width:14px;height:14px;border-radius:4px;background:#f43f5e;vertical-align:-2px;margin:0 5px 0 8px"></span><b>みがく</b>（サービス画像・つぶやき・アンケート）＝このツールが助ける4か所。あとは時計回りに回すほど、放っておいても良くなっていきます。</div>`;
+      </div>`;
 
 // ────────────────────────────────
 // STEP1：はじめての出品まで
