@@ -6,6 +6,12 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
   return {
     plugins: [react(), tailwindcss()],
+    server: {
+      host: '0.0.0.0',
+      port: 3000,
+      strictPort: true,
+      allowedHosts: true,
+    },
     define: {
       // 注意: ここで定義したキーはクライアントバンドルに埋め込まれる。
       // 開発用途専用。公開デプロイ時はキーを埋め込まず、サーバ側プロキシか
