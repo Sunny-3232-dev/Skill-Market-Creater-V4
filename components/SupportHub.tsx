@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
-import { generatePromotion, generateSurveyPatterns, getSlideDocPrompt, extractServiceTitle, generateAutoSlideStyle, generateSlideImageContents, buildSlideImagePromptText } from '../services/geminiService';
+import { generatePromotion, generateSurveyPatterns, getSlideDocPrompt, extractServiceTitle, generateAutoSlideStyle, generateSlideImageContents, buildSlideImagePromptText, getFormBannerPrompt } from '../services/geminiService';
 import { extractWords } from '../utils/textProcessing';
 import { SkillIdea, SurveyPattern, SurveyQuestionDef, ThumbnailPromptVersion, SlideImagePrompt } from '../types';
 import { MegaphoneIcon, ClipboardListIcon, PresentationIcon, SparkleIcon } from './icons';
@@ -242,6 +242,7 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
   const [isRegisteringBody, setIsRegisteringBody] = useState(false);
 
   const [copiedSlideDocVersion, setCopiedSlideDocVersion] = useState<ThumbnailPromptVersion | null>(null);
+  const [copiedBannerPrompt, setCopiedBannerPrompt] = useState(false);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
 
   // Loading / error
@@ -606,6 +607,16 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
     navigator.clipboard.writeText(text).then(() => {
       setCopiedSlideNo(slide.no);
       setTimeout(() => setCopiedSlideNo(prev => (prev === slide.no ? null : prev)), 2000);
+    });
+  };
+
+  // Googleフォームのヘッダーバナー用プロンプトをコピーする
+  // （トップ画像をChatGPTに添付してもらう前提の静的プロンプト。API呼び出しなし）
+  const handleCopyBannerPrompt = () => {
+    if (!selectedPattern) return;
+    navigator.clipboard.writeText(getFormBannerPrompt(selectedPattern.formTitle)).then(() => {
+      setCopiedBannerPrompt(true);
+      setTimeout(() => setCopiedBannerPrompt(false), 2000);
     });
   };
 
@@ -1233,6 +1244,66 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
                       isDirty={selectedIsDirty}
                     />
                     <CodeViewer pattern={selectedPattern} />
+
+                    {/* 仕上げ：Googleフォームの上部に載せるヘッダーバナー画像 */}
+                    <div className="card p-6 mt-6">
+                      <span className="text-[10px] font-semibold text-brand-600 bg-brand-50 px-2 py-0.5 rounded-full">仕上げ（任意）</span>
+                      <h4 className="text-base font-bold text-stone-900 mt-2">フォーム上部のバナー画像も、おそろいのトンマナで</h4>
+                      <p className="text-xs text-stone-500 mt-1 leading-relaxed">
+                        Googleフォームのヘッダー画像（1600×400）を、サービスの<span className="font-semibold text-stone-700">トップ画像と同じ雰囲気</span>で作るプロンプトです。回答者がひと目で「あのサービスのアンケートだ」と分かります。
+                      </p>
+
+                      <div className="grid grid-cols-1 md:grid-cols-[minmax(0,340px)_1fr] gap-x-8 gap-y-4 items-center my-5">
+                        {/* 図解：トップ画像 → 同じトンマナ → フォームのヘッダー */}
+                        <svg viewBox="0 0 340 140" className="w-full max-w-[340px] mx-auto" aria-label="添付したトップ画像と同じトンマナで、フォーム上部のバナーが作られる図" role="img">
+                          <rect x="8" y="36" width="84" height="56" rx="8" fill="#0f172a"/>
+                          <rect x="16" y="50" width="52" height="8" rx="3" fill="#fff" opacity="0.95"/>
+                          <rect x="16" y="64" width="38" height="5" rx="2.5" fill="#fff" opacity="0.4"/>
+                          <circle cx="78" cy="78" r="7" fill="#fbbf24"/>
+                          <text x="50" y="112" fontSize="11" fill="#78716c" textAnchor="middle">トップ画像（添付）</text>
+                          <path d="M102 64 L142 64" stroke="#f43f5e" strokeWidth="3" strokeLinecap="round"/>
+                          <polygon points="138,57 152,64 138,71" fill="#f43f5e"/>
+                          <text x="127" y="48" fontSize="10" fontWeight="600" fill="#f43f5e" textAnchor="middle">同じトンマナ</text>
+                          <text x="249" y="13" fontSize="10" fontWeight="600" fill="#e11d48" textAnchor="middle">ここを作る（1600×400）</text>
+                          <rect x="166" y="20" width="166" height="104" rx="10" fill="#fff" stroke="#e7e5e4" strokeWidth="2"/>
+                          <rect x="166" y="20" width="166" height="34" rx="10" fill="#0f172a" stroke="#f43f5e" strokeWidth="2"/>
+                          <rect x="180" y="30" width="70" height="7" rx="3" fill="#fff" opacity="0.95"/>
+                          <rect x="180" y="42" width="46" height="4" rx="2" fill="#fff" opacity="0.4"/>
+                          <circle cx="316" cy="37" r="6" fill="#fbbf24"/>
+                          <rect x="180" y="66" width="120" height="6" rx="3" fill="#d6d3d1"/>
+                          <rect x="180" y="80" width="138" height="5" rx="2.5" fill="#e7e5e4"/>
+                          <rect x="180" y="92" width="138" height="5" rx="2.5" fill="#e7e5e4"/>
+                          <rect x="180" y="104" width="96" height="5" rx="2.5" fill="#e7e5e4"/>
+                          <text x="249" y="137" fontSize="11" fill="#78716c" textAnchor="middle">Googleフォーム</text>
+                        </svg>
+                        {/* 手順 */}
+                        <ol className="text-xs text-stone-600 space-y-2.5 list-decimal list-inside leading-relaxed">
+                          <li>「ChatGPT を開く」で新しいチャットを開く（画像生成／GPT Image 対応モデル）</li>
+                          <li><span className="font-semibold">サービスのトップ画像（1枚目のサムネ）をチャットに添付</span>する</li>
+                          <li>「バナー用プロンプトをコピー」を押して、そのまま貼り付けて送信</li>
+                          <li>できた画像を保存し、Googleフォームの<span className="font-semibold">テーマをカスタマイズ（パレットのアイコン）→ ヘッダー画像</span>にアップロード</li>
+                        </ol>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={handleCopyBannerPrompt}
+                          className={`text-xs font-semibold px-5 py-2.5 rounded-full transition-colors ${copiedBannerPrompt ? 'bg-brand-50 text-brand-600' : 'bg-stone-900 text-white hover:bg-stone-700'}`}
+                        >
+                          {copiedBannerPrompt ? 'コピーしました' : 'バナー用プロンプトをコピー'}
+                        </button>
+                        <a
+                          href="https://chatgpt.com/"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(e) => { e.preventDefault(); window.open('https://chatgpt.com/', '_blank', 'noopener,noreferrer'); }}
+                          className="btn-secondary px-4 py-2.5 text-xs"
+                        >
+                          ChatGPT を開く
+                        </a>
+                      </div>
+                    </div>
                   </>
                 )}
                 <div className="pb-6"></div>
