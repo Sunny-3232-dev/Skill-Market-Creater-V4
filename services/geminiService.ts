@@ -1,6 +1,6 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
-import { UserInput, SkillIdea, SurveyPattern, ThumbnailPromptVersion, SlideImagePrompt } from "../types";
+import { UserInput, SkillIdea, SurveyPattern, ThumbnailPromptVersion, SlideImagePrompt, FlyerContent, MultiFlyerContent } from "../types";
 
 const generateUniqueId = (): string => {
   return crypto.randomUUID();
@@ -587,6 +587,16 @@ const CHATGPT_STYLE_OVERRIDES: Partial<Record<ThumbnailPromptVersion, string>> =
 `,
 };
 
+// チャットに貼る単発プロンプト用のトンマナ指定を解決する。
+// ai_auto はサービス専用トンマナがあればそれを優先し、無ければ汎用指定にフォールバックする。
+const resolveChatToneSpec = (
+  toneVersion: ThumbnailPromptVersion,
+  autoStyle?: string
+): string =>
+  (toneVersion === 'ai_auto' && autoStyle && autoStyle.trim())
+    ? autoStyle.trim()
+    : (CHATGPT_STYLE_OVERRIDES[toneVersion] ?? SLIDE_STYLE_DIRECTIVES[toneVersion]);
+
 // 1枚分の中身＋選択トンマナから、ChatGPTにそのまま貼れる画像生成プロンプトを組み立てる。
 // ★改善点：共通デザイン仕様（画風・配色・書体・世界観）は毎回明記して統一する一方、
 //   レイアウト構成は各ページの役割に最適化させ、「前と同じ版面のコピー」を明確に禁止する。
@@ -597,9 +607,7 @@ export const buildSlideImagePromptText = (
   // ai_auto のとき、generateAutoSlideStyle が作ったサービス専用トンマナを差し込む
   autoStyle?: string
 ): string => {
-  const designSpec = (toneVersion === 'ai_auto' && autoStyle && autoStyle.trim())
-    ? autoStyle.trim()
-    : (CHATGPT_STYLE_OVERRIDES[toneVersion] ?? SLIDE_STYLE_DIRECTIVES[toneVersion]);
+  const designSpec = resolveChatToneSpec(toneVersion, autoStyle);
   const roleLabel = SLIDE_ROLE_LABELS[slide.role] ?? `${slide.no}枚目`;
   const layout = SLIDE_ROLE_LAYOUTS[slide.role] ?? 'このページの内容に合った、読みやすいレイアウトにする。';
 
@@ -1364,3 +1372,274 @@ export const getFormBannerPrompt = (formTitle: string): string => `ChatGPTの画
 ・購入後のお客様への「お願い＋感謝」のバナーなので、宣伝感のない、やわらかく丁寧なトーンにする。
 ・文字はすべて日本語で、スマホの小さな画面でもくっきり読めるように描く。
 ・マークダウン記号（#、* など）は画像に出さない。`;
+
+// ===== チラシ（紙に印刷して配って認知を広げる）用 =====
+// スライド資料と同じ考え方で、「紙に載せる文言」はAIに作らせ、
+// トンマナ（画風）と紙面ルールはクライアント側でプロンプトに差し込む。
+
+/** サービス本文から、A4たてのチラシ1枚に印刷する文言を作る。 */
+export const generateFlyerContent = async (serviceBody: string): Promise<FlyerContent | null> => {
+  const body = serviceBody?.trim();
+  if (!body) return null;
+  const apiKey = getApiKey();
+  const ai = new GoogleGenAI(apiKey ? { apiKey } : {});
+
+  const prompt = `
+あなたは紙のチラシ（A4たて）を設計するコピーライターです。
+以下のサービス本文をもとに、チラシ1枚に印刷する文言を作成してください。
+受け取るのはこのサービスをまだ知らない人です。手に取って5秒で「誰の、どんな困りごとを解決するのか」が伝わることを最優先にしてください。
+
+【ルール】
+- 本文に書かれている情報だけを使う。創作・誇張はしない。
+- 紙は文字を詰め込めない。下の文字数の目安を必ず守り、短く言い切る。
+- 読んだ人が自分のことだと感じる言い回しにする。体言止めばかりにしない。
+- マークダウン記法（#、* など）と絵文字は使わない。
+- 電話番号・メールアドレス・URL・氏名は書かない（配る本人があとで手を入れる）。
+
+【各項目の目安】
+- headline：いちばん大きく出す見出し。20文字以内。ターゲットの困りごとか、得られる結果を言う。サービス名をそのまま置かない。
+- subCopy：見出しを補う一言。30文字以内。
+- problems：「こんなことで困っていませんか」の箇条書き。3〜4個、各20文字以内。
+- benefits：このサービスでできること。3〜4個、各20文字以内。
+- forWhom：こんな方におすすめ。2〜3個、各20文字以内。
+- flow：依頼から納品までの流れ。3〜4ステップ、各12文字以内。ステップ番号は付けない。
+- price：本文に価格の記載があれば「3,000円〜」のように短く書く。記載が無ければ空文字にする。
+- cta：最後に置く、行動をうながす一言。20文字以内。
+
+【サービス本文】
+${body.slice(0, 4000)}
+`;
+
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-3.5-flash',
+      contents: prompt,
+      config: {
+        responseMimeType: 'application/json',
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            headline: { type: Type.STRING },
+            subCopy: { type: Type.STRING },
+            problems: { type: Type.ARRAY, items: { type: Type.STRING } },
+            benefits: { type: Type.ARRAY, items: { type: Type.STRING } },
+            forWhom: { type: Type.ARRAY, items: { type: Type.STRING } },
+            flow: { type: Type.ARRAY, items: { type: Type.STRING } },
+            price: { type: Type.STRING },
+            cta: { type: Type.STRING },
+          },
+          required: ['headline', 'subCopy', 'problems', 'benefits', 'forWhom', 'flow', 'price', 'cta'],
+        },
+      },
+    });
+    const parsed = JSON.parse(response.text || '{}');
+    const list = (v: any): string[] => (Array.isArray(v) ? v.map((x: any) => String(x).trim()).filter(Boolean) : []);
+    const content: FlyerContent = {
+      headline: String(parsed.headline || '').trim(),
+      subCopy: String(parsed.subCopy || '').trim(),
+      problems: list(parsed.problems),
+      benefits: list(parsed.benefits),
+      forWhom: list(parsed.forWhom),
+      flow: list(parsed.flow),
+      price: String(parsed.price || '').trim(),
+      cta: String(parsed.cta || '').trim(),
+    };
+    return content.headline ? content : null;
+  } catch {
+    return null;
+  }
+};
+
+/** 複数サービスを1枚にまとめるチラシの文言を作る。 */
+export const generateMultiFlyerContent = async (
+  services: Array<{ title: string; body: string }>
+): Promise<MultiFlyerContent | null> => {
+  const targets = services.filter(s => s.body?.trim());
+  if (targets.length === 0) return null;
+  const apiKey = getApiKey();
+  const ai = new GoogleGenAI(apiKey ? { apiKey } : {});
+
+  const serviceBlocks = targets
+    .map((s, i) => `【サービス${i + 1}：${s.title || '（名称未登録）'}】\n${s.body.trim().slice(0, 1500)}`)
+    .join('\n\n');
+
+  const prompt = `
+あなたは紙のチラシ（A4たて）を設計するコピーライターです。
+同じ出品者が提供する${targets.length}つのサービスを、1枚のチラシにまとめて紹介します。その文言を作成してください。
+受け取るのはこの出品者をまだ知らない人です。「この人には何を頼めるのか」が一目で分かることを最優先にしてください。
+
+【ルール】
+- 各サービスの本文に書かれている情報だけを使う。創作・誇張はしない。
+- items は、下に並んだサービス${targets.length}件と同じ順番・同じ件数で作る。増やしても減らしてもいけない。
+- 紙は文字を詰め込めない。下の文字数の目安を必ず守り、短く言い切る。
+- マークダウン記法（#、* など）と絵文字は使わない。
+- 電話番号・メールアドレス・URL・氏名は書かない（配る本人があとで手を入れる）。
+
+【各項目の目安】
+- headline：${targets.length}つのサービスを束ねる見出し。20文字以内。個々のサービス名ではなく、この出品者に頼めることの共通点を言う。
+- subCopy：見出しを補う一言。30文字以内。
+- items[].title：枠の見出し。サービス名を15文字以内に短くする。意味が変わる省略はしない。
+- items[].oneLiner：何をしてくれるサービスかの1行。25文字以内。
+- items[].forWhom：どんな人向けか。15文字以内。
+- items[].price：本文に価格の記載があれば「3,000円〜」のように短く。記載が無ければ空文字。
+- cta：最後に置く、行動をうながす一言。20文字以内。
+
+${serviceBlocks}
+`;
+
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-3.5-flash',
+      contents: prompt,
+      config: {
+        responseMimeType: 'application/json',
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            headline: { type: Type.STRING },
+            subCopy: { type: Type.STRING },
+            items: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  title: { type: Type.STRING },
+                  oneLiner: { type: Type.STRING },
+                  forWhom: { type: Type.STRING },
+                  price: { type: Type.STRING },
+                },
+                required: ['title', 'oneLiner', 'forWhom', 'price'],
+              },
+            },
+            cta: { type: Type.STRING },
+          },
+          required: ['headline', 'subCopy', 'items', 'cta'],
+        },
+      },
+    });
+    const parsed = JSON.parse(response.text || '{}');
+    const items = Array.isArray(parsed.items)
+      ? parsed.items.map((it: any) => ({
+          title: String(it?.title || '').trim(),
+          oneLiner: String(it?.oneLiner || '').trim(),
+          forWhom: String(it?.forWhom || '').trim(),
+          price: String(it?.price || '').trim(),
+        })).filter((it: any) => it.title)
+      : [];
+    if (items.length === 0) return null;
+    return {
+      headline: String(parsed.headline || '').trim(),
+      subCopy: String(parsed.subCopy || '').trim(),
+      items,
+      cta: String(parsed.cta || '').trim(),
+    };
+  } catch {
+    return null;
+  }
+};
+
+// 紙に印刷して配ることが前提。画面で見る画像との違い（余白・文字の太さ・QRの扱い）をここで縛る。
+const FLYER_PRINT_RULES = `■ 紙に印刷して配る前提のルール（必ず守る）
+・出力は1枚の画像。A4のたて長（比率およそ1:1.41）で作る。プレゼン資料や複数ページにはしない。
+・手に取って読む紙なので、文字は大きく太めにする。細い線・薄いグレーの文字・小さすぎる注釈は使わない。
+・紙の外周1割ほどは余白として空け、文字や主要な絵を端ギリギリに置かない（印刷のときに切れるため）。
+・視線が上から下へ素直に流れる構成にする。要素を斜めに散らしたり、読む順番が分からない配置にしない。
+・QRコードは描かないこと（読み取れない偽物になる）。かわりに右下へ、一辺が紙の幅の5分の1ほどの「白い正方形の枠」を空け、そのすぐ下に小さく「詳しくはこちら」と入れる。あとから本物のQRコードを貼るための場所。
+・URL・メールアドレス・電話番号・氏名は書かない（配る本人があとで入れる）。
+・文字はすべて日本語で、印刷してもくっきり読めるように描く。下に指定した文言だけを正確に、誤字なく入れる。勝手に文章を足さない。
+・マークダウン記号（#、* など）は画像に出さない。`;
+
+const flyerBullets = (items: string[]): string => items.map(v => `・${v}`).join('\n');
+
+/** 1サービス分のチラシプロンプトを組み立てる（ChatGPTにそのまま貼れる形）。 */
+export const buildFlyerPromptText = (
+  content: FlyerContent,
+  toneVersion: ThumbnailPromptVersion,
+  autoStyle?: string
+): string => {
+  const designSpec = resolveChatToneSpec(toneVersion, autoStyle);
+  const priceLine = content.price ? `\n【価格】\n${content.price}` : '';
+
+  return `ChatGPTの画像生成（GPT Image）で、紙に印刷して配るチラシを1枚作ります。A4たての片面チラシです。
+
+■ デザイン仕様（この仕様どおりに作る）
+${designSpec}
+
+${FLYER_PRINT_RULES}
+
+■ 紙面の構成（上から順に）
+1. 見出しとサブコピー。紙の上3分の1を使い、いちばん目立たせる。
+2. 「こんなことで困っていませんか」。チェックマークか吹き出しで並べる。
+3. 「このサービスでできること」。アイコン付きの箱で並べ、ここを紙面の主役にする。
+4. 「こんな方におすすめ」。短く、軽い見た目で。
+5. 「ご依頼の流れ」。1→2→3と矢印でつなぐ。価格の指定があればその近くで目立たせる。
+6. 行動をうながす一言。最下部に帯を敷いて置き、その右にQR用の白い正方形の枠を空ける。
+
+■ 紙に入れる文字（この文言だけを正確に）
+【見出し（いちばん大きく）】
+${content.headline}
+【サブコピー】
+${content.subCopy}
+【こんなことで困っていませんか】
+${flyerBullets(content.problems)}
+【このサービスでできること】
+${flyerBullets(content.benefits)}
+【こんな方におすすめ】
+${flyerBullets(content.forWhom)}
+【ご依頼の流れ】
+${content.flow.map((v, i) => `${i + 1}. ${v}`).join('\n')}${priceLine}
+【行動をうながす一言（最下部の帯）】
+${content.cta}`;
+};
+
+// 枠の数によって紙面の割り方を変える。全部同じグリッドにすると、2件はスカスカ、6件は窮屈になる。
+const multiFlyerLayoutHint = (count: number): string => {
+  if (count <= 2) return '2件なので、上下に大きな枠を2つ積む。1枠あたりの面積を大きく取り、写真的な装飾を添えてよい。';
+  if (count === 3) return '3件なので、たてに帯状の枠を3つ積む。横幅いっぱいを使い、左に見出し、右に説明を置く。';
+  if (count === 4) return '4件なので、2列×2段のグリッドにする。4枠の大きさは完全にそろえる。';
+  return `${count}件なので、2列のグリッドに上から詰めて並べる。枠の大きさは全てそろえ、装飾より読みやすさを優先する。`;
+};
+
+/** 複数サービスをまとめたチラシのプロンプトを組み立てる。 */
+export const buildMultiFlyerPromptText = (
+  content: MultiFlyerContent,
+  toneVersion: ThumbnailPromptVersion,
+  autoStyle?: string
+): string => {
+  const designSpec = resolveChatToneSpec(toneVersion, autoStyle);
+  const itemBlocks = content.items.map((it, i) => {
+    const lines = [
+      `［${i + 1}枠目］`,
+      `見出し：${it.title}`,
+      `1行紹介：${it.oneLiner}`,
+      `おすすめの人：${it.forWhom}`,
+    ];
+    if (it.price) lines.push(`価格：${it.price}`);
+    return lines.join('\n');
+  }).join('\n\n');
+
+  return `ChatGPTの画像生成（GPT Image）で、紙に印刷して配るチラシを1枚作ります。A4たての片面チラシで、${content.items.length}つのサービスをまとめて紹介します。
+
+■ デザイン仕様（この仕様どおりに作る）
+${designSpec}
+
+${FLYER_PRINT_RULES}
+
+■ 紙面の構成（上から順に）
+1. 見出しとサブコピー。紙の上4分の1を使い、「この人に何を頼めるのか」が一目で分かるようにする。
+2. サービス一覧。${multiFlyerLayoutHint(content.items.length)}
+   各枠には「見出し／1行紹介／おすすめの人／価格」を、全ての枠で同じ配置・同じ文字の大きさで入れる。
+   枠ごとに色や形を変えて散らかさない。区別はアイコンか差し色の1点だけにする。
+3. 行動をうながす一言。最下部に帯を敷いて置き、その右にQR用の白い正方形の枠を空ける。
+
+■ 紙に入れる文字（この文言だけを正確に。枠の順番も下のとおりにする）
+【見出し（いちばん大きく）】
+${content.headline}
+【サブコピー】
+${content.subCopy}
+
+${itemBlocks}
+
+【行動をうながす一言（最下部の帯）】
+${content.cta}`;
+};

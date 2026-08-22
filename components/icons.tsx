@@ -33,6 +33,14 @@ export const PresentationIcon = () => (
   </svg>
 );
 
+export const FlyerIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M5 3h14a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/>
+    <path d="M8 7h8"/><path d="M8 11h5"/>
+    <rect x="13" y="14" width="5" height="5" rx="0.5"/>
+  </svg>
+);
+
 export const PinIcon: React.FC<{ filled?: boolean }> = ({ filled }) => (
   <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill={filled ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
     <path d="M12 17v5"/>

@@ -1,8 +1,8 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
-import { generatePromotion, generateSurveyPatterns, getSlideDocPrompt, extractServiceTitle, generateAutoSlideStyle, generateSlideImageContents, buildSlideImagePromptText, getFormBannerPrompt } from '../services/geminiService';
+import { generatePromotion, generateSurveyPatterns, getSlideDocPrompt, extractServiceTitle, generateAutoSlideStyle, generateSlideImageContents, buildSlideImagePromptText, getFormBannerPrompt, generateFlyerContent, generateMultiFlyerContent, buildFlyerPromptText, buildMultiFlyerPromptText } from '../services/geminiService';
 import { extractWords } from '../utils/textProcessing';
-import { SkillIdea, SurveyPattern, SurveyQuestionDef, ThumbnailPromptVersion, SlideImagePrompt } from '../types';
-import { MegaphoneIcon, ClipboardListIcon, PresentationIcon, SparkleIcon } from './icons';
+import { SkillIdea, SurveyPattern, SurveyQuestionDef, ThumbnailPromptVersion, SlideImagePrompt, FlyerContent, MultiFlyerContent } from '../types';
+import { MegaphoneIcon, ClipboardListIcon, PresentationIcon, SparkleIcon, FlyerIcon } from './icons';
 import { PromptPreview } from './promptPreviews';
 import LoadingOverlay from './LoadingOverlay';
 import TweetCard, { TweetPost } from './support/TweetCard';
@@ -19,7 +19,7 @@ interface SupportHubProps {
   onGoToLearn: () => void;
 }
 
-type MenuId = 'promoter' | 'survey' | 'slidedoc';
+type MenuId = 'promoter' | 'survey' | 'slidedoc' | 'flyer';
 
 // URLから取得して登録した自分の出品済みサービス
 interface RegisteredService {
@@ -32,6 +32,8 @@ interface RegisteredService {
 
 const SKILL_URL_PATTERN = /^https:\/\/skill\.libecity\.com\/services\/\d+/;
 const MAX_REGISTERED_SERVICES = 10;
+// まとめチラシ1枚に載せられる件数。増やすほど1件あたりが小さくなり、配っても読まれない。
+const MAX_MULTI_FLYER = 6;
 
 const STORAGE_KEY = 'skill_market_support_v1';
 const CREATOR_IDEAS_KEY = 'skill_market_ideas';
@@ -102,6 +104,47 @@ const SectionLabel: React.FC<{ label: string }> = ({ label }) => (
 // 絵文字が単独行になるのを防ぐ：
 //  1) 絵文字だけの行は直前の文末にくっつけて戻す
 //  2) 「。」での改行は、直後が絵文字だけで行末になる場合は割らない（文末絵文字を残す）
+// トンマナ（画風）を見本つきで選ぶグリッド。スライド資料とチラシで共用する。
+const ToneGrid: React.FC<{
+  value: ThumbnailPromptVersion;
+  onChange: (v: ThumbnailPromptVersion) => void;
+  className?: string;
+}> = ({ value, onChange, className = '' }) => (
+  <div className={`grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 ${className}`}>
+    {SLIDE_DOC_VERSIONS.map(({ id, label }) => {
+      const isActive = value === id;
+      return (
+        <button
+          key={id}
+          type="button"
+          onClick={() => onChange(id)}
+          aria-pressed={isActive}
+          title={label}
+          className={`relative rounded-xl border p-2 text-left transition-all ${
+            isActive ? 'border-brand-400 ring-2 ring-brand-100 bg-brand-50/40' : 'border-stone-200 bg-white hover:border-brand-200'
+          }`}
+        >
+          <PromptPreview version={id} badge="トンマナ見本" className="w-full rounded-lg border border-stone-100" />
+          <div className="flex items-center gap-1.5 mt-2 px-0.5">
+            <span className={`shrink-0 w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center ${isActive ? 'border-brand-500' : 'border-stone-300'}`}>
+              {isActive && <span className="w-1.5 h-1.5 rounded-full bg-brand-500"></span>}
+            </span>
+            <span className="text-xs font-semibold text-stone-800 leading-tight">{label}</span>
+          </div>
+        </button>
+      );
+    })}
+  </div>
+);
+
+// チラシの文言を、コピー前に「紙に何が載るか」として下読みするための行。
+const FlyerPreviewRow: React.FC<{ label: string; children: React.ReactNode }> = ({ label, children }) => (
+  <div className="flex flex-col sm:flex-row sm:gap-4 py-2 border-b border-stone-100 last:border-b-0">
+    <span className="text-[11px] font-semibold text-stone-400 sm:w-24 shrink-0 pt-0.5">{label}</span>
+    <div className="text-xs text-stone-700 leading-relaxed min-w-0">{children}</div>
+  </div>
+);
+
 const EMOJI_CLASS = '\\p{Extended_Pictographic}\\uFE0F\\u200D';
 const formatTweet = (raw: string): string => {
   // 1) 絵文字だけの行を直前の行末に結合
@@ -159,11 +202,14 @@ interface ResultsBundle {
   autoStyleDirective: string;
   /** ChatGPTで1枚ずつ作るための画像別の中身（未生成なら空配列） */
   slidePrompts: SlideImagePrompt[];
+  /** このサービス1枚分のチラシ文言（未生成なら null） */
+  flyerContent: FlyerContent | null;
 }
 
 const EMPTY_RESULTS: ResultsBundle = {
   posts: [], patterns: [], patternsOriginal: [], selectedPatternId: null,
   showCode: false, slideDocReady: false, activeMenu: null, autoStyleDirective: '', slidePrompts: [],
+  flyerContent: null,
 };
 
 interface PersistedState {
@@ -182,6 +228,12 @@ interface PersistedState {
   registeredServices: RegisteredService[];
   selectedServiceId: string | null;
   resultsByServiceId: Record<string, ResultsBundle>;
+  flyerContent: FlyerContent | null;
+  flyerMode: 'single' | 'multi';
+  flyerVersion: ThumbnailPromptVersion;
+  // まとめチラシはサービスをまたぐので、サービス別バケットではなく全体で1つ持つ
+  multiFlyerIds: string[];
+  multiFlyerContent: MultiFlyerContent | null;
 }
 
 const loadPersisted = (): Partial<PersistedState> => {
@@ -226,6 +278,16 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
   );
   const [isSlideGenLoading, setIsSlideGenLoading] = useState(false);
   const [copiedSlideNo, setCopiedSlideNo] = useState<number | null>(null);
+
+  // チラシ（紙に印刷して配る）
+  const [flyerContent, setFlyerContent] = useState<FlyerContent | null>(init.flyerContent ?? null);
+  const [flyerMode, setFlyerMode] = useState<'single' | 'multi'>(init.flyerMode ?? 'single');
+  const [flyerVersion, setFlyerVersion] = useState<ThumbnailPromptVersion>(init.flyerVersion ?? 'ai_auto');
+  const [multiFlyerIds, setMultiFlyerIds] = useState<string[]>(Array.isArray(init.multiFlyerIds) ? init.multiFlyerIds : []);
+  const [multiFlyerContent, setMultiFlyerContent] = useState<MultiFlyerContent | null>(init.multiFlyerContent ?? null);
+  const [isMultiFlyerLoading, setIsMultiFlyerLoading] = useState(false);
+  const [copiedFlyer, setCopiedFlyer] = useState(false);
+  const [copiedMultiFlyer, setCopiedMultiFlyer] = useState(false);
 
   // 出品済みサービスのURL登録
   const [registeredServices, setRegisteredServices] = useState<RegisteredService[]>(
@@ -274,12 +336,13 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
         posts, patterns, patternsOriginal, selectedPatternId, showCode, slideDocReady,
         autoStyleDirective, slideMode, slideVersion, slidePrompts,
         registeredServices, selectedServiceId, resultsByServiceId,
+        flyerContent, flyerMode, flyerVersion, multiFlyerIds, multiFlyerContent,
       };
       localStorage.setItem(STORAGE_KEY, JSON.stringify(s));
     } catch (e) {
       console.warn('Failed to save support state', e);
     }
-  }, [serviceBody, activeMenu, posts, patterns, patternsOriginal, selectedPatternId, showCode, slideDocReady, autoStyleDirective, slideMode, slideVersion, slidePrompts, registeredServices, selectedServiceId, resultsByServiceId]);
+  }, [serviceBody, activeMenu, posts, patterns, patternsOriginal, selectedPatternId, showCode, slideDocReady, autoStyleDirective, slideMode, slideVersion, slidePrompts, registeredServices, selectedServiceId, resultsByServiceId, flyerContent, flyerMode, flyerVersion, multiFlyerIds, multiFlyerContent]);
 
   // ---- サービスごとの生成物を保存: 表示中の結果を選択中サービスのバケットへ同期 ----
   useEffect(() => {
@@ -288,9 +351,9 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
     if (loadedServiceRef.current !== selectedServiceId) return;
     setResultsByServiceId(prev => ({
       ...prev,
-      [selectedServiceId]: { posts, patterns, patternsOriginal, selectedPatternId, showCode, slideDocReady, activeMenu, autoStyleDirective, slidePrompts },
+      [selectedServiceId]: { posts, patterns, patternsOriginal, selectedPatternId, showCode, slideDocReady, activeMenu, autoStyleDirective, slidePrompts, flyerContent },
     }));
-  }, [posts, patterns, patternsOriginal, selectedPatternId, showCode, slideDocReady, activeMenu, autoStyleDirective, slidePrompts, selectedServiceId]);
+  }, [posts, patterns, patternsOriginal, selectedPatternId, showCode, slideDocReady, activeMenu, autoStyleDirective, slidePrompts, flyerContent, selectedServiceId]);
 
   // ---- アンケートカードのヘッダー高さ同期 ----
   const surveyHeaderRefs = useRef<(HTMLDivElement | null)[]>([]);
@@ -443,6 +506,7 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
     setErrorMenu(null);
     setAutoStyleDirective('');
     setSlidePrompts([]);
+    setFlyerContent(null);
   };
 
   // 保存済みバケットを画面（表示中の結果）に反映する
@@ -458,6 +522,7 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
     setErrorMenu(null);
     setAutoStyleDirective(r.autoStyleDirective ?? '');
     setSlidePrompts(Array.isArray(r.slidePrompts) ? r.slidePrompts : []);
+    setFlyerContent(r.flyerContent ?? null);
   };
 
   const handleSelectService = (sv: RegisteredService) => {
@@ -481,8 +546,12 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
     }
     // 内容が更新されたら、その本文由来の生成物（宣伝文・アンケート・スライド資料）は
     // 古くなるので初期化する。選択中サービスのバケットも保存effect経由で空になる。
-    const hasAnyResult = posts.length > 0 || patterns.length > 0 || slideDocReady || activeMenu !== null || autoStyleDirective !== '' || slidePrompts.length > 0;
+    const hasAnyResult = posts.length > 0 || patterns.length > 0 || slideDocReady || activeMenu !== null || autoStyleDirective !== '' || slidePrompts.length > 0 || flyerContent !== null;
     if (changed && hasAnyResult) resetGeneratedResults();
+    // まとめチラシに載せているサービスの本文が変わったら、その文言も古くなる
+    if (changed && multiFlyerContent && selectedServiceId && multiFlyerIds.includes(selectedServiceId)) {
+      setMultiFlyerContent(null);
+    }
   };
 
   // 貼り付けた本文からGeminiでサービス名を認識し、カード（ラジオボタンの右）に確定表示する
@@ -510,6 +579,11 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
 
   const handleRemoveRegistered = (id: string) => {
     setRegisteredServices(prev => prev.filter(sv => sv.id !== id));
+    // まとめチラシの選択に入っていたら、選択と生成済みの文言を破棄する
+    if (multiFlyerIds.includes(id)) {
+      setMultiFlyerIds(prev => prev.filter(x => x !== id));
+      setMultiFlyerContent(null);
+    }
     // そのサービスの保存済み生成物も破棄
     setResultsByServiceId(prev => {
       if (!(id in prev)) return prev;
@@ -598,6 +672,105 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
     }
   };
 
+  // ---- チラシ（紙に印刷して配る） ----
+  // 「作成する」で、このサービス1枚分の文言を作る。
+  // AIおまかせ用のトンマナは資料メニューと共用なので、未設計のときだけここで一緒に作る。
+  const handleRunFlyer = async () => {
+    if (!hasInput) return;
+    const keyReady = await ensureKeySet();
+    if (!keyReady) return;
+
+    const token = ++runTokenRef.current;
+    setIsLoading(true);
+    setLoadingMenu('flyer');
+    setErrorMenu(null);
+    try {
+      const [content, auto] = await Promise.all([
+        generateFlyerContent(serviceBody),
+        autoStyleDirective ? Promise.resolve(autoStyleDirective) : generateAutoSlideStyle(serviceBody),
+      ]);
+      if (token !== runTokenRef.current) return; // キャンセル済み
+      if (!content) {
+        setErrorMenu('flyer');
+        notify('チラシの文言を作れませんでした。本文を増やして再度お試しください。', 'error');
+        return;
+      }
+      setFlyerContent(content);
+      if (!autoStyleDirective && auto.trim()) setAutoStyleDirective(auto.trim());
+      setFlyerMode('single');
+      setCopiedFlyer(false);
+      setActiveMenu('flyer');
+      setTimeout(scrollToResults, 100);
+    } catch (error) {
+      if (token !== runTokenRef.current) return;
+      setErrorMenu('flyer');
+      onHandleApiError(error);
+    } finally {
+      if (token === runTokenRef.current) {
+        setIsLoading(false);
+        setLoadingMenu(null);
+      }
+    }
+  };
+
+  // まとめチラシに載せるサービスの選び直し。組み合わせが変われば文言は作り直しになる。
+  const toggleMultiFlyerId = (id: string) => {
+    const has = multiFlyerIds.includes(id);
+    if (!has && multiFlyerIds.length >= MAX_MULTI_FLYER) {
+      notify(`1枚に載せられるのは${MAX_MULTI_FLYER}件までです。`, 'error');
+      return;
+    }
+    setMultiFlyerIds(has ? multiFlyerIds.filter(x => x !== id) : [...multiFlyerIds, id]);
+    setMultiFlyerContent(null);
+    setCopiedMultiFlyer(false);
+  };
+
+  // 選んだサービスをまとめて1枚に載せる文言を作る（並び順は登録順に合わせる）
+  const handleGenerateMultiFlyer = async () => {
+    const targets = registeredServices.filter(sv => multiFlyerIds.includes(sv.id) && sv.content.trim());
+    if (targets.length < 2) return;
+    const keyReady = await ensureKeySet();
+    if (!keyReady) return;
+
+    setIsMultiFlyerLoading(true);
+    try {
+      const data = await generateMultiFlyerContent(targets.map(sv => ({ title: sv.title, body: sv.content })));
+      if (!data) {
+        notify('まとめチラシの文言を作れませんでした。各サービスの本文が登録されているか確認してください。', 'error');
+        return;
+      }
+      setMultiFlyerContent(data);
+      setCopiedMultiFlyer(false);
+      setActiveMenu('flyer');
+    } catch (error) {
+      onHandleApiError(error);
+    } finally {
+      setIsMultiFlyerLoading(false);
+    }
+  };
+
+  const handleCopyFlyerPrompt = () => {
+    if (!flyerContent) return;
+    const text = buildFlyerPromptText(
+      flyerContent, flyerVersion,
+      flyerVersion === 'ai_auto' ? autoStyleDirective : undefined
+    );
+    navigator.clipboard.writeText(text).then(() => {
+      setCopiedFlyer(true);
+      setTimeout(() => setCopiedFlyer(false), 2000);
+    });
+  };
+
+  // まとめチラシは複数サービスにまたがるため、1サービス専用トンマナは渡さない（汎用のおまかせ指定になる）
+  const handleCopyMultiFlyerPrompt = () => {
+    if (!multiFlyerContent) return;
+    const text = buildMultiFlyerPromptText(multiFlyerContent, flyerVersion);
+    navigator.clipboard.writeText(text).then(() => {
+      setCopiedMultiFlyer(true);
+      setTimeout(() => setCopiedMultiFlyer(false), 2000);
+    });
+  };
+
   // コピー時に、選択トンマナ（＋AIおまかせの専用トンマナ）を差し込んでプロンプトを組み立てる
   const handleCopySlidePrompt = (slide: SlideImagePrompt) => {
     const text = buildSlideImagePromptText(
@@ -654,6 +827,8 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
     setSelectedServiceId(null);
     resetGeneratedResults();
     setResultsByServiceId({}); // サービスごとの保存済み生成物も全消去
+    setMultiFlyerIds([]);
+    setMultiFlyerContent(null);
     setShowClearConfirm(false);
   };
 
@@ -666,6 +841,7 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
     promoter: handleRunPromoter,
     survey: handleRunSurvey,
     slidedoc: handleRunSlideDoc,
+    flyer: handleRunFlyer,
   };
 
   const supportMenus = [
@@ -686,6 +862,14 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
       onRun: handleRunSlideDoc,
     },
     {
+      id: 'flyer' as MenuId,
+      title: 'チラシを作る（検証中）',
+      description: '紙に印刷して配るチラシのプロンプトを用意。1サービス分と、複数をまとめた1枚の2種類が作れます。',
+      highlight: 'A4たて・印刷向け',
+      icon: <FlyerIcon />,
+      onRun: handleRunFlyer,
+    },
+    {
       id: 'survey' as MenuId,
       title: 'アンケートを作る',
       description: '購入者の声を集めるGoogleフォームを自動設計。価格印象などもサービス情報から自動反映します。',
@@ -699,6 +883,7 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
   const resultTabs = [
     posts.length > 0 && { id: 'promoter' as MenuId, label: `宣伝文 ${posts.length}本` },
     slideDocReady && { id: 'slidedoc' as MenuId, label: 'スライド資料' },
+    (flyerContent || multiFlyerContent) && { id: 'flyer' as MenuId, label: 'チラシ（検証中）' },
     patterns.length > 0 && { id: 'survey' as MenuId, label: 'アンケート 3案' },
   ].filter(Boolean) as Array<{ id: MenuId; label: string }>;
 
@@ -893,7 +1078,7 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
             <div className="h-px bg-stone-200 flex-grow"></div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {supportMenus.map((menu) => {
               const hasResult = resultTabs.some(t => t.id === menu.id);
               const isBusy = loadingMenu === menu.id;
@@ -1094,31 +1279,7 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
                   </div>
 
                   {/* トンマナ選択（サンプル画像ボタン。NotebookLMと同じ8種） */}
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 mb-3">
-                    {SLIDE_DOC_VERSIONS.map(({ id, label }) => {
-                      const isActive = slideVersion === id;
-                      return (
-                        <button
-                          key={id}
-                          type="button"
-                          onClick={() => setSlideVersion(id)}
-                          aria-pressed={isActive}
-                          title={label}
-                          className={`relative rounded-xl border p-2 text-left transition-all ${
-                            isActive ? 'border-brand-400 ring-2 ring-brand-100 bg-brand-50/40' : 'border-stone-200 bg-white hover:border-brand-200'
-                          }`}
-                        >
-                          <PromptPreview version={id} badge="トンマナ見本" className="w-full rounded-lg border border-stone-100" />
-                          <div className="flex items-center gap-1.5 mt-2 px-0.5">
-                            <span className={`shrink-0 w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center ${isActive ? 'border-brand-500' : 'border-stone-300'}`}>
-                              {isActive && <span className="w-1.5 h-1.5 rounded-full bg-brand-500"></span>}
-                            </span>
-                            <span className="text-xs font-semibold text-stone-800 leading-tight">{label}</span>
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
+                  <ToneGrid value={slideVersion} onChange={setSlideVersion} className="mb-3" />
                   <p className="text-[11px] text-stone-400 mb-4">
                     選んだトンマナはコピーに即反映されます（切り替えても作り直しは不要）。
                     {slideVersion === 'ai_auto' && (autoStyleDirective ? '「AIおまかせ」はこのサービス専用に設計済みのトンマナを使います。' : '「AIおまかせ」は汎用のおまかせ指定になります（専用設計は「作成する」で行われます）。')}
@@ -1196,6 +1357,177 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
                   )}
                 </div>
                 )}
+              </div>
+            )}
+
+            {/* Flyer Results */}
+            {shownMenu === 'flyer' && (flyerContent || multiFlyerContent) && (
+              <div>
+                <div className="mb-5">
+                  <h3 className="text-lg font-bold text-stone-900">チラシをつくる（検証中）</h3>
+                  <p className="text-xs text-stone-500 mt-1">
+                    紙に印刷して配るためのプロンプトです。ChatGPTの画像生成（GPT Image）に貼ると、A4たてのチラシが1枚出てきます。
+                    <span className="font-medium text-stone-600">QRコードは画像生成では作れない</span>ため、あとから貼れるように右下の余白を空ける指示にしています。
+                  </p>
+                </div>
+
+                {/* 作り方の切り替え */}
+                <div className="flex flex-wrap gap-2 mb-6">
+                  <button type="button" onClick={() => setFlyerMode('single')} aria-pressed={flyerMode === 'single'} className={`px-4 py-2 text-xs ${flyerMode === 'single' ? 'seg-active' : 'seg'}`}>このサービスで1枚</button>
+                  <button type="button" onClick={() => setFlyerMode('multi')} aria-pressed={flyerMode === 'multi'} className={`px-4 py-2 text-xs ${flyerMode === 'multi' ? 'seg-active' : 'seg'}`}>複数まとめて1枚</button>
+                </div>
+
+                {/* トンマナ選択（スライド資料と同じ8種） */}
+                <div className="mb-3">
+                  <h4 className="text-base font-bold text-stone-900">トンマナを選ぶ</h4>
+                  <p className="text-xs text-stone-500 mt-1">
+                    サービス画像やスライド資料と同じトンマナにしておくと、紙で見た人がSNSやサービスページで再会したときに同じ出品者だと気づきます。
+                  </p>
+                </div>
+                <ToneGrid value={flyerVersion} onChange={setFlyerVersion} className="mb-3" />
+                <p className="text-[11px] text-stone-400 mb-6">
+                  選んだトンマナはコピーに即反映されます（切り替えても作り直しは不要）。
+                  {flyerVersion === 'ai_auto' && (flyerMode === 'multi'
+                    ? '「AIおまかせ」は、まとめチラシに載せる内容全体からChatGPT側で判断させます。'
+                    : (autoStyleDirective
+                      ? '「AIおまかせ」はこのサービス専用に設計済みのトンマナを使います。'
+                      : '「AIおまかせ」は汎用のおまかせ指定になります。'))}
+                </p>
+
+                {/* このサービスで1枚 */}
+                {flyerMode === 'single' && (
+                  flyerContent ? (
+                    <>
+                      <div className="card p-5 mb-4">
+                        <FlyerPreviewRow label="見出し"><span className="text-sm font-bold text-stone-900">{flyerContent.headline}</span></FlyerPreviewRow>
+                        <FlyerPreviewRow label="サブコピー">{flyerContent.subCopy}</FlyerPreviewRow>
+                        <FlyerPreviewRow label="お困りごと">{flyerContent.problems.join(' ／ ')}</FlyerPreviewRow>
+                        <FlyerPreviewRow label="できること">{flyerContent.benefits.join(' ／ ')}</FlyerPreviewRow>
+                        <FlyerPreviewRow label="おすすめ">{flyerContent.forWhom.join(' ／ ')}</FlyerPreviewRow>
+                        <FlyerPreviewRow label="ご依頼の流れ">{flyerContent.flow.map((f, i) => `${i + 1}. ${f}`).join(' → ')}</FlyerPreviewRow>
+                        {flyerContent.price && <FlyerPreviewRow label="価格">{flyerContent.price}</FlyerPreviewRow>}
+                        <FlyerPreviewRow label="最後の一言">{flyerContent.cta}</FlyerPreviewRow>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2 mb-8">
+                        <button type="button" onClick={handleCopyFlyerPrompt} className="btn-dark px-6 py-2.5 text-xs">
+                          {copiedFlyer ? 'コピーしました' : 'プロンプトをコピー'}
+                        </button>
+                        <a
+                          href="https://chatgpt.com/"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(e) => { e.preventDefault(); window.open('https://chatgpt.com/', '_blank', 'noopener,noreferrer'); }}
+                          className="btn-secondary px-4 py-2.5 text-xs"
+                        >
+                          ChatGPT を開く
+                        </a>
+                      </div>
+                    </>
+                  ) : (
+                    <p className="text-sm text-stone-500 mb-8">上のメニューの「チラシを作る」から、選択中のサービスのチラシ文言を作ってください。</p>
+                  )
+                )}
+
+                {/* 複数まとめて1枚 */}
+                {flyerMode === 'multi' && (
+                  <>
+                    <div className="card p-5 mb-4">
+                      <h4 className="text-sm font-semibold text-stone-700 mb-1">1枚に載せるサービスを選ぶ</h4>
+                      <p className="text-xs text-stone-500 mb-3">
+                        2〜{MAX_MULTI_FLYER}件まで選べます。載せる数を絞るほど1件あたりが大きくなり、手に取った人が読めます。（選択中 {multiFlyerIds.length}件）
+                      </p>
+                      {registeredServices.length === 0 ? (
+                        <p className="text-xs text-brand-600">登録済みサービスがありません。上の「登録済みサービス」から追加してください。</p>
+                      ) : (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          {registeredServices.map(sv => {
+                            const checked = multiFlyerIds.includes(sv.id);
+                            const ready = sv.content.trim().length > 0;
+                            return (
+                              <label
+                                key={sv.id}
+                                className={`flex items-start gap-2.5 rounded-xl border p-3 transition-colors ${
+                                  checked ? 'border-brand-400 bg-brand-50/40' : 'border-stone-200 bg-white hover:border-brand-200'
+                                } ${ready ? 'cursor-pointer' : 'opacity-50 cursor-not-allowed'}`}
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={checked}
+                                  disabled={!ready}
+                                  onChange={() => toggleMultiFlyerId(sv.id)}
+                                  className="mt-0.5 accent-brand-500"
+                                />
+                                <span className="min-w-0">
+                                  <span className="block text-xs font-semibold text-stone-800 truncate">{sv.title}</span>
+                                  <span className="block text-[11px] text-stone-400">{ready ? `本文 ${sv.content.trim().length}文字` : '本文が未登録'}</span>
+                                </span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      )}
+                      {registeredServices.length === 1 && (
+                        <p className="text-xs text-brand-600 mt-3">まとめチラシには2件以上の登録が必要です。</p>
+                      )}
+                      <div className="mt-4">
+                        <button
+                          type="button"
+                          onClick={handleGenerateMultiFlyer}
+                          disabled={multiFlyerIds.length < 2 || isMultiFlyerLoading}
+                          className="btn-primary px-6 py-2.5 text-xs"
+                        >
+                          {isMultiFlyerLoading ? '文言を作成中…' : (multiFlyerContent ? 'この組み合わせで作り直す' : 'まとめチラシの文言を作る')}
+                        </button>
+                      </div>
+                    </div>
+
+                    {multiFlyerContent && (
+                      <>
+                        <div className="card p-5 mb-4">
+                          <FlyerPreviewRow label="見出し"><span className="text-sm font-bold text-stone-900">{multiFlyerContent.headline}</span></FlyerPreviewRow>
+                          <FlyerPreviewRow label="サブコピー">{multiFlyerContent.subCopy}</FlyerPreviewRow>
+                          {multiFlyerContent.items.map((it, i) => (
+                            <FlyerPreviewRow key={i} label={`${i + 1}枠目`}>
+                              <span className="font-semibold text-stone-900">{it.title}</span>
+                              <span className="text-stone-500">（{it.forWhom}{it.price ? ` ／ ${it.price}` : ''}）</span>
+                              <br />{it.oneLiner}
+                            </FlyerPreviewRow>
+                          ))}
+                          <FlyerPreviewRow label="最後の一言">{multiFlyerContent.cta}</FlyerPreviewRow>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2 mb-8">
+                          <button type="button" onClick={handleCopyMultiFlyerPrompt} className="btn-dark px-6 py-2.5 text-xs">
+                            {copiedMultiFlyer ? 'コピーしました' : 'プロンプトをコピー'}
+                          </button>
+                          <a
+                            href="https://chatgpt.com/"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => { e.preventDefault(); window.open('https://chatgpt.com/', '_blank', 'noopener,noreferrer'); }}
+                            className="btn-secondary px-4 py-2.5 text-xs"
+                          >
+                            ChatGPT を開く
+                          </a>
+                        </div>
+                      </>
+                    )}
+                  </>
+                )}
+
+                {/* Usage guide */}
+                <div className="bg-stone-50 border border-stone-200/80 rounded-2xl p-6 mb-6">
+                  <h4 className="text-sm font-bold text-stone-900 mb-3">印刷して配るまでの手順</h4>
+                  <ol className="text-xs text-stone-600 space-y-2 list-decimal list-inside leading-relaxed mb-4">
+                    <li>「ChatGPT を開く」から新しいチャットを開き、コピーしたプロンプトを貼る（既存のサービス画像を先に添付すると、雰囲気をそろえやすくなります）</li>
+                    <li>出てきた画像を確認する。文字が崩れていたら「◯◯の文字が崩れているので直して」と伝えれば描き直せます</li>
+                    <li>画像を保存し、右下に空けた白い枠にサービスページのQRコードを貼る</li>
+                    <li>お名前・連絡先を入れて完成。コンビニ印刷や印刷所で刷って配りましょう</li>
+                  </ol>
+                  <p className="text-[11px] text-stone-400 leading-relaxed">
+                    生成される画像の縦横比はA4ちょうどにはなりません。印刷前にA4に合わせて余白を足すか、少し切り取って調整してください。
+                    文字は画像として描かれるので、印刷前に誤字がないか必ず自分の目で確認してください。
+                  </p>
+                </div>
               </div>
             )}
 
@@ -1337,11 +1669,14 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
               ? '困りごとに寄り添ってから、解決策をそっと添える形で。読んだ方が気持ちよく受け取れる文にしています。'
               : loadingMenu === 'slidedoc'
               ? 'サービス本文を読み取り、このサービスに合ったスライド資料のトンマナを設計しています…'
+              : loadingMenu === 'flyer'
+              ? '手に取った人が5秒で分かるように、紙に載せる文言を削り込んでいます…'
               : 'アンケート設問構成を3パターン設計しています…'
           }
           title={
             loadingMenu === 'promoter' ? '投稿のたたき台を20本用意しています'
             : loadingMenu === 'slidedoc' ? 'スライド資料のデザインを準備しています'
+            : loadingMenu === 'flyer' ? 'チラシに載せる文言を組み立てています'
             : 'アンケートを設計しています'
           }
           sourceWords={inputWords}

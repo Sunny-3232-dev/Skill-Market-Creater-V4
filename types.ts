@@ -60,3 +60,32 @@ export interface SlideImagePrompt {
   title: string; // この画像の見出し
   body: string;  // この画像に描き込む文言（改行区切り）
 }
+
+// ===== チラシ（紙に印刷して配る）用 =====
+// ChatGPTの画像生成に渡す「紙に描き込む文言」。
+// トンマナ（共通デザイン仕様）と紙面ルールはコピー時に buildFlyerPromptText で差し込む。
+export interface FlyerContent {
+  headline: string;    // 一番大きく出す見出し
+  subCopy: string;     // 見出しを補う一言
+  problems: string[];  // こんなことで困っていませんか
+  benefits: string[];  // このサービスでできること
+  forWhom: string[];   // こんな方におすすめ
+  flow: string[];      // ご依頼の流れ（1要素＝1ステップ）
+  price: string;       // 価格の表記（本文に記載が無ければ空文字）
+  cta: string;         // 行動をうながす一言
+}
+
+// まとめチラシの1枠分（1サービス＝1枠）
+export interface MultiFlyerItem {
+  title: string;     // 枠の見出し（サービス名を短くしたもの）
+  oneLiner: string;  // 何をしてくれるサービスかの1行
+  forWhom: string;   // どんな人向けか
+  price: string;     // 価格（記載が無ければ空文字）
+}
+
+export interface MultiFlyerContent {
+  headline: string;  // 全体を束ねる見出し
+  subCopy: string;   // 見出しを補う一言
+  items: MultiFlyerItem[];
+  cta: string;
+}
