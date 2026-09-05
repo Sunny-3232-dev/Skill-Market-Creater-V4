@@ -89,3 +89,13 @@ export interface MultiFlyerContent {
   items: MultiFlyerItem[];
   cta: string;
 }
+
+// 自己紹介から抽出した「出品の根拠になる事実」。出品文の信頼と実績・出品者スキルの材料。
+// 自己紹介の散文をそのまま渡すと無関係な話に引っ張られるため、行単位の事実に崩してから渡す。
+// 文体は含めない（出品文はプロフィールの口調に合わせず、ビジネス寄りの文体で書く）。
+export interface ProfileFacts {
+  career: string[];        // 経歴・仕事
+  achievements: string[];  // 実績・数字
+  skills: string[];        // 資格・スキル・ツール
+  context: string[];       // 状況・背景（稼働時間帯・顔出し可否など）
+}

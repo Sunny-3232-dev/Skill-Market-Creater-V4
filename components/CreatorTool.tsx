@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { UserInput, SkillIdea, Step } from '../types';
-import { generateIdeas, generateServicePage, extractProfileKeywords } from '../services/geminiService';
+import { UserInput, SkillIdea, Step, ProfileFacts } from '../types';
+import { generateIdeas, generateServicePage, extractProfileKeywords, extractProfileFacts } from '../services/geminiService';
 import { extractWords } from '../utils/textProcessing';
 import InputForm from './InputForm';
 import IdeaList from './IdeaList';
@@ -13,6 +13,7 @@ import { PUBLISH_SLIDES } from './learn/deckSlides';
 const STORAGE_KEY_IDEAS = "skill_market_ideas";
 const STORAGE_KEY_INPUT = "skill_market_raw_input";
 const STORAGE_KEY_KEYWORDS = "skill_market_profile_keywords";
+const STORAGE_KEY_FACTS = "skill_market_profile_facts";
 
 interface CreatorToolProps {
   ensureKeySet: () => Promise<boolean>;
@@ -33,6 +34,8 @@ const CreatorTool: React.FC<CreatorToolProps> = ({ ensureKeySet, onHandleApiErro
   const [rawInputText, setRawInputText] = useState<string>("");
   // 自己紹介から抽出した特徴キーワード（再生成バーの絞り込みチップ）
   const [profileKeywords, setProfileKeywords] = useState<string[]>([]);
+  // 自己紹介から抽出した事実リスト（出品文の根拠。文体は含めない）
+  const [profileFacts, setProfileFacts] = useState<ProfileFacts | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
   // ステップ変更時にスクロール位置を最上部にリセット
@@ -46,7 +49,14 @@ const CreatorTool: React.FC<CreatorToolProps> = ({ ensureKeySet, onHandleApiErro
     const savedIdeas = localStorage.getItem(STORAGE_KEY_IDEAS);
     const savedInput = localStorage.getItem(STORAGE_KEY_INPUT);
     const savedKeywords = localStorage.getItem(STORAGE_KEY_KEYWORDS);
+    const savedFacts = localStorage.getItem(STORAGE_KEY_FACTS);
     if (savedInput) setRawInputText(savedInput);
+    if (savedFacts) {
+      try {
+        const parsed = JSON.parse(savedFacts);
+        if (parsed && typeof parsed === 'object') setProfileFacts(parsed);
+      } catch { /* noop */ }
+    }
     if (savedKeywords) {
       try {
         const parsed = JSON.parse(savedKeywords);
@@ -90,7 +100,15 @@ const CreatorTool: React.FC<CreatorToolProps> = ({ ensureKeySet, onHandleApiErro
 
   const inputWords = useMemo(() => extractWords(rawInputText), [rawInputText]);
 
-  // 自己紹介から特徴キーワードを抽出して保存（失敗しても本流は止めない）
+  const saveFacts = (facts: ProfileFacts | null) => {
+    setProfileFacts(facts);
+    try {
+      if (facts) localStorage.setItem(STORAGE_KEY_FACTS, JSON.stringify(facts));
+      else localStorage.removeItem(STORAGE_KEY_FACTS);
+    } catch { /* noop */ }
+  };
+
+  // 自己紹介から特徴キーワードと事実リストを抽出して保存（失敗しても本流は止めない）
   const refreshKeywords = (text: string) => {
     extractProfileKeywords(text)
       .then(kws => {
@@ -98,18 +116,21 @@ const CreatorTool: React.FC<CreatorToolProps> = ({ ensureKeySet, onHandleApiErro
         try { localStorage.setItem(STORAGE_KEY_KEYWORDS, JSON.stringify(kws)); } catch { /* noop */ }
       })
       .catch(() => { /* キーワードは補助機能なので失敗は無視 */ });
+    extractProfileFacts(text)
+      .then(facts => { if (facts) saveFacts(facts); })
+      .catch(() => { /* 事実リストが無くても出品文は作れる */ });
   };
 
   // 既存ユーザー（アイデアはあるがキーワード未取得）に一度だけ補完する
   const keywordsBootstrapped = useRef(false);
   useEffect(() => {
     if (keywordsBootstrapped.current) return;
-    if (step === Step.IDEAS && rawInputText && profileKeywords.length === 0) {
+    if (step === Step.IDEAS && rawInputText && (profileKeywords.length === 0 || !profileFacts)) {
       keywordsBootstrapped.current = true;
       refreshKeywords(rawInputText);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step, rawInputText, profileKeywords.length]);
+  }, [step, rawInputText, profileKeywords.length, profileFacts]);
 
   // ピン留めしたアイデアは常に先頭に残し、新規生成分を後ろに足す（タイトル重複は除外）
   const mergeWithPinned = (existing: SkillIdea[], generated: SkillIdea[]): SkillIdea[] => {
@@ -203,7 +224,15 @@ const CreatorTool: React.FC<CreatorToolProps> = ({ ensureKeySet, onHandleApiErro
     setLoadingMessage("このアイデアの出品ページを構成しています…");
 
     try {
-      const pageText = await generateServicePage(idea);
+      // 既存ユーザーは事実リストが無いことがある。その場で1回抽出して保存する（失敗しても続行）
+      let facts = profileFacts;
+      if (!facts && rawInputText) {
+        setLoadingMessage("自己紹介から実績や経験を整理しています…（初回のみ）");
+        facts = await extractProfileFacts(rawInputText).catch(() => null);
+        if (facts) saveFacts(facts);
+        setLoadingMessage("このアイデアの出品ページを構成しています…");
+      }
+      const pageText = await generateServicePage(idea, facts);
       const updatedIdeas = ideas.map(i =>
         i.id === idea.id ? { ...i, generatedContent: pageText } : i
       );
@@ -243,10 +272,12 @@ const CreatorTool: React.FC<CreatorToolProps> = ({ ensureKeySet, onHandleApiErro
     localStorage.removeItem(STORAGE_KEY_IDEAS);
     localStorage.removeItem(STORAGE_KEY_INPUT);
     localStorage.removeItem(STORAGE_KEY_KEYWORDS);
+    localStorage.removeItem(STORAGE_KEY_FACTS);
 
     setIdeas([]);
     setRawInputText("");
     setProfileKeywords([]);
+    setProfileFacts(null);
     keywordsBootstrapped.current = false;
     setStep(Step.INPUT);
     setServiceText("");

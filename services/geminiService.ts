@@ -1,6 +1,27 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
-import { UserInput, SkillIdea, SurveyPattern, ThumbnailPromptVersion, SlideImagePrompt, FlyerContent, MultiFlyerContent } from "../types";
+import { UserInput, SkillIdea, SurveyPattern, ThumbnailPromptVersion, SlideImagePrompt, FlyerContent, MultiFlyerContent, ProfileFacts } from "../types";
+
+// モデルIDはここだけで管理する（以前は12か所に直書きされていた）。
+// 文章モデルは検証用に ?model=xxx で差し替えられ、localStorage に残る。?model=default で元に戻す。
+export const MODELS = {
+  text: 'gemini-3.5-flash',
+  image: 'gemini-2.5-flash-image',
+  imageHq: 'gemini-3-pro-image-preview',
+} as const;
+const MODEL_OVERRIDE_KEY = 'skill_market_model_override';
+export const resolveTextModel = (): string => {
+  try {
+    const fromUrl = new URLSearchParams(window.location.search).get('model');
+    if (fromUrl !== null) {
+      if (fromUrl === '' || fromUrl === 'default') localStorage.removeItem(MODEL_OVERRIDE_KEY);
+      else localStorage.setItem(MODEL_OVERRIDE_KEY, fromUrl);
+    }
+    return localStorage.getItem(MODEL_OVERRIDE_KEY) || MODELS.text;
+  } catch {
+    return MODELS.text;
+  }
+};
 
 const generateUniqueId = (): string => {
   return crypto.randomUUID();
@@ -394,7 +415,7 @@ ${body.slice(0, 4000)}
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-3.5-flash',
+      model: resolveTextModel(),
       contents: prompt,
     });
     let text = (response.text || '').trim();
@@ -530,7 +551,7 @@ ${body.slice(0, 4000)}
   let slidesRaw: Array<{ role: string; title: string; body: string }> = [];
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-3.5-flash',
+      model: resolveTextModel(),
       contents: prompt,
       config: {
         responseMimeType: 'application/json',
@@ -705,7 +726,7 @@ JSON配列で出力してください。各要素は以下のキーを持つオ�
 `;
 
   const response = await ai.models.generateContent({
-    model: 'gemini-3.5-flash',
+    model: resolveTextModel(),
     contents: prompt,
     config: {
       responseMimeType: "application/json",
@@ -756,7 +777,7 @@ ${text}
 `;
 
   const response = await ai.models.generateContent({
-    model: 'gemini-3.5-flash',
+    model: resolveTextModel(),
     contents: prompt,
     config: {
       responseMimeType: "application/json",
@@ -779,6 +800,82 @@ ${text}
 
 // 貼り付けたサービス本文から「出品タイトル」を認識して返す。
 // ページ取得ではなく手元のテキストを読むだけなので確実に動く（失敗時は空文字）。
+// 自己紹介から「出品の根拠になる事実」だけを行単位で抜き出す。プロフィール1回につき1回だけ走らせ、保存して使い回す。
+// 失敗したら null（呼び出し側は事実なしで本流を続ける）
+export const extractProfileFacts = async (rawText: string): Promise<ProfileFacts | null> => {
+  const text = rawText?.trim();
+  if (!text) return null;
+  const apiKey = getApiKey();
+  const ai = new GoogleGenAI(apiKey ? { apiKey } : {});
+
+  const prompt = `
+以下は、ある人の自己紹介・プロフィール文です。趣味や家族の話など、仕事と無関係な内容も混ざっています。
+この中から「サービスを出品するときの根拠」になる事実だけを、4つの区分に分けて箇条書きで抜き出してください。
+
+【ルール】
+- 原文に書かれていることだけを書く。推測・補完・言い換えによる誇張はしない
+- 数字（年数・件数・人数・金額）は原文のまま写す。原文に数字がなければ数字を作らない
+- 1項目は40文字以内の短い文にする
+- 該当がない区分は空の配列にする
+- 本名・住所・電話番号・メールアドレスなど個人を特定できる情報は含めない
+- 文体や口調に関する情報は含めない（出品文の文体は別に決める）
+
+【区分】
+career: 経歴・仕事（職種、業界、在籍年数、現在の立ち位置）
+achievements: 実績・数字（成果、件数、受賞、担当規模）
+skills: 資格・スキル・使えるツール
+context: 状況・背景（稼働できる時間帯、顔出し可否、対応できる形式。地域は都道府県までの粒度）
+
+【プロフィール文】
+${text.slice(0, 3000)}
+`;
+
+  try {
+    const response = await ai.models.generateContent({
+      model: resolveTextModel(),
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            career: { type: Type.ARRAY, items: { type: Type.STRING } },
+            achievements: { type: Type.ARRAY, items: { type: Type.STRING } },
+            skills: { type: Type.ARRAY, items: { type: Type.STRING } },
+            context: { type: Type.ARRAY, items: { type: Type.STRING } },
+          },
+          required: ['career', 'achievements', 'skills', 'context'],
+        },
+      },
+    });
+    const parsed = JSON.parse(response.text || "{}");
+    const clean = (v: unknown): string[] =>
+      Array.isArray(v) ? v.map(x => String(x).trim()).filter(Boolean).slice(0, 8) : [];
+    return {
+      career: clean(parsed?.career),
+      achievements: clean(parsed?.achievements),
+      skills: clean(parsed?.skills),
+      context: clean(parsed?.context),
+    };
+  } catch {
+    return null;
+  }
+};
+
+// 事実リストをプロンプトに差し込む形に整える。全区分が空なら空文字（ブロックごと省く）
+export const formatProfileFacts = (facts: ProfileFacts | null | undefined): string => {
+  if (!facts) return '';
+  const section = (label: string, items: string[]) =>
+    items.length > 0 ? `${label}：\n${items.map(i => `・${i}`).join('\n')}` : '';
+  const body = [
+    section('経歴・仕事', facts.career),
+    section('実績・数字', facts.achievements),
+    section('資格・スキル', facts.skills),
+    section('状況・背景', facts.context),
+  ].filter(Boolean).join('\n');
+  return body ? `\n【自己紹介から抽出した事実（根拠として使う）】\n${body}\n` : '';
+};
+
 export const extractServiceTitle = async (rawText: string): Promise<string> => {
   const text = rawText?.trim();
   if (!text) return '';
@@ -802,7 +899,7 @@ ${text.slice(0, 4000)}
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-3.5-flash',
+      model: resolveTextModel(),
       contents: prompt,
       config: {
         responseMimeType: "application/json",
@@ -821,7 +918,8 @@ ${text.slice(0, 4000)}
   }
 };
 
-export const generateServicePage = async (selectedIdea: SkillIdea): Promise<string> => {
+export const generateServicePage = async (selectedIdea: SkillIdea, facts?: ProfileFacts | null): Promise<string> => {
+  const factsBlock = formatProfileFacts(facts);
   const apiKey = getApiKey();
   // Google AI Studio ではセッションから自動的にキーが利用可能
   const ai = new GoogleGenAI(apiKey ? { apiKey } : {});
@@ -859,7 +957,7 @@ IT・プログラミング（作業自動化・効率化／Webアプリ／モバ
 テーマ：${selectedIdea.title}
 活かせる強み：${selectedIdea.strength}
 解決する悩み：${selectedIdea.solution}
-
+${factsBlock}
 【出力形式】
 カテゴリ：
 サブカテゴリ：
@@ -890,14 +988,17 @@ IT・プログラミング（作業自動化・効率化／Webアプリ／モバ
 ・「💰価格の目安」の直下に「■ 標準価格」「■ モニター価格」の2ブロックを必ず両方この文字列のまま出力し、同じプラン構造（単一／レンジ／複数プラン）をミラーで揃えること
 ・「■ モニター価格」ブロックには募集条件（先着○名限定・期間限定・感想をいただける方・レビュー協力など）を一切書かないこと。金額・プラン名以外の文言を入れるとUI側の動的付与と矛盾する
 ・「さいごに」の後に必ず「キャンセル時の注意事項」を配置すること
-・「出品者スキル」はサービス提供にあたって、ユーザーが入力した好き・得意・経験をもとにアピールできるスキルを箇条書きで3〜5個記載すること
+・「🌟信頼と実績」「🎯出品者スキル」は、【自己紹介から抽出した事実】のうちテーマに関係する項目だけを根拠にすること。関係のない項目は使わない。事実の提示がない場合は「活かせる強み」を根拠にする
+・「🎯出品者スキル」は箇条書きで3〜5個記載すること
+・事実にない実績・数字・資格を書かないこと。根拠が少ない場合は数字を作らず、進め方や姿勢で信頼を伝えること
+・本名・住所・連絡先など、個人が特定できる情報は書かないこと
+・文体は自己紹介の口調に合わせず、出品ページとして読みやすいビジネス寄りの丁寧な文体にすること
 ・マークダウンの書式（# や ** など）は一切使わないこと
 
 `;
 
   const response = await ai.models.generateContent({
-    //model: 'gemini-3-flash-preview',
-    model: 'gemini-3.5-flash',
+    model: resolveTextModel(),
     contents: prompt,
     config: {}
   });
@@ -954,7 +1055,7 @@ ${instruction}
 `;
 
   const response = await ai.models.generateContent({
-    model: 'gemini-3.5-flash',
+    model: resolveTextModel(),
     contents: prompt,
     config: {}
   });
@@ -1008,7 +1109,7 @@ URL: ${url}
 `;
 
   const response = await ai.models.generateContent({
-    model: 'gemini-3.5-flash',
+    model: resolveTextModel(),
     contents: prompt,
     config: {
       tools: [{ urlContext: {} }],
@@ -1038,7 +1139,7 @@ export const generateThumbnail = async (idea: SkillIdea, useHighQuality: boolean
   const ai = new GoogleGenAI(apiKey ? { apiKey } : {});
   const prompt = getThumbnailPrompt(idea, useHighQuality);
 
-  const model = useHighQuality ? 'gemini-3-pro-image-preview' : 'gemini-2.5-flash-image';
+  const model = useHighQuality ? MODELS.imageHq : MODELS.image;
   
   const config: any = {
     imageConfig: {
@@ -1137,7 +1238,7 @@ JSON配列 (string[]) で出力してください。
 `;
 
   const response = await ai.models.generateContent({
-    model: 'gemini-3.5-flash',
+    model: resolveTextModel(),
     contents: prompt,
     config: {
       responseMimeType: "application/json",
@@ -1309,7 +1410,7 @@ where SurveyPattern is:
 
 
   const response = await ai.models.generateContent({
-    model: 'gemini-3.5-flash',
+    model: resolveTextModel(),
     contents: prompt,
     config: {
       responseMimeType: "application/json",
@@ -1412,7 +1513,7 @@ ${body.slice(0, 4000)}
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-3.5-flash',
+      model: resolveTextModel(),
       contents: prompt,
       config: {
         responseMimeType: 'application/json',
@@ -1489,7 +1590,7 @@ ${serviceBlocks}
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-3.5-flash',
+      model: resolveTextModel(),
       contents: prompt,
       config: {
         responseMimeType: 'application/json',
