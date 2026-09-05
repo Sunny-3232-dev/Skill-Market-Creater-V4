@@ -168,6 +168,9 @@ const CreatorTool: React.FC<CreatorToolProps> = ({ ensureKeySet, onHandleApiErro
       const merged = mergeWithPinned(ideas, result);
       setIdeas(merged);
       saveIdeasToStorage(merged);
+      // バーは一覧の最下部にあるため、そのままだと新しいアイデアが画面の上に隠れる。先頭へ戻して結果を見せる
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      if (containerRef.current) containerRef.current.scrollTop = 0;
     } catch (error: any) {
       onHandleApiError(error);
     } finally {

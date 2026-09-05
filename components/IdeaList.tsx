@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { SkillIdea } from '../types';
 import { PinIcon, SparkleIcon } from './icons';
 
@@ -45,6 +45,28 @@ const IdeaList: React.FC<IdeaListProps> = ({ ideas, keywords = [], onSelect, onT
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [pinnedOnly, setPinnedOnly] = useState(false);
   const [regenInstruction, setRegenInstruction] = useState('');
+
+  // 作り直しバーは一覧の最下部にあり、カードが多いと画面外に隠れる。
+  // バーが見えていない間だけ画面下に追従ピルを出して、存在に気づけるようにする
+  const regenBarRef = useRef<HTMLDivElement>(null);
+  const regenInputRef = useRef<HTMLInputElement>(null);
+  const [regenBarVisible, setRegenBarVisible] = useState(true);
+
+  useEffect(() => {
+    const el = regenBarRef.current;
+    if (!el || typeof IntersectionObserver === 'undefined') return;
+    const observer = new IntersectionObserver(
+      ([entry]) => setRegenBarVisible(entry.isIntersecting),
+      { threshold: 0.2 }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [ideas.length]);
+
+  const jumpToRegenBar = () => {
+    regenInputRef.current?.focus({ preventScroll: true });
+    regenBarRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  };
 
   const pinnedCount = useMemo(() => ideas.filter(i => i.pinned).length, [ideas]);
 
@@ -221,7 +243,7 @@ const IdeaList: React.FC<IdeaListProps> = ({ ideas, keywords = [], onSelect, onT
       </p>
 
       {/* AIで作り直すバー（一覧を見終わった最下部に配置） */}
-      <div className="rounded-2xl border border-brand-100 p-5" style={{ backgroundImage: 'var(--gradient-brand-soft)' }}>
+      <div ref={regenBarRef} className="rounded-2xl border border-brand-100 p-5" style={{ backgroundImage: 'var(--gradient-brand-soft)' }}>
         <div className="flex items-center gap-2 mb-3">
           <span className="w-7 h-7 rounded-lg bg-stone-900 text-white flex items-center justify-center shrink-0">
             <SparkleIcon />
@@ -233,6 +255,7 @@ const IdeaList: React.FC<IdeaListProps> = ({ ideas, keywords = [], onSelect, onT
         </div>
         <div className="flex flex-col sm:flex-row gap-2">
           <input
+            ref={regenInputRef}
             value={regenInstruction}
             onChange={(e) => setRegenInstruction(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleRegenerate(); } }}
@@ -280,6 +303,21 @@ const IdeaList: React.FC<IdeaListProps> = ({ ideas, keywords = [], onSelect, onT
           </div>
         </div>
       </div>
+
+      {/* 追従ピル: バーが画面外にある間だけ出す。z はローディング(100)・トースト(200)より下 */}
+      {!regenBarVisible && (
+        <div className="fixed bottom-5 inset-x-0 z-[90] flex justify-center px-4 pointer-events-none">
+          <button
+            type="button"
+            onClick={jumpToRegenBar}
+            className="pointer-events-auto btn-dark pl-4 pr-5 py-2.5 text-xs shadow-card-hover animate-in fade-in slide-in-from-bottom-4 duration-300"
+          >
+            <SparkleIcon />
+            AIでアイデアを作り直す
+            <span aria-hidden>↓</span>
+          </button>
+        </div>
+      )}
     </div>
   );
 };
