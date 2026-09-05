@@ -262,7 +262,15 @@ const PROMPT_STYLES: Array<{
   description: string;
   note?: string;
   fullWidth?: boolean;
+  recommended?: boolean; // 迷ったときの第一候補として先頭に置き、バッジを付ける
 }> = [
+  {
+    id: 'benefit_banner',
+    label: '訴求バナー（ベネフィット型）',
+    description: '「現役◯◯が全力サポート！」のような、大見出し＋提供者キャラクター＋3つのベネフィットで構成する販促バナー風。サービスの内容・ターゲットに合わせて見出し・キャラ・配色を自動で調整し、インパクトと信頼感を両立します。',
+    fullWidth: true,
+    recommended: true,
+  },
   {
     id: 'standard',
     label: '標準',
@@ -287,12 +295,6 @@ const PROMPT_STYLES: Array<{
     id: 'youtube',
     label: 'YouTube風',
     description: '人気YouTuberのサムネイル風。インパクト重視で思わずクリックしたくなる印象。',
-  },
-  {
-    id: 'benefit_banner',
-    label: '訴求バナー（ベネフィット型）',
-    description: '「現役◯◯が全力サポート！」のような、大見出し＋提供者キャラクター＋3つのベネフィットで構成する販促バナー風。サービスの内容・ターゲットに合わせて見出し・キャラ・配色を自動で調整し、インパクトと信頼感を両立します。',
-    fullWidth: true,
   },
   {
     id: 'puffy_3d',
@@ -322,7 +324,12 @@ const PromptCard: React.FC<{
         <PromptPreview version={style.id} className="w-full sm:w-[240px] shrink-0 rounded-xl border border-stone-100" />
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between gap-3">
-            <h6 className="text-sm font-semibold text-stone-900">{style.label}</h6>
+            <div className="flex flex-wrap items-center gap-2">
+              <h6 className="text-sm font-semibold text-stone-900">{style.label}</h6>
+              {style.recommended && (
+                <span className="text-[10px] font-semibold text-brand-600 bg-brand-50 px-2 py-0.5 rounded-full">迷ったらこれ</span>
+              )}
+            </div>
             <CopyButton copied={copied} onClick={onCopy} dark />
           </div>
           <p className="text-xs text-stone-500 mt-1 leading-relaxed">{style.description}</p>
