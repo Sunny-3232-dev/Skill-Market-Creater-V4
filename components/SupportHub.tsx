@@ -11,6 +11,7 @@ import CodeViewer from './support/CodeViewer';
 import QuestionEditor from './support/QuestionEditor';
 import Deck from './learn/Deck';
 import { POLISH_SLIDES } from './learn/deckSlides';
+import CampaignTweetCard from './CampaignTweetCard';
 
 interface SupportHubProps {
   ensureKeySet: () => Promise<boolean>;
@@ -1026,6 +1027,15 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
             )}
           </div>
         </div>
+
+        {/* 期間限定: 選択中サービスのURLを入れた状態でつぶやきを作らせる */}
+        {selectedServiceUrl && (
+          <CampaignTweetCard
+            variant="polish"
+            serviceUrl={selectedServiceUrl}
+            className="card p-5 mb-8"
+          />
+        )}
 
         {/* ② 対象の本文（作業エリア＝各メニューの入力） */}
         <div className="mb-8">

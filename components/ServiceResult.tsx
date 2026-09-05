@@ -4,6 +4,7 @@ import { SkillIdea, ThumbnailPromptVersion } from '../types';
 import { PromptPreview } from './promptPreviews';
 import ServiceChatEditor, { ChatMessage } from './ServiceChatEditor';
 import { decorateHeadings } from '../utils/skillMarketMarkup';
+import CampaignTweetCard from './CampaignTweetCard';
 
 interface ServiceResultProps {
   idea: SkillIdea;
@@ -606,6 +607,12 @@ const ServiceResult: React.FC<ServiceResultProps> = ({ idea, content, onBack, on
               <p className="text-stone-500 text-[13px] leading-relaxed">
                 下の「画像生成プロンプト」をコピーして、ChatGPT や Gemini でサムネイルを生成します。
               </p>
+            </div>
+
+            {/* 出品直後はまだURLが無いので、URL欄は空のままつぶやき画面を開く */}
+            <div className="bg-white/80 p-5 rounded-2xl border border-white md:col-span-2">
+              <div className="w-7 h-7 text-white rounded-full flex items-center justify-center font-bold text-xs mb-3" style={{ backgroundImage: 'var(--gradient-brand)' }}>3</div>
+              <CampaignTweetCard variant="publish" />
             </div>
           </div>
         </div>
