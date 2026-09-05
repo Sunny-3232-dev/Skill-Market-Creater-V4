@@ -3,6 +3,7 @@ import { getThumbnailPrompt, reviseServiceContent } from '../services/geminiServ
 import { SkillIdea, ThumbnailPromptVersion } from '../types';
 import { PromptPreview } from './promptPreviews';
 import ServiceChatEditor, { ChatMessage } from './ServiceChatEditor';
+import { decorateHeadings } from '../utils/skillMarketMarkup';
 
 interface ServiceResultProps {
   idea: SkillIdea;
@@ -448,14 +449,14 @@ const ServiceResult: React.FC<ServiceResultProps> = ({ idea, content, onBack, on
   }, [promptCtx]);
 
   const handleCopyAll = () => {
-    navigator.clipboard.writeText(rebuiltContent).then(() => {
+    navigator.clipboard.writeText(decorateHeadings(rebuiltContent)).then(() => {
       setIsAllCopied(true);
       setTimeout(() => setIsAllCopied(false), 2000);
     });
   };
 
   const handleCopyDetail = () => {
-    navigator.clipboard.writeText(rebuiltDetail).then(() => {
+    navigator.clipboard.writeText(decorateHeadings(rebuiltDetail)).then(() => {
       setIsDetailCopied(true);
       setTimeout(() => setIsDetailCopied(false), 2000);
     });
@@ -651,6 +652,11 @@ const ServiceResult: React.FC<ServiceResultProps> = ({ idea, content, onBack, on
                 )}
               </div>
             </div>
+            {!editingDetail && (
+              <p className="text-[11px] text-stone-400 mb-3 leading-relaxed">
+                コピーすると見出しが <code className="text-stone-500">&lt;strong&gt;</code> で囲まれ、スキルマーケットに貼ったとき太字になります。
+              </p>
+            )}
             {editingDetail ? (
               <>
                 <textarea
