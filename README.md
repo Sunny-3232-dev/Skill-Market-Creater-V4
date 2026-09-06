@@ -41,7 +41,7 @@
 - 前段: Cloudflare Access（メール許可リスト）。カスタムドメインのみで、`preview_urls` / `workers_dev` は無効
 - Worker 側: Access の JWT（`Cf-Access-Jwt-Assertion`）を検証する。`REQUIRE_ACCESS_JWT=1` のとき、
   JWT が無い／`ACCESS_TEAM_DOMAIN`・`ACCESS_AUD` が未設定なら、静的アセットも含めて 403 を返す（fail closed）
-- 費用の歯止め: KV で「メール別」「全体」の1日あたり呼び出し回数に上限（`DAILY_LIMIT_*`）
+- 費用の歯止め: KV で「メール別」「全体」の1日あたり呼び出し回数に上限（`DAILY_LIMIT_*`）。KV は結果整合なので同時呼び出し分は数え漏れることがある（厳密な上限ではなく歯止め）
 - 中継するモデルは `ALLOWED_MODELS` に列挙したものだけ。`?model=` の切替候補もここに足す
 
 ### 初回セットアップ
@@ -64,6 +64,7 @@
 | `npm run deploy` | プロキシビルド → デプロイ |
 | `npm run cf:types` | `wrangler.jsonc` を変えたら Env 型を再生成 |
 | `npx wrangler tail` | 中継ログ（`gemini_proxy` にメール・モデル・所要時間が JSON で出る） |
+| `npx wrangler kv key list --namespace-id <KVのid> --remote --prefix quota:` | 本番の利用回数カウンタ（`--remote` を付けないとローカル模擬ストアを見てしまう） |
 
 ## スクリプト
 
