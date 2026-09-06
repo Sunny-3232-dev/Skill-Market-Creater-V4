@@ -217,3 +217,47 @@ body {
   animation-timing-function: ease-in-out;
   animation-iteration-count: infinite;
 }
+
+/* ==========================================================================
+   動くマニュアル（components/guide）。1周14秒。各要素は同じ周期のキーフレームを持ち、% が時刻。
+   Tailwind の @layer の外に置く（中に書くと purge されることがある）
+   ========================================================================== */
+.animGuide > svg { display: block; width: 100%; height: auto; }
+.animGuide.paused * { animation-play-state: paused !important; }
+
+/* --- 貼り方（PasteGuide, pg-*） --- */
+.pg-anim { animation-duration: 14s; animation-timing-function: linear; animation-iteration-count: infinite; }
+.pg-k { transform-box: fill-box; transform-origin: center; opacity: 0; }
+/* カーソル: コピー → 詳細欄 → 公開 → 退場 */
+@keyframes pgCur {
+  0%, 7%      { transform: translate(40px, 330px); }
+  12%, 15%    { transform: translate(150px, 262px); }
+  24%, 27%    { transform: translate(455px, 212px); }
+  58%, 62%    { transform: translate(562px, 302px); }
+  72%, 100%   { transform: translate(610px, 340px); }
+}
+.pg-cur { animation-name: pgCur; animation-timing-function: ease-in-out; }
+@keyframes pgCopyBtn { 0%, 12% { transform: scale(1); } 13% { transform: scale(.92); } 14.5%, 100% { transform: scale(1); } }
+.pg-copybtn { animation-name: pgCopyBtn; transform-box: fill-box; transform-origin: center; }
+@keyframes pgToast { 0%, 13% { opacity: 0; } 14.5%, 30% { opacity: 1; } 32%, 100% { opacity: 0; } }
+.pg-toast { animation-name: pgToast; }
+@keyframes pgK1 { 0%, 12% { opacity: 0; transform: scale(.3); } 12.8% { opacity: 1; transform: scale(1); } 15%, 100% { opacity: 0; transform: scale(1.6); } }
+@keyframes pgK2 { 0%, 24% { opacity: 0; transform: scale(.3); } 24.8% { opacity: 1; transform: scale(1); } 27%, 100% { opacity: 0; transform: scale(1.6); } }
+@keyframes pgK3 { 0%, 60% { opacity: 0; transform: scale(.3); } 60.8% { opacity: 1; transform: scale(1); } 63%, 100% { opacity: 0; transform: scale(1.6); } }
+.pg-k1 { animation-name: pgK1; } .pg-k2 { animation-name: pgK2; } .pg-k3 { animation-name: pgK3; }
+@keyframes pgL1 { 0%, 29% { opacity: 0; } 30.5%, 100% { opacity: 1; } } .pg-l1 { animation-name: pgL1; }
+@keyframes pgL2 { 0%, 33% { opacity: 0; } 34.5%, 100% { opacity: 1; } } .pg-l2 { animation-name: pgL2; }
+@keyframes pgL3 { 0%, 37% { opacity: 0; } 38.5%, 100% { opacity: 1; } } .pg-l3 { animation-name: pgL3; }
+@keyframes pgL4 { 0%, 41% { opacity: 0; } 42.5%, 100% { opacity: 1; } } .pg-l4 { animation-name: pgL4; }
+@keyframes pgL5 { 0%, 45% { opacity: 0; } 46.5%, 100% { opacity: 1; } } .pg-l5 { animation-name: pgL5; }
+@keyframes pgPubBtn { 0%, 60% { transform: scale(1); } 61% { transform: scale(.92); } 62.5%, 100% { transform: scale(1); } }
+.pg-pubbtn { animation-name: pgPubBtn; transform-box: fill-box; transform-origin: center; }
+@keyframes pgForm { 0%, 64% { opacity: 1; } 66%, 100% { opacity: 0; } } .pg-form { animation-name: pgForm; }
+@keyframes pgPub { 0%, 64% { opacity: 0; } 66%, 100% { opacity: 1; } } .pg-pub { animation-name: pgPub; }
+@keyframes pgBadge { 0%, 70% { opacity: 0; } 72%, 100% { opacity: 1; } } .pg-badge { animation-name: pgBadge; }
+@media (prefers-reduced-motion: reduce) {
+  /* 動かさず、いちばん情報の多いコマ（公開されて太字になった状態）で止める */
+  .pasteGuide * { animation: none !important; }
+  .pasteGuide .pg-form, .pasteGuide .pg-cur, .pasteGuide .pg-k, .pasteGuide .pg-toast { opacity: 0; }
+  .pasteGuide .pg-pub, .pasteGuide .pg-badge { opacity: 1; }
+}

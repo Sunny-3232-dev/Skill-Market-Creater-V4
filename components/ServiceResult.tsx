@@ -7,6 +7,7 @@ import { decorateHeadings } from '../utils/skillMarketMarkup';
 import CampaignTweetCard from './CampaignTweetCard';
 import Troubleshoot from './Troubleshoot';
 import ListingPreview from './ListingPreview';
+import PasteGuide from './guide/PasteGuide';
 
 interface ServiceResultProps {
   idea: SkillIdea;
@@ -608,6 +609,8 @@ const ServiceResult: React.FC<ServiceResultProps> = ({ idea, content, onBack, on
               </a>
             }
           />
+          {/* 貼り方を1枚の絵で見せる（文章の説明の代わり） */}
+          <PasteGuide className="mb-5" />
           <div className="mb-5">
             <button
               onClick={() => setShowTip(!showTip)}
