@@ -147,6 +147,19 @@ const reconstructContent = (parts: ContentParts): string => {
   return out.trim();
 };
 
+// 仕上げ画面の3つの段（貼る → 画像 → つぶやく）の見出し。
+// 数字は上の進捗バー（入力→選ぶ→仕上げ）と衝突するので、順序は言葉で示す
+const SectionHead: React.FC<{ eyebrow: string; title: string; description: string; action?: React.ReactNode }> = ({ eyebrow, title, description, action }) => (
+  <div className="flex flex-col md:flex-row md:items-start justify-between gap-3 mb-5">
+    <div className="min-w-0">
+      <span className="eyebrow mb-1 block">{eyebrow}</span>
+      <h3 className="text-lg font-bold text-stone-900 tracking-tight">{title}</h3>
+      <p className="text-xs text-stone-500 mt-1 leading-relaxed max-w-2xl">{description}</p>
+    </div>
+    {action && <div className="shrink-0 pt-1">{action}</div>}
+  </div>
+);
+
 const CopyButton: React.FC<{ copied: boolean; onClick: () => void; dark?: boolean }> = ({ copied, onClick, dark }) => (
   <button
     type="button"
@@ -203,7 +216,10 @@ const CopySection: React.FC<{
   return (
     <div className="card p-5">
       <div className="flex justify-between items-center mb-3 gap-2">
-        <h4 className="font-semibold text-stone-900 text-sm">{title}</h4>
+        <div className="flex items-center gap-2 flex-wrap min-w-0">
+          <h4 className="font-semibold text-stone-900 text-sm">{title}</h4>
+          {copied && <span className="text-[11px] text-brand-600 animate-in fade-in duration-200">→ 出品画面の「{title}」欄に貼り付け</span>}
+        </div>
         <div className="flex items-center gap-2">
           {editing ? (
             <>
@@ -371,6 +387,10 @@ const ServiceResult: React.FC<ServiceResultProps> = ({ idea, content, onBack, on
   const [expandedPrompt, setExpandedPrompt] = useState<ThumbnailPromptVersion | null>(null);
   const [copiedVersion, setCopiedVersion] = useState<ThumbnailPromptVersion | null>(null);
   const [showTip, setShowTip] = useState(false);
+  // 画像プロンプトは「迷ったらこれ」だけ開いておき、残りは求められたときに出す
+  const [showAllStyles, setShowAllStyles] = useState(false);
+  const recommendedStyle = PROMPT_STYLES.find(st => st.recommended) ?? PROMPT_STYLES[0];
+  const otherStyles = PROMPT_STYLES.filter(st => st.id !== recommendedStyle.id);
   const [showBackConfirm, setShowBackConfirm] = useState(false);
 
   // AI編集チャットが書き換える下書き本文。保存するまでは idea.generatedContent に反映されない
@@ -569,62 +589,39 @@ const ServiceResult: React.FC<ServiceResultProps> = ({ idea, content, onBack, on
       </div>
 
       <div className="space-y-10">
-        {/* Next Steps Guide */}
-        <div className="border border-brand-100 rounded-2xl p-6 md:p-8" style={{ backgroundImage: 'var(--gradient-brand-soft)' }}>
-          <h4 className="text-stone-900 font-bold text-base mb-6">次のステップ — 出品まであと少し</h4>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="bg-white/80 p-5 rounded-2xl border border-white flex flex-col">
-              <div className="w-7 h-7 text-white rounded-full flex items-center justify-center font-bold text-xs mb-3" style={{ backgroundImage: 'var(--gradient-brand)' }}>1</div>
-              <h5 className="font-semibold text-stone-900 text-sm mb-2">情報を登録</h5>
-              <p className="text-stone-500 text-[13px] leading-relaxed mb-3">
-                各項目の「コピー」ボタンで内容を保存し、出品画面の入力欄に貼り付けます。
-              </p>
-              <div className="mb-4">
-                <button
-                  onClick={() => setShowTip(!showTip)}
-                  className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-stone-400 hover:text-stone-600 transition-colors"
-                >
-                  貼り付け方のコツ <span className={`transition-transform duration-200 ${showTip ? 'rotate-180' : ''}`}>▾</span>
-                </button>
-                {showTip && (
-                  <div className="mt-2 bg-white rounded-xl p-3 text-left text-[12px] text-stone-500 leading-relaxed space-y-1.5 animate-in fade-in slide-in-from-top-2 duration-200">
-                    <p>1. 下のリンクを<span className="font-semibold text-stone-700">右クリック</span>→「分割ビューで開く」</p>
-                    <p>2. 左に出品画面、右にこの画面を並べて表示</p>
-                    <p>3. 各項目の「コピー」→ 出品画面に貼り付け</p>
-                  </div>
-                )}
+        {/* まず: 出品文をスキルマーケットに貼る */}
+        <section>
+          <SectionHead
+            eyebrow="まず"
+            title="出品文をスキルマーケットに貼る"
+            description="各項目の「コピー」を押して、出品画面の同じ名前の欄に貼り付けます。サービス詳細の見出しは太字（<strong>）付きでコピーされます。"
+            action={
+              <a
+                href="https://skill.libecity.com/services/new"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn-primary px-5 py-2.5 text-xs"
+              >
+                スキルマーケット出品画面へ
+              </a>
+            }
+          />
+          <div className="mb-5">
+            <button
+              onClick={() => setShowTip(!showTip)}
+              className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-stone-400 hover:text-stone-600 transition-colors"
+            >
+              貼り付け方のコツ <span className={`transition-transform duration-200 ${showTip ? 'rotate-180' : ''}`}>▾</span>
+            </button>
+            {showTip && (
+              <div className="mt-2 bg-stone-50 rounded-xl p-3 text-left text-[12px] text-stone-500 leading-relaxed space-y-1.5 animate-in fade-in slide-in-from-top-2 duration-200">
+                <p>1. 上の「スキルマーケット出品画面へ」を<span className="font-semibold text-stone-700">右クリック</span>→「分割ビューで開く」</p>
+                <p>2. 左に出品画面、右にこの画面を並べて表示</p>
+                <p>3. 各項目の「コピー」→ 出品画面の同じ欄に貼り付け</p>
               </div>
-              <div className="mt-auto">
-                <a
-                  href="https://skill.libecity.com/services/new"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="btn-primary px-5 py-2.5 text-xs"
-                >
-                  スキルマーケット出品画面へ
-                </a>
-              </div>
-            </div>
-
-            <div className="bg-white/80 p-5 rounded-2xl border border-white flex flex-col">
-              <div className="w-7 h-7 text-white rounded-full flex items-center justify-center font-bold text-xs mb-3" style={{ backgroundImage: 'var(--gradient-brand)' }}>2</div>
-              <h5 className="font-semibold text-stone-900 text-sm mb-2">画像準備</h5>
-              <p className="text-stone-500 text-[13px] leading-relaxed">
-                下の「画像生成プロンプト」をコピーして、ChatGPT や Gemini でサムネイルを生成します。
-              </p>
-            </div>
-
-            {/* 出品直後はまだURLが無いので、URL欄は空のままつぶやき画面を開く */}
-            <div className="bg-white/80 p-5 rounded-2xl border border-white md:col-span-2">
-              <div className="w-7 h-7 text-white rounded-full flex items-center justify-center font-bold text-xs mb-3" style={{ backgroundImage: 'var(--gradient-brand)' }}>3</div>
-              <CampaignTweetCard variant="publish" />
-            </div>
+            )}
           </div>
-        </div>
-
-        {/* Content Cards */}
-        <div className="space-y-5">
+          <div className="space-y-5">
           <div className="card p-5">
             <h4 className="font-semibold text-stone-900 text-sm mb-3">カテゴリ・サブカテゴリ</h4>
             <div className="bg-stone-50 rounded-xl p-4 text-sm flex items-center gap-3">
@@ -639,7 +636,10 @@ const ServiceResult: React.FC<ServiceResultProps> = ({ idea, content, onBack, on
           {/* サービス詳細 - 価格モードUIを埋め込んだカスタムカード */}
           <div className="card p-5">
             <div className="flex justify-between items-center mb-3 gap-2">
-              <h4 className="font-semibold text-stone-900 text-sm">サービス詳細</h4>
+              <div className="flex items-center gap-2 flex-wrap min-w-0">
+                <h4 className="font-semibold text-stone-900 text-sm">サービス詳細</h4>
+                {isDetailCopied && <span className="text-[11px] text-brand-600 animate-in fade-in duration-200">→ 出品画面の「サービス詳細」欄に貼り付け</span>}
+              </div>
               <div className="flex items-center gap-2">
                 {editingDetail ? (
                   <>
@@ -760,50 +760,60 @@ const ServiceResult: React.FC<ServiceResultProps> = ({ idea, content, onBack, on
           <CopySection title="キャンセル時の注意事項" content={parsed.policy} onSave={(v) => applySectionEdit({ policy: v })} />
           <CopySection title="スキル" content={parsed.skills} onSave={(v) => applySectionEdit({ skills: v })} />
           <CopySection title="依頼テンプレート" content={parsed.template} onSave={(v) => applySectionEdit({ template: v })} />
-
-          {/* Prompt Area */}
-          <div className="bg-stone-50 border border-stone-200/80 rounded-2xl p-6 space-y-5">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-              <div>
-                <h5 className="text-base font-bold text-stone-900">画像生成プロンプト</h5>
-                <p className="text-xs text-stone-500 mt-1">ChatGPT がおすすめ（Gemini でも OK）。Gemini の場合は「画像を作成」と思考モードにしてください。</p>
-                <p className="text-[11px] text-stone-400 mt-1">※各カードの画像は仕上がりのサンプルです。コピーしたプロンプトから、あなたのサービス内容でAIが新しく生成します。</p>
-              </div>
-              <div className="flex gap-2 flex-wrap">
-                <a
-                  href="https://chatgpt.com/"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="btn-dark px-5 py-2 text-xs"
-                >
-                  ChatGPT を開く
-                </a>
-                <a
-                  href="https://gemini.google.com/"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="btn-secondary px-5 py-2 text-xs"
-                >
-                  Gemini を開く
-                </a>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
-              {PROMPT_STYLES.map(style => (
-                <PromptCard
-                  key={style.id}
-                  style={style}
-                  prompt={prompts[style.id]}
-                  copied={copiedVersion === style.id}
-                  expanded={expandedPrompt === style.id}
-                  onCopy={() => handleCopyPrompt(style.id)}
-                  onToggle={() => setExpandedPrompt(expandedPrompt === style.id ? null : style.id)}
-                />
-              ))}
-            </div>
           </div>
-        </div>
+        </section>
+
+        {/* つぎに: サムネイル画像 */}
+        <section>
+          <SectionHead
+            eyebrow="つぎに"
+            title="サムネイル画像を用意する"
+            description="下のプロンプトをコピーして ChatGPT に貼ると、あなたのサービス内容で画像ができます（Gemini でも可。「画像を作成」と思考モードにしてください）。カードの画像は仕上がりのサンプルです。"
+            action={
+              <div className="flex gap-2 flex-wrap">
+                <a href="https://chatgpt.com/" target="_blank" rel="noopener noreferrer" className="btn-dark px-5 py-2 text-xs">ChatGPT を開く</a>
+                <a href="https://gemini.google.com/" target="_blank" rel="noopener noreferrer" className="btn-secondary px-5 py-2 text-xs">Gemini を開く</a>
+              </div>
+            }
+          />
+          <div className="space-y-4">
+            <PromptCard
+              style={recommendedStyle}
+              prompt={prompts[recommendedStyle.id]}
+              copied={copiedVersion === recommendedStyle.id}
+              expanded={expandedPrompt === recommendedStyle.id}
+              onCopy={() => handleCopyPrompt(recommendedStyle.id)}
+              onToggle={() => setExpandedPrompt(expandedPrompt === recommendedStyle.id ? null : recommendedStyle.id)}
+            />
+            <button
+              type="button"
+              onClick={() => setShowAllStyles(v => !v)}
+              aria-expanded={showAllStyles}
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-stone-500 hover:text-brand-500 transition-colors"
+            >
+              <span className={`transition-transform duration-200 ${showAllStyles ? 'rotate-180' : ''}`}>▾</span>
+              他のスタイルを見る（{otherStyles.length}種）
+            </button>
+            {showAllStyles && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start animate-in fade-in slide-in-from-top-2 duration-200">
+                {otherStyles.map(style => (
+                  <PromptCard
+                    key={style.id}
+                    style={style}
+                    prompt={prompts[style.id]}
+                    copied={copiedVersion === style.id}
+                    expanded={expandedPrompt === style.id}
+                    onCopy={() => handleCopyPrompt(style.id)}
+                    onToggle={() => setExpandedPrompt(expandedPrompt === style.id ? null : style.id)}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        </section>
+
+        {/* 出品したら: つぶやいて応募（期間外は描画されない） */}
+        <CampaignTweetCard variant="publish" className="card p-5" />
       </div>
 
       {/* 画面下部に常駐するAI編集バー（fixed配置） */}
