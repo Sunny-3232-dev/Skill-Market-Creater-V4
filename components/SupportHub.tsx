@@ -301,6 +301,8 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
   const loadedServiceRef = useRef<string | null>(init.selectedServiceId ?? null);
   const [registerUrl, setRegisterUrl] = useState('');
   const [isRegisteringBody, setIsRegisteringBody] = useState(false);
+  // URLを登録せずに本文だけ貼りたい人向けの欄を開くか
+  const [showLooseBody, setShowLooseBody] = useState(false);
 
   const [copiedSlideDocVersion, setCopiedSlideDocVersion] = useState<ThumbnailPromptVersion | null>(null);
   const [copiedBannerPrompt, setCopiedBannerPrompt] = useState(false);
@@ -487,7 +489,7 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
     setServiceBody('');
     applyResults(EMPTY_RESULTS); // 新規サービスは生成物なしから開始
     setRegisterUrl('');
-    notify('登録しました。「ページを開く」で本文をコピーし、下の「対象の本文」に貼り付けてください。');
+    notify('登録しました。「ページを開く」で本文をコピーして、開いた欄に貼り付けてください。');
     setTimeout(() => document.getElementById('support-body')?.focus(), 50);
   };
 
@@ -921,12 +923,12 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
 
         {/* ① 登録済みサービス（台帳＝登録・一覧・閲覧） */}
         <div className="mb-6">
-          <SectionLabel label="登録済みサービス" />
+          <SectionLabel label="対象のサービス" />
           <div className="card p-5">
             <div className="flex flex-wrap justify-between items-center gap-2 mb-2">
               <label htmlFor="register-url" className="text-sm font-semibold text-stone-700">
                 出品済みサービスをURLで登録
-                <span className="text-xs text-stone-400 font-normal ml-2">登録しておくと各メニューの対象にできます</span>
+                <span className="text-xs text-stone-400 font-normal ml-2">URLを登録 → 本文を貼る → 下のメニューを選ぶ、の順です</span>
               </label>
               <span className={`text-xs font-semibold ${registeredServices.length >= MAX_REGISTERED_SERVICES ? 'text-brand-600' : 'text-stone-400'}`}>
                 {registeredServices.length}/{MAX_REGISTERED_SERVICES}件
@@ -960,8 +962,8 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
                   {registeredServices.map(sv => {
                     const isSelected = selectedServiceId === sv.id;
                     return (
+                      <React.Fragment key={sv.id}>
                       <div
-                        key={sv.id}
                         role="button"
                         tabIndex={0}
                         aria-pressed={isSelected}
@@ -1005,13 +1007,50 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
                           ✕
                         </button>
                       </div>
+                      {/* 選ぶと、その場で本文を貼る欄が開く（台帳と本文を1つの流れにする） */}
+                      {isSelected && (
+                        <div className="rounded-xl border border-brand-100 bg-white p-4 animate-in fade-in slide-in-from-top-1 duration-200">
+                          <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+                            <label htmlFor="support-body" className="text-sm font-semibold text-stone-700">
+                              このサービスの本文
+                              <span className="text-xs text-stone-400 font-normal ml-2">出品ページを開いて本文をコピー → ここに貼り付け（口コミも一緒に貼るとGood）</span>
+                            </label>
+                            <a href={sv.url} target="_blank" rel="noopener noreferrer" className="btn-secondary px-4 py-1.5 text-xs shrink-0">
+                              ページを開く<span aria-hidden>↗</span>
+                            </a>
+                          </div>
+                          <textarea
+                            id="support-body"
+                            value={serviceBody}
+                            onChange={(e) => handleBodyChange(e.target.value)}
+                            className="field w-full p-4 min-h-[160px] text-sm leading-relaxed"
+                            placeholder="出品ページの本文をコピーして、ここに貼り付けてください。"
+                          />
+                          <div className="mt-3 flex flex-wrap items-center gap-3">
+                            <button
+                              type="button"
+                              onClick={handleRegisterBody}
+                              disabled={!hasInput || isRegisteringBody}
+                              className="btn-dark px-5 py-2 text-xs shrink-0"
+                            >
+                              {isRegisteringBody ? 'サービス名を認識中…' : 'この本文を保存'}
+                            </button>
+                            {hasInput && (
+                              <p className="text-xs text-emerald-600 font-medium animate-in fade-in">
+                                保存するとこのサービスに紐付き、下のメニューがすぐ使えます
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                      </React.Fragment>
                     );
                   })}
                 </div>
               </div>
             ) : (
               <p className="text-xs text-stone-400 mt-4">
-                まだ登録がありません。URLを追加するか、下の「対象の本文」に貼り付ければそのまま使えます。
+                まだ登録がありません。出品ページのURLを追加すると、本文を貼る欄が開きます。
               </p>
             )}
           </div>
@@ -1026,47 +1065,35 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
           />
         )}
 
-        {/* ② 対象の本文（作業エリア＝各メニューの入力） */}
-        <div className="mb-8">
-          <SectionLabel label="対象の本文" />
-          <div className="card p-5">
-            <label htmlFor="support-body" className="font-semibold text-stone-700 text-sm block mb-2">
-              ここに本文を貼り付け
-              <span className="text-xs text-stone-400 font-normal ml-2">出品ページを開いて本文をコピー → 貼り付け（口コミも一緒に貼るとGood）</span>
-            </label>
-            <textarea
-              id="support-body"
-              value={serviceBody}
-              onChange={(e) => handleBodyChange(e.target.value)}
-              className="field w-full p-5 min-h-[180px] text-base leading-relaxed"
-              placeholder="出品ページの本文をコピーして、ここに貼り付けてください。&#10;（上で登録したサービスは「ページを開く」から本文をコピーできます）"
-            />
-            <div className="mt-3 flex flex-wrap items-center gap-3">
-              {selectedServiceId && (
-                <>
-                  <span className="text-xs text-stone-500">
-                    選択中：<span className="font-semibold text-stone-800">{registeredServices.find(sv => sv.id === selectedServiceId)?.title || '登録サービス'}</span>
-                  </span>
-                  <button
-                    type="button"
-                    onClick={handleRegisterBody}
-                    disabled={!hasInput || isRegisteringBody}
-                    className="btn-dark px-5 py-2 text-xs shrink-0"
-                  >
-                    {isRegisteringBody ? 'サービス名を認識中…' : 'この本文を保存'}
-                  </button>
-                </>
-              )}
-              {hasInput && (
-                <p className="text-xs text-emerald-600 font-medium animate-in fade-in">
-                  {selectedServiceId
-                    ? '「この本文を保存」でこのサービスに紐付け＆AIが名前を認識（メニューはすぐ実行できます）'
-                    : '入力済み — 下のメニューを実行できます'}
-                </p>
-              )}
-            </div>
+        {/* URLを登録しない人向け: 本文だけ貼る（サービス未選択のときだけ） */}
+        {!selectedServiceId && (
+          <div className="mb-8">
+            {(showLooseBody || hasInput) ? (
+              <div className="card p-5">
+                <label htmlFor="support-body" className="font-semibold text-stone-700 text-sm block mb-2">
+                  本文だけ貼る
+                  <span className="text-xs text-stone-400 font-normal ml-2">URLを登録しない場合はこちら。口コミも一緒に貼るとGood</span>
+                </label>
+                <textarea
+                  id="support-body"
+                  value={serviceBody}
+                  onChange={(e) => handleBodyChange(e.target.value)}
+                  className="field w-full p-5 min-h-[160px] text-sm leading-relaxed"
+                  placeholder="出品ページの本文をコピーして、ここに貼り付けてください。"
+                />
+                {hasInput && <p className="mt-2 text-xs text-emerald-600 font-medium animate-in fade-in">入力済み — 下のメニューを実行できます</p>}
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setShowLooseBody(true)}
+                className="text-xs text-stone-400 hover:text-brand-500 underline decoration-stone-200 underline-offset-2 transition-colors"
+              >
+                URLを登録せずに、本文だけ貼って使う
+              </button>
+            )}
           </div>
-        </div>
+        )}
 
         {/* Menu List — この1入力で3つのAIメニューが動く、を強調 */}
         <div className="mb-8">
