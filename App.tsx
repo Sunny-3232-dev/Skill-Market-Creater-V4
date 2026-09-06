@@ -103,6 +103,14 @@ const App: React.FC = () => {
               ← Top
             </button>
           )}
+          {currentTool !== ToolType.LEARN && (
+            <button
+              onClick={() => setCurrentTool(ToolType.LEARN)}
+              className="btn-secondary px-4 py-2 text-xs"
+            >
+              ヒント集
+            </button>
+          )}
           <a
             href="https://library.libecity.com/articles/01KD26FQVJ9VJNH99JBJ9F3TGS"
             target="_blank"

@@ -7,8 +7,7 @@ import InputForm from './InputForm';
 import IdeaList from './IdeaList';
 import ServiceResult from './ServiceResult';
 import LoadingOverlay from './LoadingOverlay';
-import Deck from './learn/Deck';
-import { PUBLISH_SLIDES } from './learn/deckSlides';
+import CreatorProgress from './CreatorProgress';
 
 const STORAGE_KEY_IDEAS = "skill_market_ideas";
 const STORAGE_KEY_INPUT = "skill_market_raw_input";
@@ -292,19 +291,13 @@ const CreatorTool: React.FC<CreatorToolProps> = ({ ensureKeySet, onHandleApiErro
   return (
     <>
       <div ref={containerRef} className="relative h-full flex flex-col overflow-y-auto custom-scrollbar">
+          <CreatorProgress step={step} />
           {step === Step.INPUT && (
             <>
                <div className="px-6 md:px-10 lg:px-12 pt-6">
                  <button onClick={() => setShowResetConfirm(true)} className="text-xs text-stone-400 hover:text-brand-500 underline decoration-stone-200 underline-offset-2 transition-colors">
                     履歴を消去してリセット
                  </button>
-               </div>
-               <div className="px-6 md:px-10 lg:px-12 pt-5">
-                 <Deck
-                   slides={PUBLISH_SLIDES}
-                   title="はじめての出品ガイド（読み物）"
-                   description="何を出すか決まらない、入力が多くて手が止まる、準備が万全じゃなくてためらう——出品前のつまずきと、その越え方をまとめました。"
-                 />
                </div>
                <InputForm onSubmit={handleStartIdeaGeneration} initialText={rawInputText} hasIdeas={ideas.length > 0} onBackToIdeas={() => setStep(Step.IDEAS)} />
             </>

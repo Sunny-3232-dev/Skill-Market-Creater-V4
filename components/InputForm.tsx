@@ -9,32 +9,6 @@ interface InputFormProps {
   onBackToIdeas?: () => void;
 }
 
-const GuideStep: React.FC<{
-  number: number;
-  title: string;
-  description: string;
-  isActive?: boolean;
-}> = ({ number, title, description, isActive }) => (
-  <div className={`flex-1 p-4 rounded-2xl border transition-colors ${
-    isActive ? 'bg-white border-brand-200 shadow-soft' : 'bg-stone-50 border-stone-200/60'
-  }`}>
-    <div className="flex items-start gap-3">
-      <div
-        className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
-          isActive ? 'text-white' : 'bg-white text-stone-400 border border-stone-200'
-        }`}
-        style={isActive ? { backgroundImage: 'var(--gradient-brand)' } : undefined}
-      >
-        {number}
-      </div>
-      <div className="min-w-0">
-        <h4 className={`font-semibold text-sm mb-0.5 ${isActive ? 'text-stone-900' : 'text-stone-500'}`}>{title}</h4>
-        <p className="text-xs leading-relaxed text-stone-400">{description}</p>
-      </div>
-    </div>
-  </div>
-);
-
 const InputForm: React.FC<InputFormProps> = ({ onSubmit, initialText = '', hasIdeas = false, onBackToIdeas }) => {
   const [rawText, setRawText] = useState(initialText);
   const canSubmit = rawText.trim().length > 0;
@@ -47,15 +21,8 @@ const InputForm: React.FC<InputFormProps> = ({ onSubmit, initialText = '', hasId
 
   return (
     <div className="p-6 md:p-10 lg:p-12 h-full flex flex-col">
-      <div className="flex flex-col md:flex-row gap-2 md:gap-3 mb-8">
-        <GuideStep number={1} title="「想い」を書き出す" description="箇条書きやメモでOK。AIが強みを見つけます。" isActive />
-        <GuideStep number={2} title="20の案から選ぶ" description="王道からニッチまで、あなただけの案を提案。" />
-        <GuideStep number={3} title="出品セットが完成" description="文章と画像プロンプトが出来上がります。" />
-      </div>
-
       <div className="mb-4 flex items-start justify-between gap-3">
         <div>
-          <span className="eyebrow mb-1 block">Step 1</span>
           <h2 className="text-xl md:text-2xl font-bold text-stone-900 tracking-tight">あなたの好き・得意・経験を教えてください</h2>
         </div>
         {hasIdeas && onBackToIdeas && (

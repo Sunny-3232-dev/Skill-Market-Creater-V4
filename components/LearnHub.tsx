@@ -1,6 +1,8 @@
 import React from 'react';
 import { MAGAZINE_ARTICLES, KNOWHOW_ARTICLES } from '../data/articles';
 import ArticleList from './support/ArticleList';
+import Deck from './learn/Deck';
+import { PUBLISH_SLIDES, POLISH_SLIDES } from './learn/deckSlides';
 
 // 「前提・下敷き」となる読み物レイヤー。Creator/Supportと並ぶ第3の入口。
 const LearnHub: React.FC = () => {
@@ -17,6 +19,23 @@ const LearnHub: React.FC = () => {
         </div>
 
         <div className="space-y-10">
+          {/* 作業画面から移した読み物2本。作業の邪魔をしないよう、ここでまとめて読む */}
+          <section className="space-y-4">
+            <div>
+              <h3 className="text-base font-bold text-stone-900">勉強会の資料（読み物）</h3>
+              <p className="text-stone-500 text-sm mt-1">出品前と出品後、それぞれのつまずきと越え方を18枚ずつにまとめています。</p>
+            </div>
+            <Deck
+              slides={PUBLISH_SLIDES}
+              title="はじめての出品ガイド"
+              description="何を出すか決まらない、入力が多くて手が止まる、準備が万全じゃなくてためらう——出品前のつまずきと、その越え方。"
+            />
+            <Deck
+              slides={POLISH_SLIDES}
+              title="出品を磨く3つの型"
+              description="サービス画像・アンケート・つぶやき。サポートの各メニューを「なぜそう作るのか」から使えるように。"
+            />
+          </section>
           <ArticleList
             title="学長に学ぶ、売る前の基本"
             subtitle="リベ大の両学長が「価格の決め方」「嫌われない宣伝のコツ」を解説。出品する前に押さえておきたい考え方です。"

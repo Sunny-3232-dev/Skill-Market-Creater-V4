@@ -2,12 +2,6 @@ import React from 'react';
 import { ToolType } from '../types';
 import { PenIcon, ArrowRightIcon } from './icons';
 
-const BookIcon = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
-  </svg>
-);
-
 interface HubProps {
   onSelectTool: (tool: ToolType) => void;
 }
@@ -138,17 +132,14 @@ const Hub: React.FC<HubProps> = ({ onSelectTool }) => {
           />
         </div>
 
-        {/* 手順の外側に置く「前提・読み物」レイヤー（第3の入口・STEP番号なし） */}
-        <ToolCard
-          stepLabel="いつでも参考に"
-          title="売れる人の考え方を学ぶ"
-          description="価格の決め方・宣伝のコツ・改善のヒントを、リベ大の学長や先輩出品者の記事で無料で読めます。迷ったときの下敷きに。"
-          icon={<BookIcon />}
-          onClick={() => onSelectTool(ToolType.LEARN)}
-          cta="ヒントを見る"
-          brandIcon
-          capabilities={["価格の決め方", "宣伝のコツ", "改善のヒント"]}
-        />
+        {/* 読み物はカードにせず、控えめな導線だけ置く（入口は「作る」「広める」の2つに絞る） */}
+        <p className="text-center text-xs text-stone-400">
+          価格の決め方・宣伝のコツ・改善のヒントは
+          <button type="button" onClick={() => onSelectTool(ToolType.LEARN)} className="ml-1 font-semibold text-stone-500 hover:text-brand-500 underline decoration-stone-200 underline-offset-2 transition-colors">
+            ヒント集
+          </button>
+          にまとめてあります。
+        </p>
 
         <div className="px-1">
           <p className="text-[11px] text-stone-400 leading-relaxed">

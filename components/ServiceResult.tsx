@@ -545,7 +545,6 @@ const ServiceResult: React.FC<ServiceResultProps> = ({ idea, content, onBack, on
     <div className="p-6 md:p-10 lg:p-12 pb-32 h-full flex flex-col">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
         <div>
-          <span className="eyebrow mb-1 block">Step 3</span>
           <div className="flex items-center gap-2 flex-wrap">
             <h2 className="text-xl md:text-2xl font-bold text-stone-900 tracking-tight">出品用テキストが完成しました</h2>
             {isDirty && (

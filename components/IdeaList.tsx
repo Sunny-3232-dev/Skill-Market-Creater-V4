@@ -168,7 +168,6 @@ const IdeaList: React.FC<IdeaListProps> = ({ ideas, keywords = [], onSelect, onT
     <div className="p-6 md:p-10 lg:p-12">
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-5 mb-8">
         <div>
-          <span className="eyebrow mb-1 block">Step 2</span>
           <h2 className="text-xl md:text-2xl font-bold text-stone-900 tracking-tight">気になるアイデアを選択</h2>
         </div>
         <div className="flex items-center gap-2 shrink-0">
