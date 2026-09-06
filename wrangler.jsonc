@@ -32,8 +32,8 @@
     "REQUIRE_ACCESS_JWT": "1",
     // Cloudflare Zero Trust のチーム domain（例: example.cloudflareaccess.com）と、
     // Access アプリケーションの Application Audience (AUD) Tag。Access 作成後に埋める
-    "ACCESS_TEAM_DOMAIN": "",
-    "ACCESS_AUD": "",
+    "ACCESS_TEAM_DOMAIN": "sunconnect.cloudflareaccess.com",
+    "ACCESS_AUD": "98e18024af6ec7f0525371b6383a20ef3564792b18f60632ed56759a4f2903f2",
     // 費用の歯止め（Gemini 呼び出し回数／日）
     "DAILY_LIMIT_PER_USER": "40",
     "DAILY_LIMIT_GLOBAL": "400",
