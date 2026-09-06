@@ -11,6 +11,7 @@ import CodeViewer from './support/CodeViewer';
 import QuestionEditor from './support/QuestionEditor';
 import CampaignTweetCard from './CampaignTweetCard';
 import Troubleshoot from './Troubleshoot';
+import SupportGuide from './guide/SupportGuide';
 
 interface SupportHubProps {
   ensureKeySet: () => Promise<boolean>;
@@ -925,6 +926,8 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
         {/* ① 登録済みサービス（台帳＝登録・一覧・閲覧） */}
         <div className="mb-6">
           <SectionLabel label="対象のサービス" />
+          {/* 使い方を1枚の絵で見せる（URL登録 → 本文コピー → 貼って保存 → メニュー） */}
+          <SupportGuide className="mb-4" />
           <div className="card p-5">
             <div className="flex flex-wrap justify-between items-center gap-2 mb-2">
               <label htmlFor="register-url" className="text-sm font-semibold text-stone-700">

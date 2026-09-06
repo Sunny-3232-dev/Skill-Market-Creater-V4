@@ -261,3 +261,46 @@ body {
   .pasteGuide .pg-form, .pasteGuide .pg-cur, .pasteGuide .pg-k, .pasteGuide .pg-toast { opacity: 0; }
   .pasteGuide .pg-pub, .pasteGuide .pg-badge { opacity: 1; }
 }
+
+/* --- サポートの使い方（SupportGuide, sg-*） --- */
+.sg-anim { animation-duration: 14s; animation-timing-function: linear; animation-iteration-count: infinite; }
+.sg-k { transform-box: fill-box; transform-origin: center; opacity: 0; }
+/* カーソル: URL欄 → URLを追加 → 左の本文 → 右の本文欄 → 保存 → メニュー → 退場 */
+@keyframes sgCur {
+  0%, 5%      { transform: translate(600px, 340px); }
+  10%, 13%    { transform: translate(420px, 106px); }
+  20%, 24%    { transform: translate(568px, 106px); }
+  32%, 36%    { transform: translate(145px, 170px); }
+  48%, 51%    { transform: translate(460px, 214px); }
+  64%, 68%    { transform: translate(371px, 261px); }
+  78%, 82%    { transform: translate(423px, 299px); }
+  92%, 100%   { transform: translate(600px, 340px); }
+}
+.sg-cur { animation-name: sgCur; animation-timing-function: ease-in-out; }
+@keyframes sgUrlPh { 0%, 13% { opacity: 1; } 14%, 100% { opacity: 0; } } .sg-urlph { animation-name: sgUrlPh; }
+@keyframes sgUrl { 0%, 13% { opacity: 0; } 14%, 100% { opacity: 1; } } .sg-url { animation-name: sgUrl; }
+@keyframes sgAddBtn { 0%, 22% { transform: scale(1); } 23% { transform: scale(.92); } 24.5%, 100% { transform: scale(1); } }
+.sg-addbtn { animation-name: sgAddBtn; transform-box: fill-box; transform-origin: center; }
+@keyframes sgK1 { 0%, 22% { opacity: 0; transform: scale(.3); } 22.8% { opacity: 1; transform: scale(1); } 25%, 100% { opacity: 0; transform: scale(1.6); } }
+@keyframes sgK2 { 0%, 36% { opacity: 0; transform: scale(.3); } 36.8% { opacity: 1; transform: scale(1); } 39%, 100% { opacity: 0; transform: scale(1.6); } }
+@keyframes sgK3 { 0%, 51% { opacity: 0; transform: scale(.3); } 51.8% { opacity: 1; transform: scale(1); } 54%, 100% { opacity: 0; transform: scale(1.6); } }
+@keyframes sgK4 { 0%, 68% { opacity: 0; transform: scale(.3); } 68.8% { opacity: 1; transform: scale(1); } 71%, 100% { opacity: 0; transform: scale(1.6); } }
+.sg-k1 { animation-name: sgK1; } .sg-k2 { animation-name: sgK2; } .sg-k3 { animation-name: sgK3; } .sg-k4 { animation-name: sgK4; }
+@keyframes sgRow { 0%, 24% { opacity: 0; } 26%, 100% { opacity: 1; } } .sg-row { animation-name: sgRow; }
+@keyframes sgPanel { 0%, 27% { opacity: 0; } 29%, 100% { opacity: 1; } } .sg-panel { animation-name: sgPanel; }
+@keyframes sgSel { 0%, 36% { opacity: 0; } 38%, 46% { opacity: 1; } 48%, 100% { opacity: 0; } } .sg-sel { animation-name: sgSel; }
+@keyframes sgToast { 0%, 40% { opacity: 0; } 41.5%, 52% { opacity: 1; } 54%, 100% { opacity: 0; } } .sg-toast { animation-name: sgToast; }
+@keyframes sgL1 { 0%, 53% { opacity: 0; } 54.5%, 100% { opacity: 1; } } .sg-l1 { animation-name: sgL1; }
+@keyframes sgL2 { 0%, 56% { opacity: 0; } 57.5%, 100% { opacity: 1; } } .sg-l2 { animation-name: sgL2; }
+@keyframes sgL3 { 0%, 59% { opacity: 0; } 60.5%, 100% { opacity: 1; } } .sg-l3 { animation-name: sgL3; }
+@keyframes sgL4 { 0%, 62% { opacity: 0; } 63.5%, 100% { opacity: 1; } } .sg-l4 { animation-name: sgL4; }
+@keyframes sgSaveBtn { 0%, 68% { transform: scale(1); } 69% { transform: scale(.92); } 70.5%, 100% { transform: scale(1); } }
+.sg-savebtn { animation-name: sgSaveBtn; transform-box: fill-box; transform-origin: center; }
+@keyframes sgSaved { 0%, 70% { opacity: 0; } 72%, 100% { opacity: 1; } } .sg-saved { animation-name: sgSaved; }
+@keyframes sgMenus { 0%, 74% { opacity: .35; } 78%, 100% { opacity: 1; } } .sg-menus { animation-name: sgMenus; }
+@media (prefers-reduced-motion: reduce) {
+  /* 動かさず、本文が入って保存された状態で止める */
+  .supportGuide * { animation: none !important; }
+  .supportGuide .sg-cur, .supportGuide .sg-k, .supportGuide .sg-sel, .supportGuide .sg-toast, .supportGuide .sg-urlph { opacity: 0; }
+  .supportGuide .sg-url, .supportGuide .sg-row, .supportGuide .sg-panel, .supportGuide .sg-l1, .supportGuide .sg-l2, .supportGuide .sg-l3, .supportGuide .sg-l4, .supportGuide .sg-saved, .supportGuide .sg-menus { opacity: 1; }
+}
