@@ -1,6 +1,13 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { SkillIdea } from '../types';
 import { PinIcon, SparkleIcon } from './icons';
+import Tour, { useTour } from './guide/Tour';
+
+const IDEAS_TOUR = [
+  { sel: '[data-tour="idea-list"] .card-hoverable', title: '気になる案を1つ押すと、出品文ができます', text: '15〜40秒で、タイトル・キャッチコピー・サービス詳細までそろいます。作った案には「作成済み」が付き、何度でも開けます。' },
+  { sel: '[data-tour="pin"]', title: '残したい案はピン留め', text: 'ピン留めした案は、作り直しても消えません。気になる案を2〜3個残してから、残りを作り直すのが早いです。' },
+  { sel: '[data-tour="regen"]', title: 'ピンとこなければ、AIで作り直せます', text: '一覧の一番下にあります。「副業として始めやすいもの」など方向を書くと、その向きの案が出ます。' },
+];
 
 interface IdeaListProps {
   ideas: SkillIdea[];
@@ -29,6 +36,7 @@ const PinButton: React.FC<{ pinned?: boolean; onClick: (e: React.MouseEvent) => 
   <button
     onClick={onClick}
     aria-pressed={!!pinned}
+    data-tour="pin"
     title={pinned ? 'ピン留めを外す' : 'ピン留めする'}
     className={`inline-flex items-center gap-1.5 rounded-full text-[11px] font-semibold transition-colors px-3 py-1.5 ${
       pinned
@@ -69,6 +77,7 @@ const IdeaList: React.FC<IdeaListProps> = ({ ideas, keywords = [], onSelect, onT
   };
 
   const pinnedCount = useMemo(() => ideas.filter(i => i.pinned).length, [ideas]);
+  const tour = useTour('smc-tour-ideas-v1', ideas.length > 0);
 
   const handleRegenerate = () => {
     onRegenerate(regenInstruction);
@@ -110,7 +119,7 @@ const IdeaList: React.FC<IdeaListProps> = ({ ideas, keywords = [], onSelect, onT
           <p className="text-stone-500 text-sm">{description}</p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4" data-tour={title === '王道アイデア' ? 'idea-list' : undefined}>
           {items.map((idea) => {
             const isGenerated = !!idea.generatedContent;
             return (
@@ -166,6 +175,7 @@ const IdeaList: React.FC<IdeaListProps> = ({ ideas, keywords = [], onSelect, onT
 
   return (
     <div className="p-6 md:p-10 lg:p-12">
+      <Tour steps={IDEAS_TOUR} open={tour.open} onClose={tour.close} />
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-5 mb-8">
         <div>
           <h2 className="text-xl md:text-2xl font-bold text-stone-900 tracking-tight">気になるアイデアを選択</h2>
@@ -242,7 +252,7 @@ const IdeaList: React.FC<IdeaListProps> = ({ ideas, keywords = [], onSelect, onT
       </p>
 
       {/* AIで作り直すバー（一覧を見終わった最下部に配置） */}
-      <div ref={regenBarRef} className="rounded-2xl border border-brand-100 p-5" style={{ backgroundImage: 'var(--gradient-brand-soft)' }}>
+      <div ref={regenBarRef} data-tour="regen" className="rounded-2xl border border-brand-100 p-5" style={{ backgroundImage: 'var(--gradient-brand-soft)' }}>
         <div className="flex items-center gap-2 mb-3">
           <span className="w-7 h-7 rounded-lg bg-stone-900 text-white flex items-center justify-center shrink-0">
             <SparkleIcon />

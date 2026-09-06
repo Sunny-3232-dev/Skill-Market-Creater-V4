@@ -1,5 +1,12 @@
 import React, { useState } from 'react';
 import { UserInput } from '../types';
+import Tour, { useTour } from './guide/Tour';
+
+const INPUT_TOUR = [
+  { sel: '[data-tour="input-text"]', title: 'まず、自己紹介をここに貼ります', text: '好きなこと・得意なこと・これまでの経験を。箇条書きでも、プロフィールの文章まるごとでも大丈夫です。長くて構いません。' },
+  { sel: '[data-tour="input-submit"]', title: '押すと、20のアイデアが出ます', text: '20〜40秒かかります。王道10案とニッチ10案が並び、この自己紹介にある事実だけを根拠にします。' },
+  { sel: 'nav[aria-label="作成の進み"]', title: 'この3段で進みます', text: '入力 → 選ぶ → 仕上げ。仕上げの画面で出品文をコピーして、スキルマーケットに貼ります。' },
+];
 
 interface InputFormProps {
   onSubmit: (input: UserInput) => void;
@@ -12,6 +19,8 @@ interface InputFormProps {
 const InputForm: React.FC<InputFormProps> = ({ onSubmit, initialText = '', hasIdeas = false, onBackToIdeas }) => {
   const [rawText, setRawText] = useState(initialText);
   const canSubmit = rawText.trim().length > 0;
+  // 初めてこの画面を見たときだけ自動で案内。あとはヘッダの「はじめての方へ」から
+  const tour = useTour('smc-tour-input-v1', true);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -21,6 +30,7 @@ const InputForm: React.FC<InputFormProps> = ({ onSubmit, initialText = '', hasId
 
   return (
     <div className="p-6 md:p-10 lg:p-12 h-full flex flex-col">
+      <Tour steps={INPUT_TOUR} open={tour.open} onClose={tour.close} />
       <div className="mb-4 flex items-start justify-between gap-3">
         <div>
           <h2 className="text-xl md:text-2xl font-bold text-stone-900 tracking-tight">あなたの好き・得意・経験を教えてください</h2>
@@ -38,6 +48,7 @@ const InputForm: React.FC<InputFormProps> = ({ onSubmit, initialText = '', hasId
 
       <form onSubmit={handleSubmit} className="flex-grow flex flex-col gap-5">
         <textarea
+          data-tour="input-text"
           value={rawText}
           onChange={(e) => setRawText(e.target.value)}
           className="field w-full flex-grow min-h-[200px] md:min-h-[260px] p-5 md:p-6 text-stone-800 text-base leading-relaxed resize-none"
@@ -50,7 +61,7 @@ const InputForm: React.FC<InputFormProps> = ({ onSubmit, initialText = '', hasId
           </p>
         )}
 
-        <button
+        <button data-tour="input-submit"
           type="submit"
           disabled={!canSubmit}
           className="btn-primary w-full text-base py-4 px-8"

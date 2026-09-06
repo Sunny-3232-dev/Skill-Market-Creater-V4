@@ -16,6 +16,14 @@ const LearnHub: React.FC = () => {
             うまくいっている人が実践している「価格の決め方・宣伝・改善」の考え方を、無料の記事でまとめました。
             はじめる前でも、行き詰まったときでも、のぞいてみてください。
           </p>
+          <a
+            href="https://library.libecity.com/articles/01KD26FQVJ9VJNH99JBJ9F3TGS"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex mt-3 btn-secondary px-4 py-2 text-xs"
+          >
+            このツールの使い方記事（ノウハウ図書館）↗
+          </a>
         </div>
 
         <div className="space-y-10">

@@ -27,7 +27,7 @@ const CampaignTweetCard: React.FC<CampaignTweetCardProps> = ({ serviceUrl, varia
   const href = buildCampaignTweetUrl(serviceUrl);
 
   return (
-    <div className={className}>
+    <div className={className} data-tour="campaign">
       <div className="flex flex-wrap items-center gap-2 mb-2">
         <span className="text-[10px] font-semibold text-brand-600 bg-brand-50 px-2 py-0.5 rounded-full">
           {CAMPAIGN.shortName}

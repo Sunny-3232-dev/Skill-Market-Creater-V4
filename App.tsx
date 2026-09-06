@@ -5,6 +5,7 @@ import CreatorTool from './components/CreatorTool';
 import SupportHub from './components/SupportHub';
 import LearnHub from './components/LearnHub';
 import { GEMINI_PROXY_MODE } from './services/geminiService';
+import { requestTour } from './components/guide/Tour';
 
 const getEnvApiKey = (): string => {
   try {
@@ -111,14 +112,15 @@ const App: React.FC = () => {
               ヒント集
             </button>
           )}
-          <a
-            href="https://library.libecity.com/articles/01KD26FQVJ9VJNH99JBJ9F3TGS"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="btn-secondary px-4 py-2 text-xs"
-          >
-            使い方
-          </a>
+          {(currentTool === ToolType.CREATOR || currentTool === ToolType.SUPPORT) && (
+            <button
+              onClick={requestTour}
+              className="btn-secondary px-4 py-2 text-xs"
+              title="いま開いている画面の見方を、1分で順に案内します"
+            >
+              はじめての方へ
+            </button>
+          )}
         </div>
       </header>
 

@@ -30,6 +30,18 @@
 - 公開する場合は下記「Cloudflare で配信する」の構成を使う（Worker がキーを持ち、Access で人を絞る）
 - `.env` は `.gitignore` 済み。コミットしないこと
 
+## 画面の案内（初回チュートリアル・動くマニュアル）
+
+PJ090（oVice看板）から移した2つの仕組み。
+
+- **初回チュートリアル** `components/guide/Tour.tsx` — 画面の上に暗い幕をかけ、実物の場所に穴を開けて順に指す。
+  画面ごと（入力3歩／一覧3歩／仕上げ6歩／サポート4歩）に `data-tour` 属性で対象を指定し、その画面を初めて見たときだけ自動で始まる
+  （`localStorage` の `smc-tour-*-v1`）。ヘッダの「はじめての方へ」から何度でも。見えていない項目は飛ばす。
+- **動くマニュアル** `components/guide/AnimatedGuide.tsx` — 1枚の SVG の中で手順を14秒で見せ、下の歩の一覧を同期して光らせる。
+  場面は `PasteGuide`（貼り方）と `SupportGuide`（サポートの使い方）。キーフレームは `index.css` の `pg-*` / `sg-*`
+  （全要素が同じ周期、% が時刻。`@layer` の外に書く）。`prefers-reduced-motion` では最終コマで止める。
+- **うまくいかないとき** `components/Troubleshoot.tsx` — 仕上げ・サポートの末尾に置くアコーディオン。
+
 ## Cloudflare で配信する（検証メンバー向け・APIキーを埋め込まない構成）
 
 `worker/index.ts` と `wrangler.jsonc` が Cloudflare Workers 用の構成。ブラウザは同一オリジンの

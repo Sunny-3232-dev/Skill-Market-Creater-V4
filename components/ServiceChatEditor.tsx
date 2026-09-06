@@ -119,7 +119,7 @@ const ServiceChatEditor: React.FC<ServiceChatEditorProps> = ({
 
   return (
     <div className="fixed bottom-4 inset-x-0 z-40 px-4 pointer-events-none">
-      <div className="max-w-3xl mx-auto pointer-events-auto relative animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <div data-tour="chat-editor" className="max-w-3xl mx-auto pointer-events-auto relative animate-in fade-in slide-in-from-bottom-4 duration-500">
 
         {/* 初回コーチマーク */}
         {showCoach && !showTemplates && !showHistory && (

@@ -8,6 +8,16 @@ import CampaignTweetCard from './CampaignTweetCard';
 import Troubleshoot from './Troubleshoot';
 import ListingPreview from './ListingPreview';
 import PasteGuide from './guide/PasteGuide';
+import Tour, { useTour } from './guide/Tour';
+
+const RESULT_TOUR = [
+  { sel: '[data-tour="detail-card"]', title: 'サービス詳細は、この「コピー」で', text: '見出しに <strong> が付いた形でコピーされ、スキルマーケットに貼ると太字になります。下の枠は貼ったあとの見え方です。' },
+  { sel: '[data-tour="paste-guide"]', title: '貼り方はこの絵のとおり', text: 'コピー → 出品画面の「サービス詳細」欄に貼る → 公開。貼った直後にタグが見えていて正解です。' },
+  { sel: '[data-tour="price-mode"]', title: '価格は標準とモニターを切り替えられます', text: 'モニター価格にするときは、先着人数や期限を付けてください。理由のある値引きに見えます。' },
+  { sel: '[data-tour="prompt-recommended"]', title: 'サムネイル画像はこのプロンプトから', text: '迷ったらこれ。コピーして ChatGPT に貼ると、あなたのサービス内容で画像ができます。' },
+  { sel: '[data-tour="chat-editor"]', title: '直したいところはAIに頼めます', text: '「もっと短く」「価格を上げて」のように書きます。保存するまで元の文は残るので、試して戻せます。' },
+  { sel: '[data-tour="campaign"]', title: '出品したら、つぶやいて応募', text: '9月30日までのキャンペーンです。出品してURLができたら、つぶやきのURL欄に貼ってください。' },
+];
 
 interface ServiceResultProps {
   idea: SkillIdea;
@@ -390,6 +400,7 @@ const ServiceResult: React.FC<ServiceResultProps> = ({ idea, content, onBack, on
   const [expandedPrompt, setExpandedPrompt] = useState<ThumbnailPromptVersion | null>(null);
   const [copiedVersion, setCopiedVersion] = useState<ThumbnailPromptVersion | null>(null);
   const [showTip, setShowTip] = useState(false);
+  const tour = useTour('smc-tour-result-v1', true);
   // 画像プロンプトは「迷ったらこれ」だけ開いておき、残りは求められたときに出す
   const [showAllStyles, setShowAllStyles] = useState(false);
   const recommendedStyle = PROMPT_STYLES.find(st => st.recommended) ?? PROMPT_STYLES[0];
@@ -566,6 +577,7 @@ const ServiceResult: React.FC<ServiceResultProps> = ({ idea, content, onBack, on
 
   return (
     <div className="p-6 md:p-10 lg:p-12 pb-32 h-full flex flex-col">
+      <Tour steps={RESULT_TOUR} open={tour.open} onClose={tour.close} />
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
         <div>
           <div className="flex items-center gap-2 flex-wrap">
@@ -610,7 +622,7 @@ const ServiceResult: React.FC<ServiceResultProps> = ({ idea, content, onBack, on
             }
           />
           {/* 貼り方を1枚の絵で見せる（文章の説明の代わり） */}
-          <PasteGuide className="mb-5" />
+          <div data-tour="paste-guide"><PasteGuide className="mb-5" /></div>
           <div className="mb-5">
             <button
               onClick={() => setShowTip(!showTip)}
@@ -639,7 +651,7 @@ const ServiceResult: React.FC<ServiceResultProps> = ({ idea, content, onBack, on
           <CopySection title="キャッチコピー" content={parsed.catchphrase} minRows={2} onSave={(v) => applySectionEdit({ catchphrase: v })} />
 
           {/* サービス詳細 - 価格モードUIを埋め込んだカスタムカード */}
-          <div className="card p-5">
+          <div className="card p-5" data-tour="detail-card">
             <div className="flex justify-between items-center mb-3 gap-2">
               <div className="flex items-center gap-2 flex-wrap min-w-0">
                 <h4 className="font-semibold text-stone-900 text-sm">サービス詳細</h4>
@@ -695,7 +707,7 @@ const ServiceResult: React.FC<ServiceResultProps> = ({ idea, content, onBack, on
                   {parsed.priceBefore && <ListingPreview text={parsed.priceBefore} />}
 
                   {/* 価格モードカード */}
-                  <div className="my-5 bg-white border border-stone-200 rounded-2xl p-5">
+                  <div className="my-5 bg-white border border-stone-200 rounded-2xl p-5" data-tour="price-mode">
                     <div className="flex items-baseline gap-2 mb-4">
                       <h5 className="font-semibold text-stone-900 text-sm">価格モード</h5>
                       <span className="text-[11px] text-stone-400 hidden sm:inline">選ぶと下の「価格の目安」に反映されます</span>
@@ -779,6 +791,7 @@ const ServiceResult: React.FC<ServiceResultProps> = ({ idea, content, onBack, on
             }
           />
           <div className="space-y-4">
+            <div data-tour="prompt-recommended">
             <PromptCard
               style={recommendedStyle}
               prompt={prompts[recommendedStyle.id]}
@@ -787,6 +800,7 @@ const ServiceResult: React.FC<ServiceResultProps> = ({ idea, content, onBack, on
               onCopy={() => handleCopyPrompt(recommendedStyle.id)}
               onToggle={() => setExpandedPrompt(expandedPrompt === recommendedStyle.id ? null : recommendedStyle.id)}
             />
+            </div>
             <button
               type="button"
               onClick={() => setShowAllStyles(v => !v)}

@@ -12,6 +12,14 @@ import QuestionEditor from './support/QuestionEditor';
 import CampaignTweetCard from './CampaignTweetCard';
 import Troubleshoot from './Troubleshoot';
 import SupportGuide from './guide/SupportGuide';
+import Tour, { useTour } from './guide/Tour';
+
+const SUPPORT_TOUR = [
+  { sel: '[data-tour="support-guide"]', title: '流れはこの絵のとおり', text: 'URLを登録 → ページを開いて本文をコピー → 開いた欄に貼って保存 → 下のメニュー。14秒で1周します。' },
+  { sel: '#register-url', title: 'まず、出品ページのURLを貼って登録', text: 'skill.libecity.com/services/… のURLだけ受け付けます。登録すると、その行の下に本文を貼る欄が開きます。' },
+  { sel: '#support-body', title: '本文はここに貼ります', text: '自動では取りに行けないので、「ページを開く」で出品ページを開き、本文をコピーして貼ってください。口コミも一緒に貼ると精度が上がります。' },
+  { sel: '[data-tour="support-menus"]', title: '本文が入ったら、ここから作ります', text: '宣伝文・サービス資料・チラシ・アンケート。結果はサービスごとに保存され、選び直せば戻ります。' },
+];
 
 interface SupportHubProps {
   ensureKeySet: () => Promise<boolean>;
@@ -305,6 +313,7 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
   const [isRegisteringBody, setIsRegisteringBody] = useState(false);
   // URLを登録せずに本文だけ貼りたい人向けの欄を開くか
   const [showLooseBody, setShowLooseBody] = useState(false);
+  const tour = useTour('smc-tour-support-v1', true);
 
   const [copiedSlideDocVersion, setCopiedSlideDocVersion] = useState<ThumbnailPromptVersion | null>(null);
   const [copiedBannerPrompt, setCopiedBannerPrompt] = useState(false);
@@ -902,6 +911,7 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
       <div className="p-6 md:p-10">
 
         {/* Header */}
+        <Tour steps={SUPPORT_TOUR} open={tour.open} onClose={tour.close} />
         <div className="mb-8 flex flex-wrap items-start justify-between gap-3">
           <div>
             <span className="eyebrow mb-1 block">Support</span>
@@ -927,7 +937,7 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
         <div className="mb-6">
           <SectionLabel label="対象のサービス" />
           {/* 使い方を1枚の絵で見せる（URL登録 → 本文コピー → 貼って保存 → メニュー） */}
-          <SupportGuide className="mb-4" />
+          <div data-tour="support-guide"><SupportGuide className="mb-4" /></div>
           <div className="card p-5">
             <div className="flex flex-wrap justify-between items-center gap-2 mb-2">
               <label htmlFor="register-url" className="text-sm font-semibold text-stone-700">
@@ -1100,7 +1110,7 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
         )}
 
         {/* Menu List — この1入力で3つのAIメニューが動く、を強調 */}
-        <div className="mb-8">
+        <div data-tour="support-menus" className="mb-8">
           <div className="flex items-center gap-2.5 mb-4 px-1">
             <span className="text-[10px] font-semibold text-stone-400 uppercase tracking-[0.2em]">AI メニュー</span>
             <span className="w-1 h-1 rounded-full bg-brand-300"></span>
