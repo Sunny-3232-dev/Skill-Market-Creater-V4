@@ -9,7 +9,7 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "build:cf": "tsc && VITE_GEMINI_PROXY=1 vite build",
-    "dev:cf": "npm run build:cf && wrangler dev",
+    "dev:cf": "npm run build:cf && wrangler dev --local",
     "deploy": "npm run build:cf && wrangler deploy",
     "cf:types": "wrangler types worker/worker-configuration.d.ts"
   },
