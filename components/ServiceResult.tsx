@@ -5,6 +5,7 @@ import { PromptPreview } from './promptPreviews';
 import ServiceChatEditor, { ChatMessage } from './ServiceChatEditor';
 import { decorateHeadings } from '../utils/skillMarketMarkup';
 import CampaignTweetCard from './CampaignTweetCard';
+import Troubleshoot from './Troubleshoot';
 
 interface ServiceResultProps {
   idea: SkillIdea;
@@ -814,6 +815,29 @@ const ServiceResult: React.FC<ServiceResultProps> = ({ idea, content, onBack, on
 
         {/* 出品したら: つぶやいて応募（期間外は描画されない） */}
         <CampaignTweetCard variant="publish" className="card p-5" />
+
+        <Troubleshoot items={[
+          {
+            q: '貼っても見出しが太字にならない',
+            a: <>太字になるのは「サービス詳細」の欄だけです。タイトルや注意事項の欄では効きません。メモ帳などを経由して貼ると <code>&lt;strong&gt;</code> が消えることがあるので、このページの「コピー」から直接貼ってください。</>,
+          },
+          {
+            q: '価格モード（標準／モニター）の切り替えが出ない',
+            a: <>本文に「■ 標準価格」「■ モニター価格」の両方の見出しが残っているときだけ出ます。手で編集して消えた場合は見出しを戻すか、下のAI編集に「価格の目安に標準価格とモニター価格の2つを入れて」と頼んでください。</>,
+          },
+          {
+            q: '書かれている実績や経験が自分と違う',
+            a: <>実績は自己紹介にある事実だけを根拠にしています。違うところがあれば、一覧に戻って「プロフィールを修正」で自己紹介を直してから作り直すか、各セクションの「編集」で直接書き換えてください。</>,
+          },
+          {
+            q: '生成が終わらない・エラーになる',
+            a: <>出品文の生成は15〜40秒かかります。「エラーが発生しました」と出たときは、もう一度お試しください。続く場合はページを再読み込みしてください。作ったアイデアや本文はこのブラウザに保存されているので消えません。</>,
+          },
+          {
+            q: '「APIキーが設定されていません」と出る',
+            a: <>自分のパソコンで動かしている場合は <code>.env</code> に <code>GEMINI_API_KEY</code> を書いて再起動します。配布されたURLで使っている場合は出ない表示なので、URLが正しいか確認してください。</>,
+          },
+        ]} />
       </div>
 
       {/* 画面下部に常駐するAI編集バー（fixed配置） */}

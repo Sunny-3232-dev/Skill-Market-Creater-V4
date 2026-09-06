@@ -351,7 +351,14 @@ const CreatorTool: React.FC<CreatorToolProps> = ({ ensureKeySet, onHandleApiErro
         document.body
       )}
 
-      {isLoading && <LoadingOverlay message={loadingMessage} title={loadingTitle} sourceWords={inputWords} />}
+      {isLoading && (
+        <LoadingOverlay
+          message={loadingMessage}
+          title={loadingTitle}
+          sourceWords={inputWords}
+          expectedSeconds={step === Step.GENERATING_DETAIL ? [15, 40] : [20, 40]}
+        />
+      )}
     </>
   );
 };

@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 
 interface LoadingOverlayProps {
@@ -7,6 +7,8 @@ interface LoadingOverlayProps {
   sourceWords?: string[];
   /** 指定すると「キャンセル」ボタンを表示する */
   onCancel?: () => void;
+  /** ふつうの所要時間（秒）。指定すると経過秒と目安を出し、超えたら「もう少し」と伝える */
+  expectedSeconds?: [number, number];
 }
 
 // 入力された言葉が静かに立ちのぼる演出。
@@ -39,7 +41,16 @@ const FloatingWord: React.FC<{ word: string; index: number }> = ({ word, index }
   );
 };
 
-const LoadingOverlay: React.FC<LoadingOverlayProps> = ({ message, title = "考えています…", sourceWords = [], onCancel }) => {
+const LoadingOverlay: React.FC<LoadingOverlayProps> = ({ message, title = "考えています…", sourceWords = [], onCancel, expectedSeconds }) => {
+  // 20〜40秒の待ちで「止まっているのでは」と思われないよう、経過と目安を見せる
+  const [elapsed, setElapsed] = useState(0);
+  useEffect(() => {
+    const started = Date.now();
+    const id = setInterval(() => setElapsed(Math.floor((Date.now() - started) / 1000)), 1000);
+    return () => clearInterval(id);
+  }, []);
+  const overdue = !!expectedSeconds && elapsed > expectedSeconds[1];
+
   const displayWords = useMemo(() => {
     if (!sourceWords.length) return [];
     const unique = Array.from(new Set(sourceWords));
@@ -70,6 +81,13 @@ const LoadingOverlay: React.FC<LoadingOverlayProps> = ({ message, title = "考�
           <p className="text-stone-500 text-sm leading-relaxed">
             {message}
           </p>
+          {expectedSeconds && (
+            <p className="text-[11px] text-stone-400 tabular-nums" aria-live="polite">
+              {overdue
+                ? `経過 ${elapsed}秒 — ふつうより少しかかっています。そのままお待ちください`
+                : `経過 ${elapsed}秒（ふつう ${expectedSeconds[0]}〜${expectedSeconds[1]}秒）`}
+            </p>
+          )}
         </div>
 
         {onCancel && (

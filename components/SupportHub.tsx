@@ -10,6 +10,7 @@ import PatternCard from './support/PatternCard';
 import CodeViewer from './support/CodeViewer';
 import QuestionEditor from './support/QuestionEditor';
 import CampaignTweetCard from './CampaignTweetCard';
+import Troubleshoot from './Troubleshoot';
 
 interface SupportHubProps {
   ensureKeySet: () => Promise<boolean>;
@@ -1670,6 +1671,29 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
           </div>
         )}
 
+        <Troubleshoot className="mb-8" items={[
+          {
+            q: 'URLを登録したのに本文が入らない',
+            a: <>本文は自動では取りに行きません（出品ページは会員向けで、機械からの取得が弾かれるため）。登録したサービスの「ページを開く」で出品ページを開き、本文をコピーして開いた欄に貼ってください。口コミも一緒に貼ると、宣伝文やアンケートの精度が上がります。</>,
+          },
+          {
+            q: '「出品ページURLを入力してください」と出て登録できない',
+            a: <>受け付けるのは <code>https://skill.libecity.com/services/数字</code> の形だけです。出品ページのアドレスバーからそのままコピーしてください。マイページや一覧のURLは登録できません。</>,
+          },
+          {
+            q: '宣伝文にサービスのリンクが入らない',
+            a: <>URLを登録したサービスを選んでいるときだけ、そのURLが入ります。「本文だけ貼って使う」で作った場合はリンクなしになるので、投稿するときにご自身で足してください。</>,
+          },
+          {
+            q: '作った結果が消えた',
+            a: <>結果はサービスごとに保存されています。別のサービスを選ぶと表示が切り替わるだけなので、元のサービスを選び直せば戻ります。「入力と結果をクリア」は、選んでいるサービスの結果だけを消します。</>,
+          },
+          {
+            q: 'チラシにQRコードが入らない',
+            a: <>QRコードは画像生成では読み取れるものが作れません。右下に白い余白を空けた状態で出力されるので、QRはあとから重ねてください。この機能は検証中で、載せ方はこれから変えていきます。</>,
+          },
+        ]} />
+
         {/* 「売れる出品者のヒント」記事はトップの第3入口（ヒント集）へ集約 */}
         <div className="mb-2 rounded-2xl border border-stone-200 bg-stone-50 px-5 py-4 flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-start gap-3 min-w-0">
@@ -1690,6 +1714,7 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
       {/* Loading Overlay */}
       {isLoading && (
         <LoadingOverlay
+          expectedSeconds={[10, 40]}
           message={
             loadingMenu === 'promoter'
               ? '困りごとに寄り添ってから、解決策をそっと添える形で。読んだ方が気持ちよく受け取れる文にしています。'
