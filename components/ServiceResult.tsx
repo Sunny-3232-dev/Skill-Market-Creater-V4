@@ -6,6 +6,7 @@ import ServiceChatEditor, { ChatMessage } from './ServiceChatEditor';
 import { decorateHeadings } from '../utils/skillMarketMarkup';
 import CampaignTweetCard from './CampaignTweetCard';
 import Troubleshoot from './Troubleshoot';
+import ListingPreview from './ListingPreview';
 
 interface ServiceResultProps {
   idea: SkillIdea;
@@ -685,11 +686,10 @@ const ServiceResult: React.FC<ServiceResultProps> = ({ idea, content, onBack, on
               </>
             ) : (
             <div className="bg-stone-50 rounded-xl p-4 text-stone-600 text-sm leading-relaxed">
+              <p className="text-[10px] font-semibold text-stone-400 mb-3 tracking-wide">スキルマーケットに貼ったときの見え方（見出しは太字になります）</p>
               {parsed.hasMonitorPrice ? (
                 <>
-                  {parsed.priceBefore && (
-                    <div className="whitespace-pre-wrap">{parsed.priceBefore}</div>
-                  )}
+                  {parsed.priceBefore && <ListingPreview text={parsed.priceBefore} />}
 
                   {/* 価格モードカード */}
                   <div className="my-5 bg-white border border-stone-200 rounded-2xl p-5">
@@ -745,14 +745,12 @@ const ServiceResult: React.FC<ServiceResultProps> = ({ idea, content, onBack, on
                   </div>
 
                   {/* 価格の目安ブロック(選択反映) */}
-                  <div className="whitespace-pre-wrap">{currentPriceBlock}</div>
+                  <ListingPreview text={currentPriceBlock} />
 
-                  {parsed.priceAfter && (
-                    <div className="whitespace-pre-wrap mt-3">{parsed.priceAfter}</div>
-                  )}
+                  {parsed.priceAfter && <ListingPreview text={parsed.priceAfter} className="mt-3" />}
                 </>
               ) : (
-                <div className="whitespace-pre-wrap">{parsed.detail}</div>
+                <ListingPreview text={parsed.detail} />
               )}
             </div>
             )}

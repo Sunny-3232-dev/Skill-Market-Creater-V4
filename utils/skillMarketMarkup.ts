@@ -16,15 +16,20 @@
  */
 const HEADING_PREFIXES = ['💭', '✅', '🌟', '📦', '💬', '💰', '🔚', '■'];
 
+/** その行がサービス詳細の見出しか（行頭が見出し記号）。コピー時の太字化と画面プレビューで共有 */
+export const isHeadingLine = (line: string): boolean => {
+  const trimmed = line.trim();
+  return !!trimmed && HEADING_PREFIXES.some(prefix => trimmed.startsWith(prefix));
+};
+
 /**
  * 行頭が見出し記号で始まる行を <strong> で囲む。
  * 固定文言ではなく記号で判定するので、見出しを手直ししても効き続ける。
  */
 export const decorateHeadings = (text: string): string =>
   text.split('\n').map(line => {
+    if (!isHeadingLine(line)) return line;
     const trimmed = line.trim();
-    if (!trimmed) return line;
-    if (!HEADING_PREFIXES.some(prefix => trimmed.startsWith(prefix))) return line;
     if (trimmed.includes('<strong>')) return line; // 二重付与を防ぐ
     return line.replace(trimmed, `<strong>${trimmed}</strong>`);
   }).join('\n');
