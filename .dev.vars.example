@@ -1,0 +1,4 @@
+# wrangler dev 用のローカル秘密情報。コピーして .dev.vars を作る（.dev.vars は .gitignore 済み）
+GEMINI_API_KEY=
+# ローカルでは Access が無いので JWT 検証を切る。本番の vars は "1" のまま
+REQUIRE_ACCESS_JWT=0

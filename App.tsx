@@ -4,6 +4,7 @@ import Hub from './components/Hub';
 import CreatorTool from './components/CreatorTool';
 import SupportHub from './components/SupportHub';
 import LearnHub from './components/LearnHub';
+import { GEMINI_PROXY_MODE } from './services/geminiService';
 
 const getEnvApiKey = (): string => {
   try {
@@ -36,9 +37,10 @@ const App: React.FC = () => {
 
   // Google AI Studio 環境ではセッションキーが自動で使われる。
   // ローカル開発では .env の API_KEY / GEMINI_API_KEY を参照する。
+  // プロキシモード（Cloudflare 配信）ではキーは Worker 側にあるので確認不要。
   const ensureKeySet = useCallback(async (): Promise<boolean> => {
     const aistudio = (window as any).aistudio;
-    if (aistudio || getEnvApiKey()) return true;
+    if (GEMINI_PROXY_MODE || aistudio || getEnvApiKey()) return true;
     notify("APIキーが設定されていません。.env に GEMINI_API_KEY を設定してください。", 'error');
     return false;
   }, [notify]);

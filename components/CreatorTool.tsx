@@ -162,7 +162,10 @@ const CreatorTool: React.FC<CreatorToolProps> = ({ ensureKeySet, onHandleApiErro
       setIdeas(merged);
       saveIdeasToStorage(merged);
       setStep(Step.IDEAS);
-      refreshKeywords(input.rawText); // プロフィールが変わったのでキーワードも更新
+      // プロフィールが変わったのでキーワード・事実リストも更新。
+      // ここで起動済みなので、一覧表示時の「未取得なら補完」効果を二重に走らせない
+      keywordsBootstrapped.current = true;
+      refreshKeywords(input.rawText);
     } catch (error: any) {
       onHandleApiError(error);
     } finally {

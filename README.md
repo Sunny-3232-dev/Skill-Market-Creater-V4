@@ -27,16 +27,50 @@
 この構成はローカル開発・Google AI Studio 内での利用専用です。
 
 - このままの構成で**認証なしの公開URLにデプロイしないこと**（キーが第三者に露出します）
-- 公開する場合は、サーバ側プロキシ（Cloudflare Workers 等）でキーを秘匿するか、
-  Cloudflare Access 等の認証で保護された環境に限定すること
+- 公開する場合は下記「Cloudflare で配信する」の構成を使う（Worker がキーを持ち、Access で人を絞る）
 - `.env` は `.gitignore` 済み。コミットしないこと
+
+## Cloudflare で配信する（検証メンバー向け・APIキーを埋め込まない構成）
+
+`worker/index.ts` と `wrangler.jsonc` が Cloudflare Workers 用の構成。ブラウザは同一オリジンの
+`/api/gemini/*` に投げ、Worker が Secrets の `GEMINI_API_KEY` を付けて Gemini API へ中継する。
+`VITE_GEMINI_PROXY=1` でビルドするとバンドルにキーは含まれない（`npm run build:cf`）。
+
+守り方は二重にしてある。
+
+- 前段: Cloudflare Access（メール許可リスト）。カスタムドメインのみで、`preview_urls` / `workers_dev` は無効
+- Worker 側: Access の JWT（`Cf-Access-Jwt-Assertion`）を検証する。`REQUIRE_ACCESS_JWT=1` のとき、
+  JWT が無い／`ACCESS_TEAM_DOMAIN`・`ACCESS_AUD` が未設定なら、静的アセットも含めて 403 を返す（fail closed）
+- 費用の歯止め: KV で「メール別」「全体」の1日あたり呼び出し回数に上限（`DAILY_LIMIT_*`）
+- 中継するモデルは `ALLOWED_MODELS` に列挙したものだけ。`?model=` の切替候補もここに足す
+
+### 初回セットアップ
+
+1. `wrangler login`（済みなら不要）
+2. `cp .dev.vars.example .dev.vars` して `GEMINI_API_KEY` を記入（ローカルの `wrangler dev` 用）
+3. 本番の Secret を登録: `npx wrangler secret put GEMINI_API_KEY`（対話入力）
+4. Cloudflare Zero Trust → Access → Applications で Self-hosted アプリを作る
+   - Application domain: `skillmarket.sunconnect.jp`（`wrangler.jsonc` の `routes` と同じ）
+   - Policy: Allow / Emails に検証メンバーのアドレスを列挙
+   - 作成後、Overview の **Application Audience (AUD) Tag** を控える
+5. `wrangler.jsonc` の `vars` に `ACCESS_TEAM_DOMAIN`（例 `xxxx.cloudflareaccess.com`）と `ACCESS_AUD` を記入
+6. `npm run deploy`
+
+### 日常
+
+| コマンド | 内容 |
+| --- | --- |
+| `npm run dev:cf` | プロキシビルド → `wrangler dev`（http://localhost:8787。Access なし、`.dev.vars` のキーで中継） |
+| `npm run deploy` | プロキシビルド → デプロイ |
+| `npm run cf:types` | `wrangler.jsonc` を変えたら Env 型を再生成 |
+| `npx wrangler tail` | 中継ログ（`gemini_proxy` にメール・モデル・所要時間が JSON で出る） |
 
 ## スクリプト
 
 | コマンド | 内容 |
 | --- | --- |
 | `npm run dev` | 開発サーバ起動 |
-| `npm run lint` | 型チェック（`tsc --noEmit`） |
+| `npm run lint` | 型チェック（アプリ＋Worker） |
 | `npm run build` | 型チェック + 本番ビルド |
 | `npm run preview` | ビルド成果物のプレビュー |
 

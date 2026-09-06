@@ -384,8 +384,7 @@ const SLIDE_STYLE_DIRECTIVES: Record<ThumbnailPromptVersion, string> = {
 export const generateAutoSlideStyle = async (serviceBody: string): Promise<string> => {
   const body = serviceBody?.trim();
   if (!body) return '';
-  const apiKey = getApiKey();
-  const ai = new GoogleGenAI(apiKey ? { apiKey } : {});
+  const ai = createClient();
 
   const prompt = `
 あなたはプレゼン資料のアートディレクターです。
@@ -518,8 +517,7 @@ const SLIDE_ROLE_LAYOUTS: Record<string, string> = {
 export const generateSlideImageContents = async (serviceBody: string): Promise<SlideImagePrompt[]> => {
   const body = serviceBody?.trim();
   if (!body) return [];
-  const apiKey = getApiKey();
-  const ai = new GoogleGenAI(apiKey ? { apiKey } : {});
+  const ai = createClient();
 
   const prompt = `
 あなたはSNS・スキルマーケット向けの「サービス紹介画像」を設計するアートディレクターです。
@@ -680,6 +678,24 @@ const getApiKey = (): string => {
   }
 };
 
+// 通信先の決め方
+// - 通常（ローカル開発／Google AI Studio）: ブラウザから Gemini API へ直接。キーは .env か AI Studio のセッション
+// - プロキシモード（VITE_GEMINI_PROXY=1 でビルド）: 同一オリジンの /api/gemini へ送り、Cloudflare Worker が
+//   Secrets のキーを付けて中継する。バンドルにキーは含まれない（worker/index.ts 参照）
+export const GEMINI_PROXY_MODE = import.meta.env.VITE_GEMINI_PROXY === '1';
+export const GEMINI_PROXY_PATH = '/api/gemini';
+
+const createClient = (): GoogleGenAI => {
+  if (GEMINI_PROXY_MODE) {
+    return new GoogleGenAI({
+      apiKey: 'proxy', // SDK が空キーを拒むためのダミー。Worker 側で本物に差し替える
+      httpOptions: { baseUrl: `${window.location.origin}${GEMINI_PROXY_PATH}` },
+    });
+  }
+  const apiKey = getApiKey();
+  return new GoogleGenAI(apiKey ? { apiKey } : {});
+};
+
 export interface GenerateIdeasOptions {
   // 「もっと副業向けに」等、再生成時の追加指示
   instruction?: string;
@@ -688,9 +704,7 @@ export interface GenerateIdeasOptions {
 }
 
 export const generateIdeas = async (input: UserInput, options: GenerateIdeasOptions = {}): Promise<SkillIdea[]> => {
-  const apiKey = getApiKey();
-  // Google AI Studio ではセッションから自動的にキーが利用可能
-  const ai = new GoogleGenAI(apiKey ? { apiKey } : {});
+  const ai = createClient();
 
   const instructionBlock = options.instruction?.trim()
     ? `\n【今回の追加リクエスト（最優先で反映）】\n${options.instruction.trim()}\n`
@@ -759,8 +773,7 @@ JSON配列で出力してください。各要素は以下のキーを持つオ�
 export const extractProfileKeywords = async (rawText: string): Promise<string[]> => {
   const text = rawText?.trim();
   if (!text) return [];
-  const apiKey = getApiKey();
-  const ai = new GoogleGenAI(apiKey ? { apiKey } : {});
+  const ai = createClient();
 
   const prompt = `
 以下は、ある人の自己紹介・プロフィール文です。
@@ -805,8 +818,7 @@ ${text}
 export const extractProfileFacts = async (rawText: string): Promise<ProfileFacts | null> => {
   const text = rawText?.trim();
   if (!text) return null;
-  const apiKey = getApiKey();
-  const ai = new GoogleGenAI(apiKey ? { apiKey } : {});
+  const ai = createClient();
 
   const prompt = `
 以下は、ある人の自己紹介・プロフィール文です。趣味や家族の話など、仕事と無関係な内容も混ざっています。
@@ -879,8 +891,7 @@ export const formatProfileFacts = (facts: ProfileFacts | null | undefined): stri
 export const extractServiceTitle = async (rawText: string): Promise<string> => {
   const text = rawText?.trim();
   if (!text) return '';
-  const apiKey = getApiKey();
-  const ai = new GoogleGenAI(apiKey ? { apiKey } : {});
+  const ai = createClient();
 
   const prompt = `
 以下は、リベシティ「スキルマーケットonline」の出品ページからコピーした本文です。
@@ -920,9 +931,7 @@ ${text.slice(0, 4000)}
 
 export const generateServicePage = async (selectedIdea: SkillIdea, facts?: ProfileFacts | null): Promise<string> => {
   const factsBlock = formatProfileFacts(facts);
-  const apiKey = getApiKey();
-  // Google AI Studio ではセッションから自動的にキーが利用可能
-  const ai = new GoogleGenAI(apiKey ? { apiKey } : {});
+  const ai = createClient();
 
   const prompt = `
 【役割】
@@ -1026,8 +1035,7 @@ export const reviseServiceContent = async (
   currentContent: string,
   instruction: string
 ): Promise<ServiceRevision> => {
-  const apiKey = getApiKey();
-  const ai = new GoogleGenAI(apiKey ? { apiKey } : {});
+  const ai = createClient();
 
   const prompt = `
 【役割】
@@ -1088,8 +1096,7 @@ export interface FetchedService {
 }
 
 export const fetchServiceFromUrl = async (url: string): Promise<FetchedService> => {
-  const apiKey = getApiKey();
-  const ai = new GoogleGenAI(apiKey ? { apiKey } : {});
+  const ai = createClient();
 
   const prompt = `
 以下のURLは、リベシティ「スキルマーケットonline」の出品ページです。
@@ -1134,9 +1141,7 @@ URL: ${url}
 };
 
 export const generateThumbnail = async (idea: SkillIdea, useHighQuality: boolean = false): Promise<string> => {
-  const apiKey = getApiKey();
-  // Google AI Studio ではセッションから自動的にキーが利用可能
-  const ai = new GoogleGenAI(apiKey ? { apiKey } : {});
+  const ai = createClient();
   const prompt = getThumbnailPrompt(idea, useHighQuality);
 
   const model = useHighQuality ? MODELS.imageHq : MODELS.image;
@@ -1173,9 +1178,7 @@ export const generateThumbnail = async (idea: SkillIdea, useHighQuality: boolean
 // --- Promoter Tool Functions ---
 
 export const generatePromotion = async (serviceBody: string, serviceUrl: string): Promise<string[]> => {
-  const apiKey = getApiKey();
-  // Google AI Studio では、セッションから自動的にキーが利用可能
-  const ai = new GoogleGenAI(apiKey ? { apiKey } : {});
+  const ai = createClient();
   const prompt = `
 あなたは「リベシティのつぶやき投稿」を作るプロのコピーライターです。
 以下の【出品サービスページ本文】を読み取り、リベシティの雰囲気に合う
@@ -1255,9 +1258,7 @@ JSON配列 (string[]) で出力してください。
 // --- Survey Tool Functions ---
 
 export const generateSurveyPatterns = async (serviceBody: string, priceHint: string): Promise<SurveyPattern[]> => {
-  const apiKey = getApiKey();
-  // Google AI Studio では、セッションから自動的にキーが利用可能
-  const ai = new GoogleGenAI(apiKey ? { apiKey } : {});
+  const ai = createClient();
   const servicePrice = priceHint || "価格未定";
   const selectedPattern = "";
 
@@ -1482,8 +1483,7 @@ export const getFormBannerPrompt = (formTitle: string): string => `ChatGPTの画
 export const generateFlyerContent = async (serviceBody: string): Promise<FlyerContent | null> => {
   const body = serviceBody?.trim();
   if (!body) return null;
-  const apiKey = getApiKey();
-  const ai = new GoogleGenAI(apiKey ? { apiKey } : {});
+  const ai = createClient();
 
   const prompt = `
 あなたは紙のチラシ（A4たて）を設計するコピーライターです。
@@ -1557,8 +1557,7 @@ export const generateMultiFlyerContent = async (
 ): Promise<MultiFlyerContent | null> => {
   const targets = services.filter(s => s.body?.trim());
   if (targets.length === 0) return null;
-  const apiKey = getApiKey();
-  const ai = new GoogleGenAI(apiKey ? { apiKey } : {});
+  const ai = createClient();
 
   const serviceBlocks = targets
     .map((s, i) => `【サービス${i + 1}：${s.title || '（名称未登録）'}】\n${s.body.trim().slice(0, 1500)}`)

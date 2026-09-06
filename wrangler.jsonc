@@ -1,0 +1,43 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "skill-market-creator",
+  "account_id": "a271a5dd5fed723c5279b64681b4ba20",
+  "main": "worker/index.ts",
+  "compatibility_date": "2026-09-01",
+  "compatibility_flags": ["nodejs_compat"],
+
+  // ビルド済み SPA（npm run build:cf で VITE_GEMINI_PROXY=1 付きでビルドしたもの）。
+  // run_worker_first: 全リクエストを Worker に通し、Access の JWT を確認してから配信する
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": true
+  },
+
+  // Access 認証をバイパスできる経路を塞ぐ（社内ルール）。カスタムドメインからのみ入れる
+  "preview_urls": false,
+  "workers_dev": false,
+  "observability": { "enabled": true },
+
+  // 他PJと同じく sunconnect.jp のサブドメイン。Access はこのホスト名に対して設定する
+  "routes": [{ "pattern": "skillmarket.sunconnect.jp", "custom_domain": true }],
+
+  // 1日あたりの利用回数カウンタ
+  "kv_namespaces": [{ "binding": "KV", "id": "3c8c29e6a06d480b8ebc3d4c6bfc3f37" }],
+
+  // 公開してよい設定のみ。GEMINI_API_KEY は wrangler secret put（ローカルは .dev.vars）
+  "vars": {
+    // "1" で Worker 側でも Access の JWT を検証する。本番は必ず "1"。ローカルは .dev.vars で "0"
+    "REQUIRE_ACCESS_JWT": "1",
+    // Cloudflare Zero Trust のチーム domain（例: example.cloudflareaccess.com）と、
+    // Access アプリケーションの Application Audience (AUD) Tag。Access 作成後に埋める
+    "ACCESS_TEAM_DOMAIN": "",
+    "ACCESS_AUD": "",
+    // 費用の歯止め（Gemini 呼び出し回数／日）
+    "DAILY_LIMIT_PER_USER": "40",
+    "DAILY_LIMIT_GLOBAL": "400",
+    // 中継を許すモデル。?model= で切り替えて検証する候補もここに並べる
+    "ALLOWED_MODELS": "gemini-3.5-flash,gemini-3.6-flash,gemini-3.7-flash,gemini-3.8-flash,gemini-3.1-pro-preview,gemini-2.5-flash-image,gemini-3-pro-image-preview,gemini-3-pro-image"
+  }
+}
