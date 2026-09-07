@@ -350,3 +350,70 @@ body {
   .supportGuide .sg-cur, .supportGuide .sg-k, .supportGuide .sg-sel, .supportGuide .sg-toast, .supportGuide .sg-urlph { opacity: 0; }
   .supportGuide .sg-url, .supportGuide .sg-row, .supportGuide .sg-panel, .supportGuide .sg-l1, .supportGuide .sg-l2, .supportGuide .sg-l3, .supportGuide .sg-l4, .supportGuide .sg-saved, .supportGuide .sg-menus { opacity: 1; }
 }
+
+/* --- NotebookLM の手順（NotebookLMGuide, nb-*）。1周16秒 --- */
+.nb-anim { animation-duration: 16s; animation-timing-function: linear; animation-iteration-count: infinite; }
+.nb-k { transform-box: fill-box; transform-origin: center; opacity: 0; }
+/* カーソル: ＋追加 → コピーしたテキスト → 挿入 → ＋追加 → ファイルをアップロード → 鉛筆 → 欄 → 生成 → 退場 */
+@keyframes nbCur {
+  0%, 4%      { transform: translate(300px, 340px); }
+  8%, 10%     { transform: translate(96px, 75px); }
+  14%, 16%    { transform: translate(140px, 156px); }
+  26%, 28%    { transform: translate(416px, 267px); }
+  34%, 36%    { transform: translate(96px, 75px); }
+  40%, 42%    { transform: translate(387px, 120px); }
+  56%, 59%    { transform: translate(602px, 180px); }
+  64%, 66%    { transform: translate(532px, 165px); }
+  83%, 86%    { transform: translate(532px, 268px); }
+  94%, 100%   { transform: translate(300px, 345px); }
+}
+.nb-cur { animation-name: nbCur; animation-timing-function: ease-in-out; }
+@keyframes nbK1 { 0%, 9% { opacity: 0; transform: scale(.3); } 9.8% { opacity: 1; transform: scale(1); } 12%, 100% { opacity: 0; transform: scale(1.6); } }
+@keyframes nbK2 { 0%, 15% { opacity: 0; transform: scale(.3); } 15.8% { opacity: 1; transform: scale(1); } 18%, 100% { opacity: 0; transform: scale(1.6); } }
+@keyframes nbK3 { 0%, 27% { opacity: 0; transform: scale(.3); } 27.8% { opacity: 1; transform: scale(1); } 30%, 100% { opacity: 0; transform: scale(1.6); } }
+@keyframes nbK4 { 0%, 35% { opacity: 0; transform: scale(.3); } 35.8% { opacity: 1; transform: scale(1); } 38%, 100% { opacity: 0; transform: scale(1.6); } }
+@keyframes nbK5 { 0%, 41% { opacity: 0; transform: scale(.3); } 41.8% { opacity: 1; transform: scale(1); } 44%, 100% { opacity: 0; transform: scale(1.6); } }
+@keyframes nbK6 { 0%, 58% { opacity: 0; transform: scale(.3); } 58.8% { opacity: 1; transform: scale(1); } 61%, 100% { opacity: 0; transform: scale(1.6); } }
+@keyframes nbK7 { 0%, 65% { opacity: 0; transform: scale(.3); } 65.8% { opacity: 1; transform: scale(1); } 68%, 100% { opacity: 0; transform: scale(1.6); } }
+@keyframes nbK8 { 0%, 85% { opacity: 0; transform: scale(.3); } 85.8% { opacity: 1; transform: scale(1); } 88%, 100% { opacity: 0; transform: scale(1.6); } }
+.nb-k1 { animation-name: nbK1; } .nb-k2 { animation-name: nbK2; } .nb-k3 { animation-name: nbK3; } .nb-k4 { animation-name: nbK4; }
+.nb-k5 { animation-name: nbK5; } .nb-k6 { animation-name: nbK6; } .nb-k7 { animation-name: nbK7; } .nb-k8 { animation-name: nbK8; }
+@keyframes nbAddBtn { 0%, 9% { transform: scale(1); } 10% { transform: scale(.94); } 11.5%, 35% { transform: scale(1); } 36% { transform: scale(.94); } 37.5%, 100% { transform: scale(1); } }
+.nb-addbtn { animation-name: nbAddBtn; transform-box: fill-box; transform-origin: center; }
+/* ダイアログ1（本文）: 11〜30%。選択肢の塗り、貼られる本文、挿入 */
+@keyframes nbDlg1 { 0%, 10.5% { opacity: 0; } 12%, 29% { opacity: 1; } 30.5%, 100% { opacity: 0; } } .nb-dlg1 { animation-name: nbDlg1; }
+@keyframes nbOpt1 { 0%, 16% { opacity: 0; } 17%, 100% { opacity: 1; } } .nb-opt1 { animation-name: nbOpt1; }
+@keyframes nbB1 { 0%, 19% { opacity: 0; } 20.5%, 100% { opacity: 1; } } .nb-b1 { animation-name: nbB1; }
+@keyframes nbB2 { 0%, 21.5% { opacity: 0; } 23%, 100% { opacity: 1; } } .nb-b2 { animation-name: nbB2; }
+@keyframes nbB3 { 0%, 24% { opacity: 0; } 25.5%, 100% { opacity: 1; } } .nb-b3 { animation-name: nbB3; }
+@keyframes nbIns1 { 0%, 27% { transform: scale(1); } 28% { transform: scale(.92); } 29.5%, 100% { transform: scale(1); } }
+.nb-ins1 { animation-name: nbIns1; transform-box: fill-box; transform-origin: center; }
+@keyframes nbSrc1 { 0%, 30% { opacity: 0; } 31.5%, 100% { opacity: 1; } } .nb-src1 { animation-name: nbSrc1; }
+/* ダイアログ2（画像）: 37〜50% */
+@keyframes nbDlg2 { 0%, 36.5% { opacity: 0; } 38%, 49% { opacity: 1; } 50.5%, 100% { opacity: 0; } } .nb-dlg2 { animation-name: nbDlg2; }
+@keyframes nbOpt2 { 0%, 42% { opacity: 0; } 43%, 100% { opacity: 1; } } .nb-opt2 { animation-name: nbOpt2; }
+@keyframes nbImg { 0%, 44% { opacity: 0; } 45.5%, 100% { opacity: 1; } } .nb-img { animation-name: nbImg; }
+@keyframes nbSrc2 { 0%, 50% { opacity: 0; } 51.5%, 100% { opacity: 1; } } .nb-src2 { animation-name: nbSrc2; }
+@keyframes nbLab1 { 0%, 51% { opacity: 0; } 53%, 100% { opacity: 1; } } .nb-lab1 { animation-name: nbLab1; }
+/* Studio: カード → 鉛筆 → カスタマイズ欄 → 生成 → 結果 */
+@keyframes nbPencil { 0%, 58% { transform: scale(1); } 59% { transform: scale(.88); } 60.5%, 100% { transform: scale(1); } }
+.nb-pencil { animation-name: nbPencil; transform-box: fill-box; transform-origin: center; }
+@keyframes nbCards { 0%, 60% { opacity: 1; } 62%, 100% { opacity: 0; } } .nb-cards { animation-name: nbCards; }
+@keyframes nbCustom { 0%, 60.5% { opacity: 0; } 62%, 89% { opacity: 1; } 90.5%, 100% { opacity: 0; } } .nb-custom { animation-name: nbCustom; }
+@keyframes nbPh { 0%, 67% { opacity: 1; } 68%, 100% { opacity: 0; } } .nb-ph { animation-name: nbPh; }
+@keyframes nbP1 { 0%, 67.5% { opacity: 0; } 69%, 100% { opacity: 1; } } .nb-p1 { animation-name: nbP1; }
+@keyframes nbP2 { 0%, 70% { opacity: 0; } 71.5%, 100% { opacity: 1; } } .nb-p2 { animation-name: nbP2; }
+@keyframes nbP3 { 0%, 72.5% { opacity: 0; } 74%, 100% { opacity: 1; } } .nb-p3 { animation-name: nbP3; }
+@keyframes nbP4 { 0%, 75% { opacity: 0; } 76.5%, 100% { opacity: 1; } } .nb-p4 { animation-name: nbP4; }
+@keyframes nbP5 { 0%, 77.5% { opacity: 0; } 79%, 100% { opacity: 1; } } .nb-p5 { animation-name: nbP5; }
+@keyframes nbNoChat { 0%, 62% { opacity: 0; } 64%, 84% { opacity: 1; } 86%, 100% { opacity: 0; } } .nb-nochat { animation-name: nbNoChat; }
+@keyframes nbLab3 { 0%, 62% { opacity: 0; } 64%, 100% { opacity: 1; } } .nb-lab3 { animation-name: nbLab3; }
+@keyframes nbGenBtn { 0%, 85% { transform: scale(1); } 86% { transform: scale(.94); } 87.5%, 100% { transform: scale(1); } }
+.nb-genbtn { animation-name: nbGenBtn; transform-box: fill-box; transform-origin: center; }
+@keyframes nbResult { 0%, 90% { opacity: 0; } 92%, 100% { opacity: 1; } } .nb-result { animation-name: nbResult; }
+@media (prefers-reduced-motion: reduce) {
+  /* 動かさず、いちばん迷う場面（Studio のカスタマイズ欄に貼った状態）で止める */
+  .notebookGuide * { animation: none !important; }
+  .notebookGuide .nb-cur, .notebookGuide .nb-k, .notebookGuide .nb-dlg1, .notebookGuide .nb-dlg2, .notebookGuide .nb-cards, .notebookGuide .nb-ph, .notebookGuide .nb-result { opacity: 0; }
+  .notebookGuide .nb-src1, .notebookGuide .nb-src2, .notebookGuide .nb-lab1, .notebookGuide .nb-custom, .notebookGuide .nb-p1, .notebookGuide .nb-p2, .notebookGuide .nb-p3, .notebookGuide .nb-p4, .notebookGuide .nb-p5, .notebookGuide .nb-nochat, .notebookGuide .nb-lab3 { opacity: 1; }
+}

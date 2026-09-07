@@ -12,7 +12,33 @@ import QuestionEditor from './support/QuestionEditor';
 import CampaignTweetCard from './CampaignTweetCard';
 import Troubleshoot from './Troubleshoot';
 import SupportGuide from './guide/SupportGuide';
-import Tour, { useTour } from './guide/Tour';
+import Tour, { TOUR_EVENT } from './guide/Tour';
+import NotebookLMGuide from './guide/NotebookLMGuide';
+
+// メニューごとの案内。結果が初めて表示されたときだけ自動で始まる（キーは smc-tour-menu-<id>-v1）
+const MENU_TOURS: Record<MenuId, { sel: string; title: string; text: string }[]> = {
+  promoter: [
+    { sel: '[data-tour="menu-promoter-list"]', title: '宣伝文のたたき台が20本並びます', text: '困りごとに寄り添ってから解決策を添える形です。全部使う必要はありません。' },
+    { sel: '[data-tour="menu-promoter-list"] > *', title: '気に入った1本を「コピー」→ リベシティの「つぶやき」に貼る', text: '文はカードの中で直せます。登録したサービスのURLは自動で入ります。' },
+    { sel: '[data-tour="campaign"]', title: 'キャンペーン中は、この3行を付けて投稿', text: '9月30日まで。ボタンから3行入りのつぶやき画面が開きます。' },
+  ],
+  survey: [
+    { sel: '[data-tour="menu-survey-patterns"]', title: '3パターンから1つ選びます', text: 'Light は短く、Balanced は標準、Improvement は改善点を深く聞く構成です。設問は選んだあとで編集できます。' },
+    { sel: '[data-tour="menu-survey-code"]', title: 'GASコードをコピー → script.google.com に貼って実行', text: 'Google Apps Script の新しいプロジェクトに貼り、実行するとGoogleフォームができます。手順は下に書いてあります。' },
+    { sel: '[data-tour="menu-survey-banner"]', title: 'フォーム上部のバナー画像はこのプロンプトで', text: 'ChatGPT に貼ると、フォームのヘッダー画像ができます。' },
+  ],
+  slidedoc: [
+    { sel: '[data-tour="menu-slide-mode"]', title: '作り方を選びます', text: 'まとめて作るなら NotebookLM、1枚ずつ画風をそろえて作るなら ChatGPT。' },
+    { sel: '[data-tour="menu-slide-tones"]', title: 'トンマナを1つ選んで「プロンプトをコピー」', text: '迷ったら「AIおまかせ」。サービス本文から配色・書体を設計します。' },
+    { sel: '[data-tour="menu-slide-notebooklm"]', title: 'NotebookLM の貼る場所は3つ。下の絵で動きを見てください', text: '本文とアイコン画像は左の「ソース」。トンマナ・構成のプロンプトは右の「Studio」→「スライド資料」の鉛筆（カスタマイズ）欄。真ん中のチャットには貼りません。' },
+    { sel: '[data-tour="menu-slide-steps"]', title: 'できたら PDF でダウンロード → JPG に', text: 'I Love PDF で1枚ずつの画像にして、スキルマーケットのサービス画像に追加します。' },
+  ],
+  flyer: [
+    { sel: '[data-tour="menu-flyer-mode"]', title: 'このサービスで1枚か、複数まとめて1枚か', text: 'まとめる場合は、登録済みサービスから2〜6件を選びます。' },
+    { sel: '[data-tour="menu-flyer-tone"]', title: 'トンマナを選びます', text: 'サービス画像やスライドと同じにしておくと、紙で見た人がSNSで再会したとき同じ出品者だと気づきます。' },
+    { sel: '[data-tour="menu-flyer-copy"]', title: 'プロンプトをコピー → ChatGPT に貼る', text: 'A4たてのチラシが1枚出ます。QRコードは画像生成では作れないので、右下の余白にあとから貼ります。' },
+  ],
+};
 
 const SUPPORT_TOUR = [
   { sel: '[data-tour="support-guide"]', title: '流れはこの絵のとおり', text: 'URLを登録 → ページを開いて本文をコピー → 開いた欄に貼って保存 → 下のメニュー。14秒で1周します。' },
@@ -313,7 +339,7 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
   const [isRegisteringBody, setIsRegisteringBody] = useState(false);
   // URLを登録せずに本文だけ貼りたい人向けの欄を開くか
   const [showLooseBody, setShowLooseBody] = useState(false);
-  const tour = useTour('smc-tour-support-v1', true);
+
 
   const [copiedSlideDocVersion, setCopiedSlideDocVersion] = useState<ThumbnailPromptVersion | null>(null);
   const [copiedBannerPrompt, setCopiedBannerPrompt] = useState(false);
@@ -900,9 +926,30 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
   ].filter(Boolean) as Array<{ id: MenuId; label: string }>;
 
   const hasResults = resultTabs.length > 0;
+  // ---- 案内（幕と穴） ----
+  // 基本の案内と、表示中のメニューの案内を1つの Tour で切り替える。文脈ごとに初回だけ自動で始まる
+  const [tourOpen, setTourOpen] = useState(false);
   const shownMenu: MenuId | null = resultTabs.some(t => t.id === activeMenu)
     ? activeMenu
     : (resultTabs[0]?.id ?? null);
+  const tourKey = shownMenu ? `smc-tour-menu-${shownMenu}-v1` : 'smc-tour-support-v1';
+  const tourSteps = shownMenu ? MENU_TOURS[shownMenu] : SUPPORT_TOUR;
+  useEffect(() => {
+    let seen = false;
+    try { seen = !!localStorage.getItem(tourKey); } catch { /* noop */ }
+    if (seen) return;
+    const t = window.setTimeout(() => setTourOpen(true), 900);
+    return () => window.clearTimeout(t);
+  }, [tourKey]);
+  useEffect(() => {
+    const open = () => setTourOpen(true);
+    window.addEventListener(TOUR_EVENT, open);
+    return () => window.removeEventListener(TOUR_EVENT, open);
+  }, []);
+  const closeTour = () => {
+    setTourOpen(false);
+    try { localStorage.setItem(tourKey, '1'); } catch { /* noop */ }
+  };
 
   const usedCount = posts.filter(p => p.used).length;
 
@@ -911,7 +958,7 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
       <div className="p-6 md:p-10">
 
         {/* Header */}
-        <Tour steps={SUPPORT_TOUR} open={tour.open} onClose={tour.close} />
+        <Tour steps={tourSteps} open={tourOpen} onClose={closeTour} />
         <div className="mb-8 flex flex-wrap items-start justify-between gap-3">
           <div>
             <span className="eyebrow mb-1 block">Support</span>
@@ -1205,7 +1252,7 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
                     </span>
                   )}
                 </div>
-                <div className="space-y-5 pb-6">
+                <div className="space-y-5 pb-6" data-tour="menu-promoter-list">
                   {posts.map((post, idx) => (
                     <TweetCard key={idx} post={post} index={idx} onChange={handleTweetChange} />
                   ))}
@@ -1223,7 +1270,7 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
 
                 {/* 作り方の切り替え */}
                 <div className="flex flex-wrap gap-2 mb-6">
-                  <button type="button" onClick={() => setSlideMode('notebooklm')} aria-pressed={slideMode === 'notebooklm'} className={`px-4 py-2 text-xs ${slideMode === 'notebooklm' ? 'seg-active' : 'seg'}`}>NotebookLMで一括</button>
+                  <button type="button" data-tour="menu-slide-mode" onClick={() => setSlideMode('notebooklm')} aria-pressed={slideMode === 'notebooklm'} className={`px-4 py-2 text-xs ${slideMode === 'notebooklm' ? 'seg-active' : 'seg'}`}>NotebookLMで一括</button>
                   <button type="button" onClick={() => setSlideMode('chatgpt')} aria-pressed={slideMode === 'chatgpt'} className={`px-4 py-2 text-xs ${slideMode === 'chatgpt' ? 'seg-active' : 'seg'}`}>ChatGPTで1枚ずつ</button>
                 </div>
 
@@ -1235,7 +1282,7 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
                   <p className="text-[11px] text-stone-400 mt-1">※画像は雰囲気を伝えるトンマナ見本です。実際に作られるのはサムネイルではなくスライド資料です。</p>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start mb-8">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start mb-8" data-tour="menu-slide-tones">
                   {SLIDE_DOC_VERSIONS.map(({ id, label, description }) => {
                     const isCopied = copiedSlideDocVersion === id;
                     const isWide = id === 'my_style' || id === 'ai_auto';
@@ -1272,13 +1319,16 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
                   })}
                 </div>
 
+                {/* NotebookLM のどこに何を貼るかを1枚の絵で（本文・画像はソース、指示は Studio のカスタマイズ欄） */}
+                <div data-tour="menu-slide-notebooklm"><NotebookLMGuide className="mb-4" /></div>
+
                 {/* Usage guide */}
-                <div className="bg-stone-50 border border-stone-200/80 rounded-2xl p-6 mb-6">
+                <div className="bg-stone-50 border border-stone-200/80 rounded-2xl p-6 mb-6" data-tour="menu-slide-steps">
                   <h4 className="text-sm font-bold text-stone-900 mb-3">スライド生成から画像化までの手順</h4>
                   <ol className="text-xs text-stone-600 space-y-2 list-decimal list-inside leading-relaxed mb-4">
                     <li>「NotebookLM を開く」ボタンから新規ノートブックを作成</li>
-                    <li>「ソース」にサービス詳細文章を追加（必要に応じてキャラアイコン画像も添付）</li>
-                    <li>「スタジオ」→「スライド作成」→ カスタマイズ欄にコピーしたプロンプトを貼り付け</li>
+                    <li>左の「ソース」→「＋ 追加」→「コピーしたテキスト」に、サービス詳細文章を貼って「挿入」。アイコン画像を入れるなら、もう一度「＋ 追加」→「ファイルをアップロード」（<span className="font-semibold">どちらもソース。真ん中のチャット欄ではありません</span>）</li>
+                    <li>右の「Studio」→「スライド資料」の<span className="font-semibold">鉛筆（カスタマイズ）</span>→ 開いた欄にコピーしたプロンプトを貼り付け（<span className="font-semibold">チャット欄に貼ると資料に反映されません</span>）</li>
                     <li>生成を実行してスライドを確認し、<span className="font-semibold">PDF形式でダウンロード</span></li>
                     <li>「I Love PDF を開く」ボタンから PDF→JPG のページに移動し、ダウンロードした PDF をアップロード</li>
                     <li>「ページを抽出」→ 変換を実行 → 各スライドを JPG 化した ZIP ファイルがダウンロードされます（解凍すると 1 枚ずつの画像になります）</li>
@@ -1413,7 +1463,7 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
 
                 {/* 作り方の切り替え */}
                 <div className="flex flex-wrap gap-2 mb-6">
-                  <button type="button" onClick={() => setFlyerMode('single')} aria-pressed={flyerMode === 'single'} className={`px-4 py-2 text-xs ${flyerMode === 'single' ? 'seg-active' : 'seg'}`}>このサービスで1枚</button>
+                  <button type="button" data-tour="menu-flyer-mode" onClick={() => setFlyerMode('single')} aria-pressed={flyerMode === 'single'} className={`px-4 py-2 text-xs ${flyerMode === 'single' ? 'seg-active' : 'seg'}`}>このサービスで1枚</button>
                   <button type="button" onClick={() => setFlyerMode('multi')} aria-pressed={flyerMode === 'multi'} className={`px-4 py-2 text-xs ${flyerMode === 'multi' ? 'seg-active' : 'seg'}`}>複数まとめて1枚</button>
                 </div>
 
@@ -1424,7 +1474,7 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
                     サービス画像やスライド資料と同じトンマナにしておくと、紙で見た人がSNSやサービスページで再会したときに同じ出品者だと気づきます。
                   </p>
                 </div>
-                <ToneGrid value={flyerVersion} onChange={setFlyerVersion} className="mb-3" />
+                <div data-tour="menu-flyer-tone"><ToneGrid value={flyerVersion} onChange={setFlyerVersion} className="mb-3" /></div>
                 <p className="text-[11px] text-stone-400 mb-6">
                   選んだトンマナはコピーに即反映されます（切り替えても作り直しは不要）。
                   {flyerVersion === 'ai_auto' && (flyerMode === 'multi'
@@ -1449,7 +1499,7 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
                         <FlyerPreviewRow label="最後の一言">{flyerContent.cta}</FlyerPreviewRow>
                       </div>
                       <div className="flex flex-wrap items-center gap-2 mb-8">
-                        <button type="button" onClick={handleCopyFlyerPrompt} className="btn-dark px-6 py-2.5 text-xs">
+                        <button type="button" data-tour="menu-flyer-copy" onClick={handleCopyFlyerPrompt} className="btn-dark px-6 py-2.5 text-xs">
                           {copiedFlyer ? 'コピーしました' : 'プロンプトをコピー'}
                         </button>
                         <a
@@ -1587,7 +1637,7 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
                     別の3案を生成する
                   </button>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8 items-stretch">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8 items-stretch" data-tour="menu-survey-patterns">
                   {patterns.map((pattern, index) => (
                     <PatternCard
                       key={pattern.id}
@@ -1615,7 +1665,7 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
                       onReset={handleResetQuestions}
                       isDirty={selectedIsDirty}
                     />
-                    <CodeViewer pattern={selectedPattern} />
+                    <div data-tour="menu-survey-code"><CodeViewer pattern={selectedPattern} /></div>
 
                     {/* 仕上げ：Googleフォームの上部に載せるヘッダーバナー画像 */}
                     <div className="card p-6 mt-6">
@@ -1661,6 +1711,7 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
                         <button
                           type="button"
                           onClick={handleCopyBannerPrompt}
+                          data-tour="menu-survey-banner"
                           className={`text-xs font-semibold px-5 py-2.5 rounded-full transition-colors ${copiedBannerPrompt ? 'bg-brand-50 text-brand-600' : 'bg-stone-900 text-white hover:bg-stone-700'}`}
                         >
                           {copiedBannerPrompt ? 'コピーしました' : 'バナー用プロンプトをコピー'}
