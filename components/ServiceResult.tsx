@@ -5,6 +5,7 @@ import { PromptPreview } from './promptPreviews';
 import ServiceChatEditor, { ChatMessage } from './ServiceChatEditor';
 import { decorateHeadings } from '../utils/skillMarketMarkup';
 import CampaignTweetCard from './CampaignTweetCard';
+import { isCampaignActive } from '../data/campaign';
 import Troubleshoot from './Troubleshoot';
 import ListingPreview from './ListingPreview';
 import PasteGuide from './guide/PasteGuide';
@@ -12,14 +13,32 @@ import SplitViewGuide from './guide/SplitViewGuide';
 import Tour, { useTour } from './guide/Tour';
 
 const RESULT_TOUR = [
-  { sel: '[data-tour="detail-card"]', title: 'サービス詳細は、この「コピー」で', text: '見出しに <strong> が付いた形でコピーされ、スキルマーケットに貼ると太字になります。下の枠は貼ったあとの見え方です。' },
-  { sel: '[data-tour="split-guide"]', title: 'まず、画面を2分割します', text: '「スキルマーケット出品画面へ」を右クリック（トラックパッドは2本指でタップ）→ 上から3つ目「分割ビューで開く」。ここが一番つまずくところなので、絵で動きを見てください。' },
-  { sel: '[data-tour="paste-guide"]', title: '項目ごとに、左でコピーして右に貼ります', text: 'タイトル → キャッチコピー → サービス詳細の順。サービス詳細は <strong> が見えていて正解です。公開すると太字になります。' },
+  { sel: '[data-tour="usage-strip"]', title: 'この画面は4段で進みます', text: '内容を確認して直す → 画像を用意 → スキルマーケットに貼る → つぶやく。押すとその段へ飛びます。貼るのは最後です。' },
+  { sel: '[data-tour="detail-card"]', title: 'まず、AIが作った出品文を確認します', text: 'サービス詳細は、貼ったあとの見え方で表示しています。気になるところは「編集」で手直しできます。' },
   { sel: '[data-tour="price-mode"]', title: '価格は標準とモニターを切り替えられます', text: 'モニター価格にするときは、先着人数や期限を付けてください。理由のある値引きに見えます。' },
-  { sel: '[data-tour="prompt-recommended"]', title: 'サムネイル画像はこのプロンプトから', text: '迷ったらこれ。コピーして ChatGPT に貼ると、あなたのサービス内容で画像ができます。' },
-  { sel: '[data-tour="chat-editor"]', title: '直したいところはAIに頼めます', text: '「もっと短く」「価格を上げて」のように書きます。保存するまで元の文は残るので、試して戻せます。' },
+  { sel: '[data-tour="chat-editor"]', title: 'まとめて直すなら、画面下のAI編集に頼めます', text: '「もっと短く」「価格を上げて」のように書きます。保存するまで元の文は残るので、試して戻せます。貼る前に済ませてください。' },
+  { sel: '[data-tour="prompt-recommended"]', title: 'つぎに、サムネイル画像を用意します', text: '迷ったらこれ。コピーして ChatGPT に貼ると、あなたのサービス内容で画像ができます。' },
+  { sel: '[data-tour="paste-section"]', title: 'さいごに、スキルマーケットに貼ります', text: '画面を2分割して、この一覧の順に「コピー」→ 右の同じ名前の欄へ。分割の操作を動きで見たいときは「貼り方を動きで見る」を開いてください。' },
   { sel: '[data-tour="campaign"]', title: '出品したら、つぶやいて応募', text: '9月30日までのキャンペーンです。出品してURLができたら、つぶやきのURL欄に貼ってください。' },
 ];
+
+// この画面の4段。押すとその段へ飛び、枠を一瞬光らせる
+const USAGE_STEPS = [
+  { id: 'result-review', title: '内容を確認して、直す', hint: 'カードの編集・画面下のAI編集' },
+  { id: 'result-image', title: 'サムネイル画像を用意', hint: 'プロンプトを ChatGPT へ' },
+  { id: 'result-paste', title: 'スキルマーケットに貼る', hint: '画面を2分割して、順にコピー' },
+  { id: 'result-tweet', title: '出品したら、つぶやく', hint: 'キャンペーンに応募' },
+];
+
+const jumpToSection = (id: string) => {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  el.classList.remove('section-flash');
+  // 同じ段を続けて押しても光るよう、いったん外してから付け直す
+  window.setTimeout(() => el.classList.add('section-flash'), 0);
+  window.setTimeout(() => el.classList.remove('section-flash'), 1900);
+};
 
 interface ServiceResultProps {
   idea: SkillIdea;
@@ -403,6 +422,13 @@ const ServiceResult: React.FC<ServiceResultProps> = ({ idea, content, onBack, on
   const [copiedVersion, setCopiedVersion] = useState<ThumbnailPromptVersion | null>(null);
   const [showTip, setShowTip] = useState(false);
   const tour = useTour();
+  // 「貼る」段の一覧で、どの項目をコピー済みか（貼り付け済みの目安）
+  const [pastedLabels, setPastedLabels] = useState<Set<string>>(() => new Set());
+  const markPasted = (label: string, text: string) => {
+    navigator.clipboard.writeText(text).then(() => {
+      setPastedLabels(prev => new Set(prev).add(label));
+    });
+  };
   // 画像プロンプトは「迷ったらこれ」だけ開いておき、残りは求められたときに出す
   const [showAllStyles, setShowAllStyles] = useState(false);
   const recommendedStyle = PROMPT_STYLES.find(st => st.recommended) ?? PROMPT_STYLES[0];
@@ -430,6 +456,7 @@ const ServiceResult: React.FC<ServiceResultProps> = ({ idea, content, onBack, on
     setChatError(null);
     setShowBackConfirm(false);
     setEditingDetail(false);
+    setPastedLabels(new Set());
   }, [idea.id]);
 
   const isDirty = draftContent !== savedContent;
@@ -605,42 +632,29 @@ const ServiceResult: React.FC<ServiceResultProps> = ({ idea, content, onBack, on
         )}
       </div>
 
+      {/* この画面の使い方: 4段。押すとその段へ飛んで、枠を光らせる（貼るのは最後） */}
+      <ol data-tour="usage-strip" aria-label="この画面の使い方" className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-8 list-none m-0 p-0">
+        {USAGE_STEPS.filter(st => st.id !== 'result-tweet' || isCampaignActive()).map((st, i) => (
+          <li key={st.id}>
+            <button type="button" onClick={() => jumpToSection(st.id)} className="w-full text-left card-hoverable px-3 py-2.5 flex items-start gap-2">
+              <span className="shrink-0 w-6 h-6 rounded-full bg-stone-900 text-white text-[11px] font-bold flex items-center justify-center">{i + 1}</span>
+              <span className="min-w-0">
+                <span className="block text-[12px] font-semibold text-stone-900 leading-snug">{st.title}</span>
+                <span className="block text-[11px] text-stone-500 leading-snug">{st.hint}</span>
+              </span>
+            </button>
+          </li>
+        ))}
+      </ol>
+
       <div className="space-y-10">
-        {/* まず: 出品文をスキルマーケットに貼る */}
-        <section>
+        {/* まず: 内容を確認して直す。貼るのは直し終わってから */}
+        <section id="result-review" className="scroll-mt-24 rounded-2xl">
           <SectionHead
             eyebrow="まず"
-            title="出品文をスキルマーケットに貼る"
-            description="画面を左右に2分割してから、タイトル → キャッチコピー → サービス詳細の順に、左の「コピー」を右の同じ名前の欄に貼っていきます。サービス詳細の見出しは太字（<strong>）付きでコピーされます。"
-            action={
-              <a
-                href="https://skill.libecity.com/services/new"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="btn-primary px-5 py-2.5 text-xs"
-              >
-                スキルマーケット出品画面へ
-              </a>
-            }
+            title="内容を確認して、直す"
+            description="AIが作った出品文です。各カードの「編集」で手直しできます。まとめて直すなら、画面下の AI 編集に「もっと短く」「価格を上げて」のように頼んでください。スキルマーケットに貼るのは、直し終わってからです。"
           />
-          {/* 貼り方を2枚の絵で見せる。1枚目は一番つまずく「画面の2分割」、2枚目は項目ごとのコピー→貼り付け */}
-          <div data-tour="split-guide"><SplitViewGuide className="mb-4" /></div>
-          <div data-tour="paste-guide"><PasteGuide className="mb-5" /></div>
-          <div className="mb-5">
-            <button
-              onClick={() => setShowTip(!showTip)}
-              className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-stone-400 hover:text-stone-600 transition-colors"
-            >
-              貼り付け方のコツ <span className={`transition-transform duration-200 ${showTip ? 'rotate-180' : ''}`}>▾</span>
-            </button>
-            {showTip && (
-              <div className="mt-2 bg-stone-50 rounded-xl p-3 text-left text-[12px] text-stone-500 leading-relaxed space-y-1.5 animate-in fade-in slide-in-from-top-2 duration-200">
-                <p>1. 上の「スキルマーケット出品画面へ」を<span className="font-semibold text-stone-700">右クリック</span>（MacBook のトラックパッドは<span className="font-semibold text-stone-700">2本指でタップ</span>）</p>
-                <p>2. 出たメニューの<span className="font-semibold text-stone-700">上から3つ目「分割ビューで開く」</span>を押す → 左にこの画面、右に出品画面が並びます</p>
-                <p>3. タイトルから順に、左の「コピー」→ 右の同じ名前の欄に貼り付け。サービス詳細は <code>&lt;strong&gt;</code> が見えたままで正解</p>
-              </div>
-            )}
-          </div>
           <div className="space-y-5">
           <div className="card p-5">
             <h4 className="font-semibold text-stone-900 text-sm mb-3">カテゴリ・サブカテゴリ</h4>
@@ -794,7 +808,7 @@ const ServiceResult: React.FC<ServiceResultProps> = ({ idea, content, onBack, on
         </section>
 
         {/* つぎに: サムネイル画像 */}
-        <section>
+        <section id="result-image" className="scroll-mt-24 rounded-2xl">
           <SectionHead
             eyebrow="つぎに"
             title="サムネイル画像を用意する"
@@ -844,8 +858,88 @@ const ServiceResult: React.FC<ServiceResultProps> = ({ idea, content, onBack, on
           </div>
         </section>
 
+        {/* さいごに: スキルマーケットに貼る。直し終わった本文を、貼る順に並べる */}
+        <section id="result-paste" className="scroll-mt-24 rounded-2xl" data-tour="paste-section">
+          <SectionHead
+            eyebrow="さいごに"
+            title="スキルマーケットに貼る"
+            description="画面を左右に2分割してから、下の順に「コピー」→ 右の出品画面の同じ名前の欄に貼ります。サービス詳細の見出しは太字（<strong>）付きでコピーされます。"
+            action={
+              <a
+                href="https://skill.libecity.com/services/new"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn-primary px-5 py-2.5 text-xs"
+              >
+                スキルマーケット出品画面へ
+              </a>
+            }
+          />
+          <div className="card divide-y divide-stone-100 overflow-hidden">
+            <div className="px-4 py-3 flex items-center gap-3 text-sm">
+              <span className="shrink-0 w-6 h-6 rounded-full bg-stone-100 text-stone-500 text-[11px] font-bold flex items-center justify-center">0</span>
+              <span className="text-stone-500">カテゴリを選ぶ：</span>
+              <span className="font-semibold text-stone-800">{parsed.category || '未設定'}</span>
+              <span className="text-stone-300">/</span>
+              <span className="text-stone-600">{parsed.subCategory || '未設定'}</span>
+              <span className="ml-auto text-[11px] text-stone-400 shrink-0">出品画面で選ぶ</span>
+            </div>
+            {[
+              { label: 'タイトル', text: parsed.title },
+              { label: 'キャッチコピー', text: parsed.catchphrase },
+              { label: 'サービス詳細', text: decorateHeadings(rebuiltDetail) },
+              { label: 'キャンセル時の注意事項', text: parsed.policy },
+              { label: 'スキル', text: parsed.skills },
+              { label: '依頼テンプレート', text: parsed.template },
+            ].filter(row => row.text.trim()).map((row, i) => {
+              const done = pastedLabels.has(row.label);
+              return (
+                <div key={row.label} className={`px-4 py-3 flex items-center gap-3 ${done ? 'bg-emerald-50/40' : ''}`}>
+                  <span className={`shrink-0 w-6 h-6 rounded-full text-[11px] font-bold flex items-center justify-center ${done ? 'bg-emerald-600 text-white' : 'bg-stone-900 text-white'}`}>{done ? '✓' : i + 1}</span>
+                  <div className="min-w-0 flex-grow">
+                    <p className="text-sm font-semibold text-stone-800 leading-snug">{row.label}</p>
+                    <p className="text-[11px] text-stone-400 truncate">{row.text.replace(/\s+/g, ' ').slice(0, 60)}</p>
+                  </div>
+                  <span className={`text-[11px] shrink-0 ${done ? 'text-emerald-700' : 'text-stone-400'}`}>{done ? '右の同じ欄に貼り付け' : `→ 右の「${row.label}」欄へ`}</span>
+                  <button type="button" onClick={() => markPasted(row.label, row.text)} className={`shrink-0 px-4 py-1.5 rounded-full text-xs font-semibold transition-colors ${done ? 'bg-white border border-emerald-200 text-emerald-700' : 'bg-stone-900 text-white hover:bg-stone-700'}`}>
+                    {done ? 'もう一度コピー' : 'コピー'}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+          <div className="mt-4">
+            <button
+              onClick={() => setShowTip(!showTip)}
+              className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-stone-400 hover:text-stone-600 transition-colors"
+            >
+              画面を2分割するやり方 <span className={`transition-transform duration-200 ${showTip ? 'rotate-180' : ''}`}>▾</span>
+            </button>
+            {showTip && (
+              <div className="mt-2 bg-stone-50 rounded-xl p-3 text-left text-[12px] text-stone-500 leading-relaxed space-y-1.5 animate-in fade-in slide-in-from-top-2 duration-200">
+                <p>1. 上の「スキルマーケット出品画面へ」を<span className="font-semibold text-stone-700">右クリック</span>（MacBook のトラックパッドは<span className="font-semibold text-stone-700">2本指でタップ</span>）</p>
+                <p>2. 出たメニューの<span className="font-semibold text-stone-700">上から3つ目「分割ビューで開く」</span>を押す → 左にこの画面、右に出品画面が並びます</p>
+                <p>3. 上の一覧の順に、左の「コピー」→ 右の同じ名前の欄に貼り付け。サービス詳細は <code>&lt;strong&gt;</code> が見えたままで正解</p>
+              </div>
+            )}
+          </div>
+          {/* 動く絵は求められたときだけ（画面の主役は本文なので、既定では閉じる） */}
+          <details className="mt-4 group" data-tour="paste-guides">
+            <summary className="cursor-pointer list-none inline-flex items-center gap-1.5 text-xs font-semibold text-stone-500 hover:text-brand-500 transition-colors [&::-webkit-details-marker]:hidden">
+              <span aria-hidden className="transition-transform duration-200 group-open:rotate-180">▾</span>
+              貼り方を動きで見る（画面の2分割／項目ごとの貼り付け）
+            </summary>
+            <div className="mt-3 space-y-4">
+              <SplitViewGuide />
+              <PasteGuide />
+            </div>
+          </details>
+        </section>
+
         {/* 出品したら: つぶやいて応募（期間外は描画されない） */}
-        <CampaignTweetCard variant="publish" className="card p-5" />
+        <div id="result-tweet" className="scroll-mt-24 rounded-2xl">
+          <CampaignTweetCard variant="publish" className="card p-5" />
+        </div>
 
         <Troubleshoot items={[
           {

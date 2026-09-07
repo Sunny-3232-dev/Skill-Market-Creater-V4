@@ -417,3 +417,11 @@ body {
   .notebookGuide .nb-cur, .notebookGuide .nb-k, .notebookGuide .nb-dlg1, .notebookGuide .nb-dlg2, .notebookGuide .nb-cards, .notebookGuide .nb-ph, .notebookGuide .nb-result { opacity: 0; }
   .notebookGuide .nb-src1, .notebookGuide .nb-src2, .notebookGuide .nb-lab1, .notebookGuide .nb-custom, .notebookGuide .nb-p1, .notebookGuide .nb-p2, .notebookGuide .nb-p3, .notebookGuide .nb-p4, .notebookGuide .nb-p5, .notebookGuide .nb-nochat, .notebookGuide .nb-lab3 { opacity: 1; }
 }
+
+/* 「この画面の使い方」から飛んだ先の段を一瞬光らせる */
+@keyframes sectionFlash {
+  0%   { box-shadow: 0 0 0 0 rgba(244, 63, 94, 0); }
+  15%  { box-shadow: 0 0 0 5px rgba(244, 63, 94, 0.35); }
+  100% { box-shadow: 0 0 0 5px rgba(244, 63, 94, 0); }
+}
+.section-flash { animation: sectionFlash 1.8s ease-out; }
