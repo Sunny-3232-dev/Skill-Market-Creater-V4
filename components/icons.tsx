@@ -48,8 +48,9 @@ export const PinIcon: React.FC<{ filled?: boolean }> = ({ filled }) => (
   </svg>
 );
 
-export const SparkleIcon = () => (
+// 作り直す（ぐるっと回る矢印）。キラキラ（✨）はAIツール然として見えるので使わない
+export const RedoIcon = () => (
   <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M18.4 5.6l-2.8 2.8M8.4 15.6l-2.8 2.8"/>
+    <path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/>
   </svg>
 );

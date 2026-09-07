@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { SkillIdea } from '../types';
-import { PinIcon, SparkleIcon } from './icons';
+import { PinIcon, RedoIcon } from './icons';
 import Tour, { useTour } from './guide/Tour';
 
 const IDEAS_TOUR = [
@@ -255,7 +255,7 @@ const IdeaList: React.FC<IdeaListProps> = ({ ideas, keywords = [], onSelect, onT
       <div ref={regenBarRef} data-tour="regen" className="rounded-2xl border border-brand-100 p-5" style={{ backgroundImage: 'var(--gradient-brand-soft)' }}>
         <div className="flex items-center gap-2 mb-3">
           <span className="w-7 h-7 rounded-lg bg-stone-900 text-white flex items-center justify-center shrink-0">
-            <SparkleIcon />
+            <RedoIcon />
           </span>
           <div>
             <h3 className="text-sm font-bold text-stone-900">AIでアイデアを作り直す</h3>
@@ -321,7 +321,7 @@ const IdeaList: React.FC<IdeaListProps> = ({ ideas, keywords = [], onSelect, onT
             onClick={jumpToRegenBar}
             className="pointer-events-auto btn-dark pl-4 pr-5 py-2.5 text-xs shadow-card-hover animate-in fade-in slide-in-from-bottom-4 duration-300"
           >
-            <SparkleIcon />
+            <RedoIcon />
             AIでアイデアを作り直す
             <span aria-hidden>↓</span>
           </button>

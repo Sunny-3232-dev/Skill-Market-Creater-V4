@@ -50,11 +50,11 @@
       transition-all duration-300 ease-smooth whitespace-nowrap cursor-pointer;
   }
 
-  /* Primary: 画面内で最重要のアクション1つだけに使う（ブランドグラデーション） */
+  /* Primary: 画面内で最重要のアクション1つだけに使う。ローズ600の単色。
+     グラデーションはワードマーク「Creator Pro」だけに残す（AIツール然とした見た目を避ける） */
   .btn-primary {
-    @apply text-white shadow-brand hover:-translate-y-0.5 hover:brightness-105
+    @apply bg-brand-600 text-white shadow-brand hover:bg-brand-700 hover:-translate-y-0.5
       active:translate-y-0 active:scale-[0.99];
-    background-image: var(--gradient-brand);
   }
 
   /* Dark: 中量級のアクション（実行・コピー等の実務ボタン） */

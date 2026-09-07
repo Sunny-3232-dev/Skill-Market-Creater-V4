@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react'
 import { generatePromotion, generateSurveyPatterns, getSlideDocPrompt, extractServiceTitle, generateAutoSlideStyle, generateSlideImageContents, buildSlideImagePromptText, getFormBannerPrompt, generateFlyerContent, generateMultiFlyerContent, buildFlyerPromptText, buildMultiFlyerPromptText } from '../services/geminiService';
 import { extractWords } from '../utils/textProcessing';
 import { SkillIdea, SurveyPattern, SurveyQuestionDef, ThumbnailPromptVersion, SlideImagePrompt, FlyerContent, MultiFlyerContent } from '../types';
-import { MegaphoneIcon, ClipboardListIcon, PresentationIcon, SparkleIcon, FlyerIcon } from './icons';
+import { MegaphoneIcon, ClipboardListIcon, PresentationIcon, FlyerIcon } from './icons';
 import { PromptPreview } from './promptPreviews';
 import LoadingOverlay from './LoadingOverlay';
 import TweetCard, { TweetPost } from './support/TweetCard';
@@ -1171,8 +1171,7 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
                     <span className="absolute top-4 right-4 text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full">結果あり</span>
                   )}
                   <div
-                    className="w-12 h-12 rounded-2xl text-white flex items-center justify-center mb-4 shadow-brand"
-                    style={{ backgroundImage: 'var(--gradient-brand)' }}
+                    className="bg-brand-600 w-12 h-12 rounded-2xl text-white flex items-center justify-center mb-4 shadow-brand"
                   >
                     {menu.icon}
                   </div>

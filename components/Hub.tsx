@@ -32,11 +32,10 @@ const ToolCard: React.FC<{
         : 'p-5 md:p-6 gap-4 md:gap-6 bg-white border-stone-200 shadow-soft hover:border-brand-200 hover:shadow-card-hover'}`}
     style={featured ? { backgroundImage: 'var(--gradient-brand-soft)' } : undefined}
   >
-    {/* アイコンタイル: 主役はグラデ、参考はブランド淡色、補助はニュートラル */}
+    {/* アイコンタイル: 主役はローズ単色、参考はブランド淡色、補助はニュートラル */}
     <div
       className={`shrink-0 flex items-center justify-center rounded-2xl
-        ${featured ? 'w-14 h-14 md:w-16 md:h-16 text-white' : brandIcon ? 'w-12 h-12 bg-brand-50 text-brand-500' : 'w-12 h-12 bg-stone-100 text-stone-600'}`}
-      style={featured ? { backgroundImage: 'var(--gradient-brand)' } : undefined}
+        ${featured ? 'w-14 h-14 md:w-16 md:h-16 bg-brand-600 text-white' : brandIcon ? 'w-12 h-12 bg-brand-50 text-brand-500' : 'w-12 h-12 bg-stone-100 text-stone-600'}`}
     >
       {icon}
     </div>
@@ -103,7 +102,7 @@ const Hub: React.FC<HubProps> = ({ onSelectTool }) => {
         <div className="text-center pt-2 md:pt-4">
           <h2 className="text-2xl md:text-[2rem] font-bold text-stone-900 tracking-tight leading-snug">
             あなたの「好き・得意」を、<br className="md:hidden" />
-            <span className="text-brand-gradient">売れるサービス</span>に。
+            <span className="text-brand-600">売れるサービス</span>に。
           </h2>
           <p className="mt-3 text-stone-500 text-sm leading-relaxed">
             アイデア出しから出品文・サムネイル・集客まで、この一つで完結します。

@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { SparkleIcon } from './icons';
+import { PenIcon } from './icons';
 
 export interface ChatMessage {
   role: 'user' | 'assistant';
@@ -211,7 +211,7 @@ const ServiceChatEditor: React.FC<ServiceChatEditorProps> = ({
                 )}
                 <div className="relative w-9 h-9 rounded-xl bg-stone-900 text-white flex items-center justify-center">
                   <span className="animate-twinkle inline-flex">
-                    <SparkleIcon />
+                    <PenIcon />
                   </span>
                 </div>
               </div>
