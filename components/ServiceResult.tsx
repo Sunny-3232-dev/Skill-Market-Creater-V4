@@ -715,12 +715,24 @@ const ServiceResult: React.FC<ServiceResultProps> = ({ idea, content, onBack, on
                       <h5 className="font-semibold text-stone-900 text-sm">価格モード</h5>
                       <span className="text-[11px] text-stone-400 hidden sm:inline">選ぶと下の「価格の目安」に反映されます</span>
                     </div>
+                    <p className="text-[11px] text-stone-500 leading-relaxed mb-3">
+                      安すぎる価格は、自信がなさそうに見えることがあります。下げるなら「先着」「期限」の理由をつけてください。
+                      価格の考え方は「参考資料」の学長の記事にまとまっています。
+                    </p>
 
                     <div className="flex gap-2 mb-1">
                       <button type="button" onClick={() => setPriceMode('standard')} className={toggleButtonClass(priceMode === 'standard')}>
                         標準価格
                       </button>
-                      <button type="button" onClick={() => setPriceMode('monitor')} className={toggleButtonClass(priceMode === 'monitor')}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPriceMode('monitor');
+                          // 理由のない値引きは自信がなさそうに見える。条件が無ければ「先着3名」を初期値にする
+                          if (limitCount === null && limitPeriod === null) setLimitCount(3);
+                        }}
+                        className={toggleButtonClass(priceMode === 'monitor')}
+                      >
                         モニター価格
                       </button>
                     </div>
@@ -728,13 +740,14 @@ const ServiceResult: React.FC<ServiceResultProps> = ({ idea, content, onBack, on
                     {priceMode === 'monitor' && (
                       <div className="space-y-4 pt-4 mt-3 border-t border-stone-100 animate-in fade-in slide-in-from-top-2 duration-200">
                         <div>
-                          <p className="text-xs font-semibold text-stone-600 mb-2">先着人数 <span className="text-stone-400 font-normal">(任意・もう一度押すと解除)</span></p>
+                          <p className="text-xs font-semibold text-stone-600 mb-2">先着人数 <span className="text-stone-400 font-normal">(先着か期限のどちらか1つは必ず付けます)</span></p>
                           <div className="flex gap-2">
                             {[1, 3, 5].map(n => (
                               <button
                                 key={n}
                                 type="button"
-                                onClick={() => setLimitCount(limitCount === n ? null : (n as LimitCount))}
+                                // 最後の1つの条件は外せない（値引きの理由を必ず残す）
+                                onClick={() => setLimitCount(limitCount === n ? (limitPeriod !== null ? null : limitCount) : (n as LimitCount))}
                                 className={chipButtonClass(limitCount === n)}
                               >
                                 {n}名
@@ -744,13 +757,13 @@ const ServiceResult: React.FC<ServiceResultProps> = ({ idea, content, onBack, on
                         </div>
 
                         <div>
-                          <p className="text-xs font-semibold text-stone-600 mb-2">期間 <span className="text-stone-400 font-normal">(任意・もう一度押すと解除)</span></p>
+                          <p className="text-xs font-semibold text-stone-600 mb-2">期間 <span className="text-stone-400 font-normal">(もう一度押すと解除)</span></p>
                           <div className="flex gap-2">
                             {monthEndOptions.map(opt => (
                               <button
                                 key={opt.id}
                                 type="button"
-                                onClick={() => setLimitPeriod(limitPeriod === opt.id ? null : opt.id)}
+                                onClick={() => setLimitPeriod(limitPeriod === opt.id ? (limitCount !== null ? null : limitPeriod) : opt.id)}
                                 className={chipButtonClass(limitPeriod === opt.id)}
                               >
                                 {opt.label}

@@ -1747,7 +1747,7 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
           },
         ]} />
 
-        {/* 「売れる出品者のヒント」記事はトップの第3入口（ヒント集）へ集約 */}
+        {/* 学長・先輩出品者の記事は「参考資料」へ集約 */}
         <div className="mb-2 rounded-2xl border border-stone-200 bg-stone-50 px-5 py-4 flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-start gap-3 min-w-0">
             <span className="shrink-0 w-9 h-9 rounded-xl bg-brand-50 text-brand-500 flex items-center justify-center mt-0.5">
@@ -1759,7 +1759,7 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
             </div>
           </div>
           <button onClick={onGoToLearn} className="btn-secondary px-4 py-2 text-xs shrink-0">
-            ヒント集を見る
+            参考資料を見る
           </button>
         </div>
       </div>

@@ -72,7 +72,7 @@ const App: React.FC = () => {
 
   const toolName = currentTool === ToolType.CREATOR ? 'Creator'
     : currentTool === ToolType.SUPPORT ? 'サポートメニュー'
-    : currentTool === ToolType.LEARN ? 'ヒント集'
+    : currentTool === ToolType.LEARN ? '参考資料'
     : '';
 
   return (
@@ -109,7 +109,7 @@ const App: React.FC = () => {
               onClick={() => setCurrentTool(ToolType.LEARN)}
               className="btn-secondary px-4 py-2 text-xs"
             >
-              ヒント集
+              参考資料
             </button>
           )}
           {(currentTool === ToolType.CREATOR || currentTool === ToolType.SUPPORT) && (

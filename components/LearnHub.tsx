@@ -11,7 +11,7 @@ const LearnHub: React.FC = () => {
       <div className="max-w-3xl mx-auto">
         <div className="mb-8">
           <span className="eyebrow mb-1 block">いつでも参考に</span>
-          <h2 className="text-xl md:text-2xl font-bold text-stone-900 tracking-tight">売れる出品者のヒント</h2>
+          <h2 className="text-xl md:text-2xl font-bold text-stone-900 tracking-tight">参考になる資料と記事</h2>
           <p className="text-stone-500 text-sm mt-2 leading-relaxed">
             うまくいっている人が実践している「価格の決め方・宣伝・改善」の考え方を、無料の記事でまとめました。
             はじめる前でも、行き詰まったときでも、のぞいてみてください。

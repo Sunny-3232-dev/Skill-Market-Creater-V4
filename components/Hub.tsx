@@ -156,7 +156,7 @@ const Hub: React.FC<HubProps> = ({ onSelectTool }) => {
         <p className="text-center text-xs text-stone-400">
           価格の決め方・宣伝のコツ・改善のヒントは
           <button type="button" onClick={() => onSelectTool(ToolType.LEARN)} className="ml-1 font-semibold text-stone-500 hover:text-brand-500 underline decoration-stone-200 underline-offset-2 transition-colors">
-            ヒント集
+            参考資料
           </button>
           にまとめてあります。
         </p>
