@@ -7,6 +7,7 @@ import AnimatedGuide from './AnimatedGuide';
 const PasteGuide: React.FC<{ className?: string }> = ({ className }) => (
   <AnimatedGuide
     className={className}
+    title="項目ごとにコピーして、右の欄に貼る"
     cycleMs={14000}
     edges={[3080, 5320, 9240]}
     steps={[

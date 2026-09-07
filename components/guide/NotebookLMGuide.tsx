@@ -9,6 +9,7 @@ import AnimatedGuide from './AnimatedGuide';
 const NotebookLMGuide: React.FC<{ className?: string }> = ({ className }) => (
   <AnimatedGuide
     className={className}
+    title="NotebookLM のどこに何を貼るか"
     cycleMs={16000}
     edges={[4960, 8160, 9760, 13440]}
     steps={[

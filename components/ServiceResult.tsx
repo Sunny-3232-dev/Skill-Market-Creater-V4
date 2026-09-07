@@ -402,7 +402,7 @@ const ServiceResult: React.FC<ServiceResultProps> = ({ idea, content, onBack, on
   const [expandedPrompt, setExpandedPrompt] = useState<ThumbnailPromptVersion | null>(null);
   const [copiedVersion, setCopiedVersion] = useState<ThumbnailPromptVersion | null>(null);
   const [showTip, setShowTip] = useState(false);
-  const tour = useTour('smc-tour-result-v1', true);
+  const tour = useTour();
   // 画像プロンプトは「迷ったらこれ」だけ開いておき、残りは求められたときに出す
   const [showAllStyles, setShowAllStyles] = useState(false);
   const recommendedStyle = PROMPT_STYLES.find(st => st.recommended) ?? PROMPT_STYLES[0];

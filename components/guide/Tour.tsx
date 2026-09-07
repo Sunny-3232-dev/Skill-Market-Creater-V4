@@ -99,7 +99,10 @@ const Tour: React.FC<TourProps> = ({ steps, open, onClose }) => {
         className="absolute bg-white rounded-2xl shadow-card-hover border border-stone-200/60 p-5 flex flex-col gap-2 transition-all duration-300 ease-smooth"
         style={{ width: 'min(22rem, calc(100vw - 24px))', top: card?.top ?? 24, left: card?.left ?? 24, opacity: card ? 1 : 0 }}
       >
-        <div className="text-[11px] font-bold tracking-widest text-brand-500">{index + 1} / {steps.length}</div>
+        <div className="flex items-center justify-between">
+          <span className="text-[11px] font-bold tracking-widest text-brand-500">画面の案内</span>
+          <span className="text-[11px] font-semibold text-stone-400 tabular-nums">{index + 1} / {steps.length}</span>
+        </div>
         <h4 className="text-base font-bold text-stone-900 leading-snug">{step.title}</h4>
         <p className="text-sm text-stone-600 leading-relaxed">{step.text}</p>
         <div className="flex justify-end gap-2 mt-2">
@@ -115,24 +118,13 @@ const Tour: React.FC<TourProps> = ({ steps, open, onClose }) => {
 export default Tour;
 
 /**
- * 案内の開閉と「初回だけ自動で始める」。
- * autoStartWhen が true になったとき（その画面が初めて描かれたとき）に、見た印が無ければ 900ms 後に始める。
- * 閉じたら印を付け、2回目からは出さない。ボタンからは何度でも開ける。
+ * 案内の開閉。自動では始めない（ヘッダの「画面の案内（1分）」を押したときだけ）。
+ * 以前は画面ごとに初回だけ自動で始めていたが、何が案内なのか分かりにくく、
+ * ハンズオンでは参加者が毎回閉じないと進めなかったため廃止した。
  */
-export const useTour = (storageKey: string, autoStartWhen: boolean) => {
+export const useTour = () => {
   const [open, setOpen] = useState(false);
-  useEffect(() => {
-    if (!autoStartWhen) return;
-    let seen = false;
-    try { seen = !!localStorage.getItem(storageKey); } catch { /* noop */ }
-    if (seen) return;
-    const t = window.setTimeout(() => setOpen(true), 900);
-    return () => window.clearTimeout(t);
-  }, [autoStartWhen, storageKey]);
-  const close = useCallback(() => {
-    setOpen(false);
-    try { localStorage.setItem(storageKey, '1'); } catch { /* noop */ }
-  }, [storageKey]);
+  const close = useCallback(() => setOpen(false), []);
   const start = useCallback(() => setOpen(true), []);
   // ヘッダの「はじめての方へ」ボタン（App.tsx）は、いま表示中の画面の案内を開く
   useEffect(() => {

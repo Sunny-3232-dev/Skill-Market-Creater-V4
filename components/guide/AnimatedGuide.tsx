@@ -11,6 +11,8 @@ interface AnimatedGuideProps {
   /** 各歩の終わり(ms)。歩の数 - 1 個 */
   edges: number[];
   steps: GuideStep[];
+  /** 絵の題。「動くマニュアル」の小見出しと一緒に上に出す（見るだけのものだと分かるように） */
+  title: string;
   /** SVG 本体。カーソル要素に data-guide-cursor を付けておくと、その経過時間で歩を同期する */
   children: React.ReactNode;
   caption?: string;
@@ -20,7 +22,7 @@ interface AnimatedGuideProps {
 // PJ090（oVice看板）の「動くマニュアル」の枠。
 // 1枚の絵の中で全部起こし、下の歩の一覧をいま何歩目か光らせる。
 // 動き自体は CSS の @keyframes（index.css）で、ここは同期と操作だけを持つ。
-const AnimatedGuide: React.FC<AnimatedGuideProps> = ({ cycleMs, edges, steps, children, caption, className }) => {
+const AnimatedGuide: React.FC<AnimatedGuideProps> = ({ cycleMs, edges, steps, title, children, caption, className }) => {
   const figRef = useRef<HTMLElement>(null);
   const [current, setCurrent] = useState(0);
   const [paused, setPaused] = useState(false);
@@ -49,6 +51,11 @@ const AnimatedGuide: React.FC<AnimatedGuideProps> = ({ cycleMs, edges, steps, ch
 
   return (
     <figure ref={figRef} className={`animGuide ${paused ? 'paused' : ''} ${className ?? ''} rounded-2xl border border-stone-200/80 bg-white overflow-hidden m-0`}>
+      <div className="flex items-baseline gap-2 px-4 pt-3 pb-2">
+        <span className="text-[10px] font-bold tracking-widest text-brand-500">動くマニュアル</span>
+        <span className="text-sm font-bold text-stone-900">{title}</span>
+        <span className="text-[11px] text-stone-400">見るだけ。操作は要りません</span>
+      </div>
       {children}
       <div className="border-t border-stone-100 px-4 py-3 flex flex-wrap items-start gap-3">
         <ol className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-1.5 min-w-[16rem] list-none m-0 p-0">

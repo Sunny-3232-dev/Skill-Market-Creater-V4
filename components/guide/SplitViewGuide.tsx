@@ -8,6 +8,7 @@ import AnimatedGuide from './AnimatedGuide';
 const SplitViewGuide: React.FC<{ className?: string }> = ({ className }) => (
   <AnimatedGuide
     className={className}
+    title="画面を2分割する"
     cycleMs={14000}
     edges={[2380, 5600]}
     steps={[

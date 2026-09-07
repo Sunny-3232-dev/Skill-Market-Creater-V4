@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { ToolType } from '../types';
 import { PenIcon, ArrowRightIcon } from './icons';
 
@@ -85,7 +85,17 @@ const SupportToolsIcon = () => (
   </svg>
 );
 
+const FIRST_HINT_KEY = 'smc-first-hint-v1';
+
 const Hub: React.FC<HubProps> = ({ onSelectTool }) => {
+  // 初めての人に、案内の場所を1回だけ伝える。幕で塞がず、閉じたら出さない
+  const [showFirstHint, setShowFirstHint] = useState<boolean>(() => {
+    try { return !localStorage.getItem(FIRST_HINT_KEY); } catch { return true; }
+  });
+  const dismissFirstHint = () => {
+    setShowFirstHint(false);
+    try { localStorage.setItem(FIRST_HINT_KEY, '1'); } catch { /* noop */ }
+  };
   return (
     <div className="p-5 md:p-10 h-full flex flex-col items-center overflow-y-auto custom-scrollbar">
       <div className="flex flex-col gap-7 w-full max-w-3xl my-auto">
@@ -99,6 +109,16 @@ const Hub: React.FC<HubProps> = ({ onSelectTool }) => {
             アイデア出しから出品文・サムネイル・集客まで、この一つで完結します。
           </p>
         </div>
+
+        {showFirstHint && (
+          <div className="flex items-start justify-between gap-3 rounded-2xl border border-brand-100 bg-brand-50/60 px-4 py-3 text-xs text-stone-600 leading-relaxed">
+            <p>
+              <span className="font-semibold text-stone-800">はじめての方へ：</span>
+              各画面の右上にある「画面の案内（1分）」を押すと、その画面の見方を順に指して案内します。押すまで始まらないので、慣れたら使わなくて大丈夫です。
+            </p>
+            <button type="button" onClick={dismissFirstHint} aria-label="この案内を閉じる" className="shrink-0 w-6 h-6 rounded-full text-stone-400 hover:text-brand-500 hover:bg-white transition-colors">✕</button>
+          </div>
+        )}
 
         {/* 2ツールを STEP でつなぎ、主役（作る）→補助（広める）の流れを見せる */}
         <div className="flex flex-col gap-3">

@@ -7,6 +7,7 @@ import AnimatedGuide from './AnimatedGuide';
 const SupportGuide: React.FC<{ className?: string }> = ({ className }) => (
   <AnimatedGuide
     className={className}
+    title="サポートの使い方"
     cycleMs={14000}
     edges={[3360, 6440, 9520]}
     steps={[

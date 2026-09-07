@@ -116,9 +116,9 @@ const App: React.FC = () => {
             <button
               onClick={requestTour}
               className="btn-secondary px-4 py-2 text-xs"
-              title="いま開いている画面の見方を、1分で順に案内します"
+              title="いま開いている画面の見方を、順に指して案内します。押すまで始まりません"
             >
-              はじめての方へ
+              画面の案内（1分）
             </button>
           )}
         </div>

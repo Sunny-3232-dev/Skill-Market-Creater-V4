@@ -77,7 +77,7 @@ const IdeaList: React.FC<IdeaListProps> = ({ ideas, keywords = [], onSelect, onT
   };
 
   const pinnedCount = useMemo(() => ideas.filter(i => i.pinned).length, [ideas]);
-  const tour = useTour('smc-tour-ideas-v1', ideas.length > 0);
+  const tour = useTour();
 
   const handleRegenerate = () => {
     onRegenerate(regenInstruction);

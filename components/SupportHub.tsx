@@ -15,7 +15,7 @@ import SupportGuide from './guide/SupportGuide';
 import Tour, { TOUR_EVENT } from './guide/Tour';
 import NotebookLMGuide from './guide/NotebookLMGuide';
 
-// メニューごとの案内。結果が初めて表示されたときだけ自動で始まる（キーは smc-tour-menu-<id>-v1）
+// メニューごとの案内。結果を表示中にヘッダの「画面の案内（1分）」を押すと、そのメニューの案内が開く
 const MENU_TOURS: Record<MenuId, { sel: string; title: string; text: string }[]> = {
   promoter: [
     { sel: '[data-tour="menu-promoter-list"]', title: '宣伝文のたたき台が20本並びます', text: '困りごとに寄り添ってから解決策を添える形です。全部使う必要はありません。' },
@@ -927,29 +927,18 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
 
   const hasResults = resultTabs.length > 0;
   // ---- 案内（幕と穴） ----
-  // 基本の案内と、表示中のメニューの案内を1つの Tour で切り替える。文脈ごとに初回だけ自動で始まる
+  // 基本の案内と、表示中のメニューの案内を1つの Tour で切り替える。自動では始めない（ヘッダのボタンからだけ）
   const [tourOpen, setTourOpen] = useState(false);
   const shownMenu: MenuId | null = resultTabs.some(t => t.id === activeMenu)
     ? activeMenu
     : (resultTabs[0]?.id ?? null);
-  const tourKey = shownMenu ? `smc-tour-menu-${shownMenu}-v1` : 'smc-tour-support-v1';
   const tourSteps = shownMenu ? MENU_TOURS[shownMenu] : SUPPORT_TOUR;
-  useEffect(() => {
-    let seen = false;
-    try { seen = !!localStorage.getItem(tourKey); } catch { /* noop */ }
-    if (seen) return;
-    const t = window.setTimeout(() => setTourOpen(true), 900);
-    return () => window.clearTimeout(t);
-  }, [tourKey]);
   useEffect(() => {
     const open = () => setTourOpen(true);
     window.addEventListener(TOUR_EVENT, open);
     return () => window.removeEventListener(TOUR_EVENT, open);
   }, []);
-  const closeTour = () => {
-    setTourOpen(false);
-    try { localStorage.setItem(tourKey, '1'); } catch { /* noop */ }
-  };
+  const closeTour = () => setTourOpen(false);
 
   const usedCount = posts.filter(p => p.used).length;
 

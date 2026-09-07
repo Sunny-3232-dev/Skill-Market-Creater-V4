@@ -19,8 +19,8 @@ interface InputFormProps {
 const InputForm: React.FC<InputFormProps> = ({ onSubmit, initialText = '', hasIdeas = false, onBackToIdeas }) => {
   const [rawText, setRawText] = useState(initialText);
   const canSubmit = rawText.trim().length > 0;
-  // 初めてこの画面を見たときだけ自動で案内。あとはヘッダの「はじめての方へ」から
-  const tour = useTour('smc-tour-input-v1', true);
+  // 案内はヘッダの「画面の案内（1分）」を押したときだけ開く
+  const tour = useTour();
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
