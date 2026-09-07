@@ -3,7 +3,7 @@ import { UserInput } from '../types';
 import Tour, { useTour } from './guide/Tour';
 
 const INPUT_TOUR = [
-  { sel: '[data-tour="input-text"]', title: 'まず、自己紹介をここに貼ります', text: '好きなこと・得意なこと・これまでの経験を。箇条書きでも、プロフィールの文章まるごとでも大丈夫です。長くて構いません。' },
+  { sel: '[data-tour="input-text"]', title: 'まず、自己紹介をここに貼ります', text: '好きなこと・得意なこと・これまでの経験を。箇条書きでも、プロフィールの文章まるごとでも大丈夫です。出したいサービスが決まっていれば「〜を出品したい」と一緒に書けば、その案の出品文をすぐ作ります。' },
   { sel: '[data-tour="input-decided"]', title: '出したいサービスが決まっているなら、ここを開く', text: '押すと欄が開きます。書くとアイデア出しを飛ばして、その案の出品文をすぐ作ります。開かなければ、自己紹介から20案を出します。' },
   { sel: '[data-tour="input-submit"]', title: '押すと、20のアイデアが出ます', text: '20〜40秒かかります。王道10案とニッチ10案が並び、この自己紹介にある事実だけを根拠にします。' },
   { sel: 'nav[aria-label="作成の進み"]', title: 'この3段で進みます', text: '入力 → 選ぶ → 仕上げ。仕上げの画面で出品文をコピーして、スキルマーケットに貼ります。' },
@@ -50,6 +50,7 @@ const InputForm: React.FC<InputFormProps> = ({ onSubmit, initialText = '', hasId
 
       <p className="text-sm text-stone-500 leading-relaxed mb-5">
         いちばんかんたんなのは、<span className="font-semibold text-stone-700">リベシティのプロフィールをそのままコピペ</span>。もっと掘り下げたい人は「スキルの種シート」の内容でもOKです。
+        出したいサービスがもう決まっていれば、<span className="font-semibold text-stone-700">「〜を出品したい」と一緒に書いて</span>ください。アイデア出しを飛ばして、その案の出品文を作ります。
       </p>
 
       <form onSubmit={handleSubmit} className="flex-grow flex flex-col gap-5">
@@ -58,7 +59,7 @@ const InputForm: React.FC<InputFormProps> = ({ onSubmit, initialText = '', hasId
           value={rawText}
           onChange={(e) => setRawText(e.target.value)}
           className="field w-full flex-grow min-h-[200px] md:min-h-[260px] p-5 md:p-6 text-stone-800 text-base leading-relaxed resize-none"
-          placeholder={"ここに貼り付け、または自由に入力してください。\n・好きなこと、得意なこと\n・これまでの仕事や人生の経験\n\nプロフィールの文章をまるごと貼り付けてもOKです。"}
+          placeholder={"ここに貼り付け、または自由に入力してください。\n・好きなこと、得意なこと\n・これまでの仕事や人生の経験\n・出したいサービスが決まっていれば「〜を出品したい」も\n\nプロフィールの文章をまるごと貼り付けてもOKです。"}
         />
 
         {hasIdeas && !hasDecided && (

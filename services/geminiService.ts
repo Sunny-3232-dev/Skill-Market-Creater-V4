@@ -933,6 +933,73 @@ ${ideaText.trim()}
   };
 };
 
+// 自己紹介の中に「これを出品したい」と決めている案が書かれているかを見る。
+// 書かれていれば shapeDecidedIdea と同じ3項目に整えて返す（アイデア出しを飛ばす判断に使う）。
+// 「得意です」「好きです」だけでは決めているとみなさない。迷ったら false
+export interface DecidedIdeaDetection {
+  decided: boolean;
+  title: string;
+  strength: string;
+  solution: string;
+}
+export const detectDecidedIdea = async (rawText: string): Promise<DecidedIdeaDetection> => {
+  const text = (rawText || '').trim();
+  const none: DecidedIdeaDetection = { decided: false, title: '', strength: '', solution: '' };
+  if (!text) return none;
+  const ai = createClient();
+  const prompt = `
+以下は、ある人の自己紹介です。この中に「これを出品したい」「このサービスを出す」と、具体的なサービスを決めている記述があるかを判定してください。
+
+【判定のルール】
+- decided=true にするのは、売る対象・提供内容が具体的に書かれ、かつ本人がそれを出品する意思を示しているときだけ
+  （例：「Canvaで作った学級通信のテンプレートを販売したい」「Excelの個別レッスンを出品する予定」）
+- 「Excelが得意」「教えるのが好き」のような、得意・好き・経験の記述だけなら decided=false
+- 複数の案が並んでいて1つに絞れていない場合も decided=false
+- 迷ったら decided=false
+
+【decided=true のとき】案の意図を変えずに次の3項目に整える
+- title: 出品タイトル。30文字以内。何を・誰に・どう提供するかが分かる形。案に書かれた内容と言葉を尊重する
+- strength: 活かせる強み。自己紹介にある経験・実績・資格のうち、この案に関係するものだけを1〜2文で
+- solution: 解決する悩み。この案の買い手が抱えている困りごとを1〜2文で
+- 自己紹介に無い実績・数字・資格を作らない
+decided=false のときは title / strength / solution を空文字にする
+
+【自己紹介】
+${text.slice(0, 3000)}
+`;
+  try {
+    const response = await ai.models.generateContent({
+      model: resolveTextModel(),
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            decided: { type: Type.BOOLEAN },
+            title: { type: Type.STRING },
+            strength: { type: Type.STRING },
+            solution: { type: Type.STRING },
+          },
+          required: ['decided', 'title', 'strength', 'solution'],
+        },
+      },
+    });
+    const parsed = JSON.parse(response.text || "{}");
+    const title = String(parsed?.title ?? '').trim();
+    if (!parsed?.decided || !title) return none;
+    return {
+      decided: true,
+      title: title.length > 30 ? title.slice(0, 30) : title,
+      strength: String(parsed?.strength ?? '').trim(),
+      solution: String(parsed?.solution ?? '').trim(),
+    };
+  } catch {
+    // 判定に失敗しても本流（20案）は止めない
+    return none;
+  }
+};
+
 export const extractServiceTitle = async (rawText: string): Promise<string> => {
   const text = rawText?.trim();
   if (!text) return '';

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { UserInput, SkillIdea, Step, ProfileFacts } from '../types';
-import { generateIdeas, generateServicePage, extractProfileKeywords, extractProfileFacts, shapeDecidedIdea } from '../services/geminiService';
+import { generateIdeas, generateServicePage, extractProfileKeywords, extractProfileFacts, shapeDecidedIdea, detectDecidedIdea } from '../services/geminiService';
 import { extractWords } from '../utils/textProcessing';
 import InputForm from './InputForm';
 import IdeaList from './IdeaList';
@@ -140,8 +140,9 @@ const CreatorTool: React.FC<CreatorToolProps> = ({ ensureKeySet, onHandleApiErro
   };
 
   // 出したい案が決まっている人の近道。案を3項目に整え、アイデア出しを飛ばして出品文まで一気に作る。
-  // 整えた案はピン留めして一覧の先頭に残す（あとから他の案も出せる）
-  const handleDecidedIdea = async (rawText: string, decided: string) => {
+  // 整えた案はピン留めして一覧の先頭に残す（あとから他の案も出せる）。
+  // shaped を渡されたとき（自己紹介の中から読み取れたとき）は整形を省く
+  const handleDecidedIdea = async (rawText: string, decided: string, shapedGiven?: Pick<SkillIdea, 'title' | 'strength' | 'solution'>) => {
     setIsLoading(true);
     setLoadingTitle('この案で出品文を作ります');
     setLoadingMessage('案を出品タイトルの形に整え、自己紹介から実績や経験を整理しています…');
@@ -152,7 +153,7 @@ const CreatorTool: React.FC<CreatorToolProps> = ({ ensureKeySet, onHandleApiErro
       .catch(() => { /* 補助機能 */ });
     try {
       const [shaped, facts] = await Promise.all([
-        shapeDecidedIdea(rawText, decided),
+        shapedGiven ? Promise.resolve(shapedGiven) : shapeDecidedIdea(rawText, decided),
         profileFacts && rawText === rawInputText ? Promise.resolve(profileFacts) : extractProfileFacts(rawText).catch(() => null),
       ]);
       if (facts) saveFacts(facts);
@@ -194,6 +195,16 @@ const CreatorTool: React.FC<CreatorToolProps> = ({ ensureKeySet, onHandleApiErro
     }
 
     setIsLoading(true);
+    // 自己紹介の中に「〜を出品したい」と決めている案が書かれていれば、そのまま出品文へ（数秒の確認を1回挟む）
+    setLoadingTitle("読んでいます");
+    setLoadingMessage("出したいサービスがもう決まっているかを見ています…");
+    const detection = await detectDecidedIdea(input.rawText);
+    if (detection.decided) {
+      setIsLoading(false);
+      await handleDecidedIdea(input.rawText, detection.title, detection);
+      return;
+    }
+
     setLoadingTitle("アイデアを考えています");
     setLoadingMessage("あなたの情報を分析し、最適なアイデアを練り上げています…");
     try {
