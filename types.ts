@@ -1,5 +1,7 @@
 export interface UserInput {
   rawText: string;
+  /** 出したいサービスが決まっている人の案（任意）。あればアイデア出しを飛ばして出品文を作る */
+  decidedIdea?: string;
 }
 
 export interface SkillIdea {

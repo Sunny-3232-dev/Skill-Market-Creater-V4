@@ -888,6 +888,51 @@ export const formatProfileFacts = (facts: ProfileFacts | null | undefined): stri
   return body ? `\n【自己紹介から抽出した事実（根拠として使う）】\n${body}\n` : '';
 };
 
+// 「これを出品したい」と決めている案を、アイデア一覧と同じ3項目（タイトル・強み・悩み）に整える。
+// 案の意図は変えない。強みは自己紹介にある事実だけから拾う
+export const shapeDecidedIdea = async (rawText: string, ideaText: string): Promise<Pick<SkillIdea, 'title' | 'strength' | 'solution'>> => {
+  const ai = createClient();
+  const prompt = `
+以下は、ある人の自己紹介と、その人が「これを出品したい」と決めているサービスの案です。
+案の意図は変えずに、出品用の3項目に整えてください。
+
+【ルール】
+- title: 出品タイトル。30文字以内。何を・誰に・どう提供するかが分かる形にする。案に書かれた内容と言葉を尊重し、別のサービスに変えない
+- strength: 活かせる強み。自己紹介にある経験・実績・資格のうち、この案に関係するものだけを1〜2文で。関係する記述が無ければ、案から読み取れる強みを短く書く
+- solution: 解決する悩み。この案の買い手が抱えている困りごとを1〜2文で
+- 自己紹介に無い実績・数字・資格を作らない
+
+【自己紹介】
+${(rawText || '').trim().slice(0, 3000)}
+
+【決めている案】
+${ideaText.trim()}
+`;
+  const response = await ai.models.generateContent({
+    model: resolveTextModel(),
+    contents: prompt,
+    config: {
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: Type.OBJECT,
+        properties: {
+          title: { type: Type.STRING },
+          strength: { type: Type.STRING },
+          solution: { type: Type.STRING },
+        },
+        required: ['title', 'strength', 'solution'],
+      },
+    },
+  });
+  const parsed = JSON.parse(response.text || "{}");
+  const title = String(parsed?.title ?? '').trim() || ideaText.trim().slice(0, 30);
+  return {
+    title: title.length > 30 ? title.slice(0, 30) : title,
+    strength: String(parsed?.strength ?? '').trim(),
+    solution: String(parsed?.solution ?? '').trim(),
+  };
+};
+
 export const extractServiceTitle = async (rawText: string): Promise<string> => {
   const text = rawText?.trim();
   if (!text) return '';

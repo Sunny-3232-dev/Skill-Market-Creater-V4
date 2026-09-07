@@ -4,6 +4,7 @@ import Tour, { useTour } from './guide/Tour';
 
 const INPUT_TOUR = [
   { sel: '[data-tour="input-text"]', title: 'まず、自己紹介をここに貼ります', text: '好きなこと・得意なこと・これまでの経験を。箇条書きでも、プロフィールの文章まるごとでも大丈夫です。長くて構いません。' },
+  { sel: '[data-tour="input-decided"]', title: '出したいサービスが決まっているなら、ここに', text: '書くとアイデア出しを飛ばして、その案の出品文をすぐ作ります。空のままなら、自己紹介から20案を出します。' },
   { sel: '[data-tour="input-submit"]', title: '押すと、20のアイデアが出ます', text: '20〜40秒かかります。王道10案とニッチ10案が並び、この自己紹介にある事実だけを根拠にします。' },
   { sel: 'nav[aria-label="作成の進み"]', title: 'この3段で進みます', text: '入力 → 選ぶ → 仕上げ。仕上げの画面で出品文をコピーして、スキルマーケットに貼ります。' },
 ];
@@ -18,6 +19,9 @@ interface InputFormProps {
 
 const InputForm: React.FC<InputFormProps> = ({ onSubmit, initialText = '', hasIdeas = false, onBackToIdeas }) => {
   const [rawText, setRawText] = useState(initialText);
+  // 出したいサービスが決まっている人の案（任意）。あれば一覧を飛ばして出品文まで作る
+  const [decidedIdea, setDecidedIdea] = useState('');
+  const hasDecided = decidedIdea.trim().length > 0;
   const canSubmit = rawText.trim().length > 0;
   // 案内はヘッダの「画面の案内（1分）」を押したときだけ開く
   const tour = useTour();
@@ -25,7 +29,7 @@ const InputForm: React.FC<InputFormProps> = ({ onSubmit, initialText = '', hasId
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!canSubmit) return;
-    onSubmit({ rawText });
+    onSubmit({ rawText, decidedIdea: hasDecided ? decidedIdea.trim() : undefined });
   };
 
   return (
@@ -55,18 +59,37 @@ const InputForm: React.FC<InputFormProps> = ({ onSubmit, initialText = '', hasId
           placeholder={"ここに貼り付け、または自由に入力してください。\n・好きなこと、得意なこと\n・これまでの仕事や人生の経験\n\nプロフィールの文章をまるごと貼り付けてもOKです。"}
         />
 
-        {hasIdeas && (
+        {hasIdeas && !hasDecided && (
           <p className="text-xs text-stone-400 -mt-1">
             プロフィールを書き換えて生成すると、ピン留めしたアイデアは残したまま、それ以外を作り直します。
           </p>
         )}
+
+        {/* 出したい案が決まっている人の近道。空ならこれまでどおり20案を出す */}
+        <div data-tour="input-decided" className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
+          <label htmlFor="decided-idea" className="block text-sm font-semibold text-stone-800">
+            出したいサービスが決まっている方は、ここに書いてください
+            <span className="ml-2 text-xs font-normal text-stone-400">（任意）</span>
+          </label>
+          <p className="text-xs text-stone-500 mt-1 mb-2 leading-relaxed">
+            書くと、アイデア出しを飛ばして、この案の出品文をすぐ作ります。空のままなら、自己紹介から20案を出します。
+          </p>
+          <textarea
+            id="decided-idea"
+            value={decidedIdea}
+            onChange={(e) => setDecidedIdea(e.target.value)}
+            rows={2}
+            className="field w-full p-3 text-sm leading-relaxed resize-y bg-white"
+            placeholder="例：ExcelのVLOOKUPとピボットを、実務の表で教える60分の個別レッスン"
+          />
+        </div>
 
         <button data-tour="input-submit"
           type="submit"
           disabled={!canSubmit}
           className="btn-primary w-full text-base py-4 px-8"
         >
-          {hasIdeas ? 'このプロフィールで作り直す' : 'アイデアを生成する'}
+          {hasDecided ? 'この案で出品文を作る' : hasIdeas ? 'このプロフィールで作り直す' : 'アイデアを生成する'}
           <span aria-hidden>→</span>
         </button>
       </form>
