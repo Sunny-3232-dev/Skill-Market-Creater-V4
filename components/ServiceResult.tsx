@@ -8,11 +8,13 @@ import CampaignTweetCard from './CampaignTweetCard';
 import Troubleshoot from './Troubleshoot';
 import ListingPreview from './ListingPreview';
 import PasteGuide from './guide/PasteGuide';
+import SplitViewGuide from './guide/SplitViewGuide';
 import Tour, { useTour } from './guide/Tour';
 
 const RESULT_TOUR = [
   { sel: '[data-tour="detail-card"]', title: 'サービス詳細は、この「コピー」で', text: '見出しに <strong> が付いた形でコピーされ、スキルマーケットに貼ると太字になります。下の枠は貼ったあとの見え方です。' },
-  { sel: '[data-tour="paste-guide"]', title: '貼り方はこの絵のとおり', text: 'コピー → 出品画面の「サービス詳細」欄に貼る → 公開。貼った直後にタグが見えていて正解です。' },
+  { sel: '[data-tour="split-guide"]', title: 'まず、画面を2分割します', text: '「スキルマーケット出品画面へ」を右クリック（トラックパッドは2本指でタップ）→ 上から3つ目「分割ビューで開く」。ここが一番つまずくところなので、絵で動きを見てください。' },
+  { sel: '[data-tour="paste-guide"]', title: '項目ごとに、左でコピーして右に貼ります', text: 'タイトル → キャッチコピー → サービス詳細の順。サービス詳細は <strong> が見えていて正解です。公開すると太字になります。' },
   { sel: '[data-tour="price-mode"]', title: '価格は標準とモニターを切り替えられます', text: 'モニター価格にするときは、先着人数や期限を付けてください。理由のある値引きに見えます。' },
   { sel: '[data-tour="prompt-recommended"]', title: 'サムネイル画像はこのプロンプトから', text: '迷ったらこれ。コピーして ChatGPT に貼ると、あなたのサービス内容で画像ができます。' },
   { sel: '[data-tour="chat-editor"]', title: '直したいところはAIに頼めます', text: '「もっと短く」「価格を上げて」のように書きます。保存するまで元の文は残るので、試して戻せます。' },
@@ -609,7 +611,7 @@ const ServiceResult: React.FC<ServiceResultProps> = ({ idea, content, onBack, on
           <SectionHead
             eyebrow="まず"
             title="出品文をスキルマーケットに貼る"
-            description="各項目の「コピー」を押して、出品画面の同じ名前の欄に貼り付けます。サービス詳細の見出しは太字（<strong>）付きでコピーされます。"
+            description="画面を左右に2分割してから、タイトル → キャッチコピー → サービス詳細の順に、左の「コピー」を右の同じ名前の欄に貼っていきます。サービス詳細の見出しは太字（<strong>）付きでコピーされます。"
             action={
               <a
                 href="https://skill.libecity.com/services/new"
@@ -621,7 +623,8 @@ const ServiceResult: React.FC<ServiceResultProps> = ({ idea, content, onBack, on
               </a>
             }
           />
-          {/* 貼り方を1枚の絵で見せる（文章の説明の代わり） */}
+          {/* 貼り方を2枚の絵で見せる。1枚目は一番つまずく「画面の2分割」、2枚目は項目ごとのコピー→貼り付け */}
+          <div data-tour="split-guide"><SplitViewGuide className="mb-4" /></div>
           <div data-tour="paste-guide"><PasteGuide className="mb-5" /></div>
           <div className="mb-5">
             <button
@@ -632,9 +635,9 @@ const ServiceResult: React.FC<ServiceResultProps> = ({ idea, content, onBack, on
             </button>
             {showTip && (
               <div className="mt-2 bg-stone-50 rounded-xl p-3 text-left text-[12px] text-stone-500 leading-relaxed space-y-1.5 animate-in fade-in slide-in-from-top-2 duration-200">
-                <p>1. 上の「スキルマーケット出品画面へ」を<span className="font-semibold text-stone-700">右クリック</span>→「分割ビューで開く」</p>
-                <p>2. 左に出品画面、右にこの画面を並べて表示</p>
-                <p>3. 各項目の「コピー」→ 出品画面の同じ欄に貼り付け</p>
+                <p>1. 上の「スキルマーケット出品画面へ」を<span className="font-semibold text-stone-700">右クリック</span>（MacBook のトラックパッドは<span className="font-semibold text-stone-700">2本指でタップ</span>）</p>
+                <p>2. 出たメニューの<span className="font-semibold text-stone-700">上から3つ目「分割ビューで開く」</span>を押す → 左にこの画面、右に出品画面が並びます</p>
+                <p>3. タイトルから順に、左の「コピー」→ 右の同じ名前の欄に貼り付け。サービス詳細は <code>&lt;strong&gt;</code> が見えたままで正解</p>
               </div>
             )}
           </div>
