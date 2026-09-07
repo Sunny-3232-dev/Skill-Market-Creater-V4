@@ -736,6 +736,7 @@ JSON配列で出力してください。各要素は以下のキーを持つオ�
 
 【ガイドライン】
 - 最初に、入力データから「好きなこと」「得意なこと」「経験」をAIとして整理・解釈してください。
+- 入力データの中に「〜を出品したい」「〜のサービスを出す」と本人が決めている具体的なサービスが書かれている場合は、その案を意図も言葉も変えずに standard の1番目に入れてください（残りはその案の周辺・発展・別角度の案にする）。
 - 各アイデアは具体的で、すぐにでも出品できそうな具体的な内容にしてください。${options.instruction?.trim() ? '\n- 上記【今回の追加リクエスト】の意図を全アイデアに強く反映してください。' : ''}
 `;
 
@@ -886,118 +887,6 @@ export const formatProfileFacts = (facts: ProfileFacts | null | undefined): stri
     section('状況・背景', facts.context),
   ].filter(Boolean).join('\n');
   return body ? `\n【自己紹介から抽出した事実（根拠として使う）】\n${body}\n` : '';
-};
-
-// 「これを出品したい」と決めている案を、アイデア一覧と同じ3項目（タイトル・強み・悩み）に整える。
-// 案の意図は変えない。強みは自己紹介にある事実だけから拾う
-export const shapeDecidedIdea = async (rawText: string, ideaText: string): Promise<Pick<SkillIdea, 'title' | 'strength' | 'solution'>> => {
-  const ai = createClient();
-  const prompt = `
-以下は、ある人の自己紹介と、その人が「これを出品したい」と決めているサービスの案です。
-案の意図は変えずに、出品用の3項目に整えてください。
-
-【ルール】
-- title: 出品タイトル。30文字以内。何を・誰に・どう提供するかが分かる形にする。案に書かれた内容と言葉を尊重し、別のサービスに変えない
-- strength: 活かせる強み。自己紹介にある経験・実績・資格のうち、この案に関係するものだけを1〜2文で。関係する記述が無ければ、案から読み取れる強みを短く書く
-- solution: 解決する悩み。この案の買い手が抱えている困りごとを1〜2文で
-- 自己紹介に無い実績・数字・資格を作らない
-
-【自己紹介】
-${(rawText || '').trim().slice(0, 3000)}
-
-【決めている案】
-${ideaText.trim()}
-`;
-  const response = await ai.models.generateContent({
-    model: resolveTextModel(),
-    contents: prompt,
-    config: {
-      responseMimeType: "application/json",
-      responseSchema: {
-        type: Type.OBJECT,
-        properties: {
-          title: { type: Type.STRING },
-          strength: { type: Type.STRING },
-          solution: { type: Type.STRING },
-        },
-        required: ['title', 'strength', 'solution'],
-      },
-    },
-  });
-  const parsed = JSON.parse(response.text || "{}");
-  const title = String(parsed?.title ?? '').trim() || ideaText.trim().slice(0, 30);
-  return {
-    title: title.length > 30 ? title.slice(0, 30) : title,
-    strength: String(parsed?.strength ?? '').trim(),
-    solution: String(parsed?.solution ?? '').trim(),
-  };
-};
-
-// 自己紹介の中に「これを出品したい」と決めている案が書かれているかを見る。
-// 書かれていれば shapeDecidedIdea と同じ3項目に整えて返す（アイデア出しを飛ばす判断に使う）。
-// 「得意です」「好きです」だけでは決めているとみなさない。迷ったら false
-export interface DecidedIdeaDetection {
-  decided: boolean;
-  title: string;
-  strength: string;
-  solution: string;
-}
-export const detectDecidedIdea = async (rawText: string): Promise<DecidedIdeaDetection> => {
-  const text = (rawText || '').trim();
-  const none: DecidedIdeaDetection = { decided: false, title: '', strength: '', solution: '' };
-  if (!text) return none;
-  const ai = createClient();
-  const prompt = `
-以下は、ある人の自己紹介です。この中に「これを出品したい」「このサービスを出す」と、具体的なサービスを決めている記述があるかを判定してください。
-
-【判定のルール】
-- decided=true にするのは、売る対象・提供内容が具体的に書かれ、かつ本人がそれを出品する意思を示しているときだけ
-  （例：「Canvaで作った学級通信のテンプレートを販売したい」「Excelの個別レッスンを出品する予定」）
-- 「Excelが得意」「教えるのが好き」のような、得意・好き・経験の記述だけなら decided=false
-- 複数の案が並んでいて1つに絞れていない場合も decided=false
-- 迷ったら decided=false
-
-【decided=true のとき】案の意図を変えずに次の3項目に整える
-- title: 出品タイトル。30文字以内。何を・誰に・どう提供するかが分かる形。案に書かれた内容と言葉を尊重する
-- strength: 活かせる強み。自己紹介にある経験・実績・資格のうち、この案に関係するものだけを1〜2文で
-- solution: 解決する悩み。この案の買い手が抱えている困りごとを1〜2文で
-- 自己紹介に無い実績・数字・資格を作らない
-decided=false のときは title / strength / solution を空文字にする
-
-【自己紹介】
-${text.slice(0, 3000)}
-`;
-  try {
-    const response = await ai.models.generateContent({
-      model: resolveTextModel(),
-      contents: prompt,
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            decided: { type: Type.BOOLEAN },
-            title: { type: Type.STRING },
-            strength: { type: Type.STRING },
-            solution: { type: Type.STRING },
-          },
-          required: ['decided', 'title', 'strength', 'solution'],
-        },
-      },
-    });
-    const parsed = JSON.parse(response.text || "{}");
-    const title = String(parsed?.title ?? '').trim();
-    if (!parsed?.decided || !title) return none;
-    return {
-      decided: true,
-      title: title.length > 30 ? title.slice(0, 30) : title,
-      strength: String(parsed?.strength ?? '').trim(),
-      solution: String(parsed?.solution ?? '').trim(),
-    };
-  } catch {
-    // 判定に失敗しても本流（20案）は止めない
-    return none;
-  }
 };
 
 export const extractServiceTitle = async (rawText: string): Promise<string> => {

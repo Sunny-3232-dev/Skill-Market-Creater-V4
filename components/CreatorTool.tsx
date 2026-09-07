@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { UserInput, SkillIdea, Step, ProfileFacts } from '../types';
-import { generateIdeas, generateServicePage, extractProfileKeywords, extractProfileFacts, shapeDecidedIdea, detectDecidedIdea } from '../services/geminiService';
+import { generateIdeas, generateServicePage, extractProfileKeywords, extractProfileFacts } from '../services/geminiService';
 import { extractWords } from '../utils/textProcessing';
 import InputForm from './InputForm';
 import IdeaList from './IdeaList';
@@ -139,44 +139,6 @@ const CreatorTool: React.FC<CreatorToolProps> = ({ ensureKeySet, onHandleApiErro
     return [...pinned, ...fresh];
   };
 
-  // 出したい案が決まっている人の近道。案を3項目に整え、アイデア出しを飛ばして出品文まで一気に作る。
-  // 整えた案はピン留めして一覧の先頭に残す（あとから他の案も出せる）。
-  // shaped を渡されたとき（自己紹介の中から読み取れたとき）は整形を省く
-  const handleDecidedIdea = async (rawText: string, decided: string, shapedGiven?: Pick<SkillIdea, 'title' | 'strength' | 'solution'>) => {
-    setIsLoading(true);
-    setLoadingTitle('この案で出品文を作ります');
-    setLoadingMessage('案を出品タイトルの形に整え、自己紹介から実績や経験を整理しています…');
-    // キーワードは裏で。事実リストは出品文の根拠に使うので待つ（プロフィールが変わっていなければ保存済みを使う）
-    keywordsBootstrapped.current = true;
-    extractProfileKeywords(rawText)
-      .then(kws => { setProfileKeywords(kws); try { localStorage.setItem(STORAGE_KEY_KEYWORDS, JSON.stringify(kws)); } catch { /* noop */ } })
-      .catch(() => { /* 補助機能 */ });
-    try {
-      const [shaped, facts] = await Promise.all([
-        shapedGiven ? Promise.resolve(shapedGiven) : shapeDecidedIdea(rawText, decided),
-        profileFacts && rawText === rawInputText ? Promise.resolve(profileFacts) : extractProfileFacts(rawText).catch(() => null),
-      ]);
-      if (facts) saveFacts(facts);
-      const idea: SkillIdea = { id: crypto.randomUUID(), ...shaped, type: 'standard', pinned: true };
-      setLoadingTitle(`「${idea.title}」`);
-      setLoadingMessage('このアイデアの出品ページを構成しています…');
-      const pageText = await generateServicePage(idea, facts);
-      const withContent: SkillIdea = { ...idea, generatedContent: pageText };
-      const merged = [withContent, ...ideas.filter(i => i.title !== idea.title)];
-      setIdeas(merged);
-      saveIdeasToStorage(merged);
-      setSelectedIdea(withContent);
-      setServiceText(pageText);
-      setStep(Step.DETAIL);
-      window.scrollTo(0, 0);
-    } catch (error: any) {
-      setStep(Step.INPUT);
-      onHandleApiError(error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   const handleStartIdeaGeneration = async (input: UserInput) => {
     const keyReady = await ensureKeySet();
     if (!keyReady) return;
@@ -188,23 +150,7 @@ const CreatorTool: React.FC<CreatorToolProps> = ({ ensureKeySet, onHandleApiErro
       console.warn("Failed to save raw input to storage", e);
     }
 
-    const decided = input.decidedIdea?.trim();
-    if (decided) {
-      await handleDecidedIdea(input.rawText, decided);
-      return;
-    }
-
     setIsLoading(true);
-    // 自己紹介の中に「〜を出品したい」と決めている案が書かれていれば、そのまま出品文へ（数秒の確認を1回挟む）
-    setLoadingTitle("読んでいます");
-    setLoadingMessage("出したいサービスがもう決まっているかを見ています…");
-    const detection = await detectDecidedIdea(input.rawText);
-    if (detection.decided) {
-      setIsLoading(false);
-      await handleDecidedIdea(input.rawText, detection.title, detection);
-      return;
-    }
-
     setLoadingTitle("アイデアを考えています");
     setLoadingMessage("あなたの情報を分析し、最適なアイデアを練り上げています…");
     try {
