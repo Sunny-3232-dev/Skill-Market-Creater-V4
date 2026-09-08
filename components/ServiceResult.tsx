@@ -8,8 +8,7 @@ import CampaignTweetCard from './CampaignTweetCard';
 import { isCampaignActive } from '../data/campaign';
 import Troubleshoot from './Troubleshoot';
 import ListingPreview from './ListingPreview';
-import PasteGuide from './guide/PasteGuide';
-import SplitViewGuide from './guide/SplitViewGuide';
+import PasteFlowGuide from './guide/PasteFlowGuide';
 import Tour, { useTour } from './guide/Tour';
 
 const RESULT_TOUR = [
@@ -927,11 +926,10 @@ const ServiceResult: React.FC<ServiceResultProps> = ({ idea, content, onBack, on
           <details className="mt-4 group" data-tour="paste-guides">
             <summary className="cursor-pointer list-none inline-flex items-center gap-1.5 text-xs font-semibold text-stone-500 hover:text-brand-500 transition-colors [&::-webkit-details-marker]:hidden">
               <span aria-hidden className="transition-transform duration-200 group-open:rotate-180">▾</span>
-              貼り方を動きで見る（画面の2分割／項目ごとの貼り付け）
+              貼り方を動きで見る（画面の2分割 → 項目ごとの貼り付け → 公開）
             </summary>
-            <div className="mt-3 space-y-4">
-              <SplitViewGuide />
-              <PasteGuide />
+            <div className="mt-3">
+              <PasteFlowGuide />
             </div>
           </details>
         </section>
