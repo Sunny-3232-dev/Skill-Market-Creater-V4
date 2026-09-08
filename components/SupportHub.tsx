@@ -36,7 +36,6 @@ const MENU_TOURS: Record<MenuId, { sel: string; title: string; text: string }[]>
     { sel: '[data-tour="menu-slide-steps"]', title: 'できたら PDF でダウンロード → JPG に', text: 'I Love PDF で1枚ずつの画像にして、スキルマーケットのサービス画像に追加します。' },
   ],
   flyer: [
-    { sel: '[data-tour="menu-flyer-mode"]', title: 'このサービスで1枚か、複数まとめて1枚か', text: 'まとめる場合は、登録済みサービスから2〜6件を選びます。' },
     { sel: '[data-tour="menu-flyer-tone"]', title: 'トンマナを選びます', text: 'サービス画像やスライドと同じにしておくと、紙で見た人がSNSで再会したとき同じ出品者だと気づきます。' },
     { sel: '[data-tour="menu-flyer-copy"]', title: 'プロンプトをコピー → ChatGPT に貼る', text: 'A4たてのチラシが1枚出ます。QRコードは、画像のあとに ChatGPT がコード実行で本物を作って右下に重ねます（プロンプトに手順入り）。' },
     { sel: '[data-tour="menu-flyer-qr"]', title: 'QRが読めなかったときの保険', text: 'ここでこのツールがQR画像を作ります。ChatGPT にチラシ画像と一緒にアップロードして重ねてもらうか、Canva で重ねてください。' },
@@ -320,7 +319,8 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
 
   // チラシ（紙に印刷して配る）
   const [flyerContent, setFlyerContent] = useState<FlyerContent | null>(init.flyerContent ?? null);
-  const [flyerMode, setFlyerMode] = useState<'single' | 'multi'>(init.flyerMode ?? 'single');
+  // まとめチラシは当面出さない（まず1種類で様子を見る）。保存値に関わらず single に固定し、状態と処理は残す
+  const [flyerMode, setFlyerMode] = useState<'single' | 'multi'>('single');
   const [flyerVersion, setFlyerVersion] = useState<ThumbnailPromptVersion>(init.flyerVersion ?? 'ai_auto');
   const [multiFlyerIds, setMultiFlyerIds] = useState<string[]>(Array.isArray(init.multiFlyerIds) ? init.multiFlyerIds : []);
   const [multiFlyerContent, setMultiFlyerContent] = useState<MultiFlyerContent | null>(init.multiFlyerContent ?? null);
@@ -912,7 +912,7 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
     {
       id: 'flyer' as MenuId,
       title: 'チラシを作る（検証中）',
-      description: '紙に印刷して配るチラシのプロンプトを用意。1サービス分と、複数をまとめた1枚の2種類が作れます。',
+      description: '紙に印刷して配るチラシのプロンプトを用意。1サービス分のA4たてチラシが作れます。',
       highlight: 'A4たて・印刷向け',
       icon: <FlyerIcon />,
       onRun: handleRunFlyer,
@@ -1486,14 +1486,8 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
                   <h3 className="text-lg font-bold text-stone-900">チラシをつくる（検証中）</h3>
                   <p className="text-xs text-stone-500 mt-1">
                     紙に印刷して配るためのプロンプトです。ChatGPTの画像生成（GPT Image）に貼ると、A4たてのチラシが1枚出てきます。
-                    <span className="font-medium text-stone-600">QRコードは画像生成では作れない</span>ため、あとから貼れるように右下の余白を空ける指示にしています。
+                    QRコードは、画像のあとに <span className="font-medium text-stone-600">ChatGPT がコード実行で本物を作って右下に重ねます</span>（プロンプトに手順入り）。
                   </p>
-                </div>
-
-                {/* 作り方の切り替え */}
-                <div className="flex flex-wrap gap-2 mb-6">
-                  <button type="button" data-tour="menu-flyer-mode" onClick={() => setFlyerMode('single')} aria-pressed={flyerMode === 'single'} className={`px-4 py-2 text-xs ${flyerMode === 'single' ? 'seg-active' : 'seg'}`}>このサービスで1枚</button>
-                  <button type="button" onClick={() => setFlyerMode('multi')} aria-pressed={flyerMode === 'multi'} className={`px-4 py-2 text-xs ${flyerMode === 'multi' ? 'seg-active' : 'seg'}`}>複数まとめて1枚</button>
                 </div>
 
                 {/* トンマナ選択（スライド資料と同じ8種） */}
@@ -1506,11 +1500,9 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
                 <div data-tour="menu-flyer-tone"><ToneGrid value={flyerVersion} onChange={setFlyerVersion} className="mb-3" /></div>
                 <p className="text-[11px] text-stone-400 mb-6">
                   選んだトンマナはコピーに即反映されます（切り替えても作り直しは不要）。
-                  {flyerVersion === 'ai_auto' && (flyerMode === 'multi'
-                    ? '「AIおまかせ」は、まとめチラシに載せる内容全体からChatGPT側で判断させます。'
-                    : (autoStyleDirective
-                      ? '「AIおまかせ」はこのサービス専用に設計済みのトンマナを使います。'
-                      : '「AIおまかせ」は汎用のおまかせ指定になります。'))}
+                  {flyerVersion === 'ai_auto' && (autoStyleDirective
+                    ? '「AIおまかせ」はこのサービス専用に設計済みのトンマナを使います。'
+                    : '「AIおまかせ」は汎用のおまかせ指定になります。')}
                 </p>
 
                 {/* このサービスで1枚 */}
@@ -1554,92 +1546,6 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
                   ) : (
                     <p className="text-sm text-stone-500 mb-8">上のメニューの「チラシを作る」から、選択中のサービスのチラシ文言を作ってください。</p>
                   )
-                )}
-
-                {/* 複数まとめて1枚 */}
-                {flyerMode === 'multi' && (
-                  <>
-                    <div className="card p-5 mb-4">
-                      <h4 className="text-sm font-semibold text-stone-700 mb-1">1枚に載せるサービスを選ぶ</h4>
-                      <p className="text-xs text-stone-500 mb-3">
-                        2〜{MAX_MULTI_FLYER}件まで選べます。載せる数を絞るほど1件あたりが大きくなり、手に取った人が読めます。（選択中 {multiFlyerIds.length}件）
-                      </p>
-                      {registeredServices.length === 0 ? (
-                        <p className="text-xs text-brand-600">登録済みサービスがありません。上の「登録済みサービス」から追加してください。</p>
-                      ) : (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                          {registeredServices.map(sv => {
-                            const checked = multiFlyerIds.includes(sv.id);
-                            const ready = sv.content.trim().length > 0;
-                            return (
-                              <label
-                                key={sv.id}
-                                className={`flex items-start gap-2.5 rounded-xl border p-3 transition-colors ${
-                                  checked ? 'border-brand-400 bg-brand-50/40' : 'border-stone-200 bg-white hover:border-brand-200'
-                                } ${ready ? 'cursor-pointer' : 'opacity-50 cursor-not-allowed'}`}
-                              >
-                                <input
-                                  type="checkbox"
-                                  checked={checked}
-                                  disabled={!ready}
-                                  onChange={() => toggleMultiFlyerId(sv.id)}
-                                  className="mt-0.5 accent-brand-500"
-                                />
-                                <span className="min-w-0">
-                                  <span className="block text-xs font-semibold text-stone-800 truncate">{sv.title}</span>
-                                  <span className="block text-[11px] text-stone-400">{ready ? `本文 ${sv.content.trim().length}文字` : '本文が未登録'}</span>
-                                </span>
-                              </label>
-                            );
-                          })}
-                        </div>
-                      )}
-                      {registeredServices.length === 1 && (
-                        <p className="text-xs text-brand-600 mt-3">まとめチラシには2件以上の登録が必要です。</p>
-                      )}
-                      <div className="mt-4">
-                        <button
-                          type="button"
-                          onClick={handleGenerateMultiFlyer}
-                          disabled={multiFlyerIds.length < 2 || isMultiFlyerLoading}
-                          className="btn-primary px-6 py-2.5 text-xs"
-                        >
-                          {isMultiFlyerLoading ? '文言を作成中…' : (multiFlyerContent ? 'この組み合わせで作り直す' : 'まとめチラシの文言を作る')}
-                        </button>
-                      </div>
-                    </div>
-
-                    {multiFlyerContent && (
-                      <>
-                        <div className="card p-5 mb-4">
-                          <FlyerPreviewRow label="見出し"><span className="text-sm font-bold text-stone-900">{multiFlyerContent.headline}</span></FlyerPreviewRow>
-                          <FlyerPreviewRow label="サブコピー">{multiFlyerContent.subCopy}</FlyerPreviewRow>
-                          {multiFlyerContent.items.map((it, i) => (
-                            <FlyerPreviewRow key={i} label={`${i + 1}枠目`}>
-                              <span className="font-semibold text-stone-900">{it.title}</span>
-                              <span className="text-stone-500">（{it.forWhom}{it.price ? ` ／ ${it.price}` : ''}）</span>
-                              <br />{it.oneLiner}
-                            </FlyerPreviewRow>
-                          ))}
-                          <FlyerPreviewRow label="最後の一言">{multiFlyerContent.cta}</FlyerPreviewRow>
-                        </div>
-                        <div className="flex flex-wrap items-center gap-2 mb-8">
-                          <button type="button" onClick={handleCopyMultiFlyerPrompt} className="btn-dark px-6 py-2.5 text-xs">
-                            {copiedMultiFlyer ? 'コピーしました' : 'プロンプトをコピー'}
-                          </button>
-                          <a
-                            href="https://chatgpt.com/"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            onClick={(e) => { e.preventDefault(); window.open('https://chatgpt.com/', '_blank', 'noopener,noreferrer'); }}
-                            className="btn-secondary px-4 py-2.5 text-xs"
-                          >
-                            ChatGPT を開く
-                          </a>
-                        </div>
-                      </>
-                    )}
-                  </>
                 )}
 
                 {/* Usage guide */}
