@@ -13,7 +13,7 @@ export const CAMPAIGN = {
   /** 期限の表示用ラベル */
   endsAtLabel: '9月30日',
   /** キャンペーン後に控えるイベント。出品を急ぐ理由として添える */
-  nextEvent: '10月の稼げ家祭り・挑戦期間',
+  nextEvent: '10月の稼げや祭り・挑戦期間',
   /** 告知チャットへのリンク。リベシティにログインしている人だけが開ける */
   announcementUrl: 'https://libecity.com/room_list?room_id=Liberal-City&comment_id=1L58tRFiyHah6MIYeg8c',
 } as const;
