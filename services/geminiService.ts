@@ -1604,15 +1604,39 @@ ${serviceBlocks}
 };
 
 // 紙に印刷して配ることが前提。画面で見る画像との違い（余白・文字の太さ・QRの扱い）をここで縛る。
-const FLYER_PRINT_RULES = `■ 紙に印刷して配る前提のルール（必ず守る）
+// QR は画像生成で描かせない（読み取れない偽物になる）。枠だけ空けさせ、あとからコード実行で本物を重ねる。
+const flyerPrintRules = (qrSpot: string) => `■ 紙に印刷して配る前提のルール（必ず守る）
 ・出力は1枚の画像。A4のたて長（比率およそ1:1.41）で作る。プレゼン資料や複数ページにはしない。
 ・手に取って読む紙なので、文字は大きく太めにする。細い線・薄いグレーの文字・小さすぎる注釈は使わない。
 ・紙の外周1割ほどは余白として空け、文字や主要な絵を端ギリギリに置かない（印刷のときに切れるため）。
 ・視線が上から下へ素直に流れる構成にする。要素を斜めに散らしたり、読む順番が分からない配置にしない。
-・QRコードは描かないこと（読み取れない偽物になる）。かわりに右下へ、一辺が紙の幅の5分の1ほどの「白い正方形の枠」を空け、そのすぐ下に小さく「詳しくはこちら」と入れる。あとから本物のQRコードを貼るための場所。
+・QRコードは画像生成では描かないこと（読み取れない偽物になる）。${qrSpot}
 ・URL・メールアドレス・電話番号・氏名は書かない（配る本人があとで入れる）。
 ・文字はすべて日本語で、印刷してもくっきり読めるように描く。下に指定した文言だけを正確に、誤字なく入れる。勝手に文章を足さない。
 ・マークダウン記号（#、* など）は画像に出さない。`;
+
+const QR_SPOT_SINGLE = '右下へ、一辺が紙の幅の7分の1ほどの「白い正方形の枠」を空け、そのすぐ下に小さく「詳しくはこちら」と入れる。あとから本物のQRコードを重ねる場所。';
+const QR_SPOT_MULTI = '各サービスの枠の右端に、枠の高さの8割を一辺とする「白い正方形」を空ける。あとから本物のQRコードを重ねる場所。';
+
+/** 画像ができたあとに、コード実行で本物のQRを作って重ねさせる指示。URL が無ければ空（枠だけ空けて、あとで貼る） */
+const flyerQrStep = (targets: { label: string; url: string }[], multi: boolean): string => {
+  const valid = targets.filter(t => t.url.trim());
+  if (valid.length === 0) return '';
+  const list = valid.map(t => (multi ? `・${t.label}：${t.url}` : t.url)).join('\n');
+  const where = multi
+    ? '各サービスの枠の右端に空けた白い正方形の中に、対応するサービスのQRを収める（枠の順番どおりに）'
+    : '右下に空けた白い正方形の枠の中に収める';
+  return `
+
+■ QRコードの入れ方（画像生成では描かず、コード実行で本物を作って重ねる）
+1. まず上の仕様で画像を1枚作る。白い正方形の枠は空けたままにする。
+2. 次に Python（コード実行）で、下のURLのQRコードを作る。誤り訂正レベルはM、周囲に4モジュール分の白い余白を付ける。
+3. 作ったQRを、${where}大きさに縮小して重ね、完成した画像を1枚出力する。QRの余白は消さない。
+・QRは必ずコードで生成すること。画像生成で描いたQRは読み取れない。
+・生成した画像をコードから読めない場合は、その旨を短く伝えること。こちらが画像をアップロードしたら、同じ手順でQRを重ねる。
+【QRにするURL】
+${list}`;
+};
 
 const flyerBullets = (items: string[]): string => items.map(v => `・${v}`).join('\n');
 
@@ -1620,17 +1644,19 @@ const flyerBullets = (items: string[]): string => items.map(v => `・${v}`).join
 export const buildFlyerPromptText = (
   content: FlyerContent,
   toneVersion: ThumbnailPromptVersion,
-  autoStyle?: string
+  autoStyle?: string,
+  serviceUrl?: string
 ): string => {
   const designSpec = resolveChatToneSpec(toneVersion, autoStyle);
   const priceLine = content.price ? `\n【価格】\n${content.price}` : '';
+  const qrStep = flyerQrStep([{ label: content.headline, url: serviceUrl ?? '' }], false);
 
   return `ChatGPTの画像生成（GPT Image）で、紙に印刷して配るチラシを1枚作ります。A4たての片面チラシです。
 
 ■ デザイン仕様（この仕様どおりに作る）
 ${designSpec}
 
-${FLYER_PRINT_RULES}
+${flyerPrintRules(QR_SPOT_SINGLE)}
 
 ■ 紙面の構成（上から順に）
 1. 見出しとサブコピー。紙の上3分の1を使い、いちばん目立たせる。
@@ -1654,7 +1680,7 @@ ${flyerBullets(content.forWhom)}
 【ご依頼の流れ】
 ${content.flow.map((v, i) => `${i + 1}. ${v}`).join('\n')}${priceLine}
 【行動をうながす一言（最下部の帯）】
-${content.cta}`;
+${content.cta}${qrStep}`;
 };
 
 // 枠の数によって紙面の割り方を変える。全部同じグリッドにすると、2件はスカスカ、6件は窮屈になる。
@@ -1669,9 +1695,12 @@ const multiFlyerLayoutHint = (count: number): string => {
 export const buildMultiFlyerPromptText = (
   content: MultiFlyerContent,
   toneVersion: ThumbnailPromptVersion,
-  autoStyle?: string
+  autoStyle?: string,
+  // items と同じ順の出品ページURL（無い枠は空文字）
+  urls: string[] = []
 ): string => {
   const designSpec = resolveChatToneSpec(toneVersion, autoStyle);
+  const qrStep = flyerQrStep(content.items.map((it, i) => ({ label: it.title, url: urls[i] ?? '' })), true);
   const itemBlocks = content.items.map((it, i) => {
     const lines = [
       `［${i + 1}枠目］`,
@@ -1688,14 +1717,14 @@ export const buildMultiFlyerPromptText = (
 ■ デザイン仕様（この仕様どおりに作る）
 ${designSpec}
 
-${FLYER_PRINT_RULES}
+${flyerPrintRules(QR_SPOT_MULTI)}
 
 ■ 紙面の構成（上から順に）
 1. 見出しとサブコピー。紙の上4分の1を使い、「この人に何を頼めるのか」が一目で分かるようにする。
 2. サービス一覧。${multiFlyerLayoutHint(content.items.length)}
    各枠には「見出し／1行紹介／おすすめの人／価格」を、全ての枠で同じ配置・同じ文字の大きさで入れる。
    枠ごとに色や形を変えて散らかさない。区別はアイコンか差し色の1点だけにする。
-3. 行動をうながす一言。最下部に帯を敷いて置き、その右にQR用の白い正方形の枠を空ける。
+3. 行動をうながす一言。最下部に帯を敷いて置く。
 
 ■ 紙に入れる文字（この文言だけを正確に。枠の順番も下のとおりにする）
 【見出し（いちばん大きく）】
@@ -1706,5 +1735,5 @@ ${content.subCopy}
 ${itemBlocks}
 
 【行動をうながす一言（最下部の帯）】
-${content.cta}`;
+${content.cta}${qrStep}`;
 };

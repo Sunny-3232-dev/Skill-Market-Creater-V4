@@ -11,6 +11,7 @@ import CodeViewer from './support/CodeViewer';
 import QuestionEditor from './support/QuestionEditor';
 import CampaignTweetCard from './CampaignTweetCard';
 import Troubleshoot from './Troubleshoot';
+import QrFallback from './support/QrFallback';
 import SupportGuide from './guide/SupportGuide';
 import Tour, { TOUR_EVENT } from './guide/Tour';
 import { jumpToSection } from '../utils/jumpToSection';
@@ -37,7 +38,8 @@ const MENU_TOURS: Record<MenuId, { sel: string; title: string; text: string }[]>
   flyer: [
     { sel: '[data-tour="menu-flyer-mode"]', title: 'このサービスで1枚か、複数まとめて1枚か', text: 'まとめる場合は、登録済みサービスから2〜6件を選びます。' },
     { sel: '[data-tour="menu-flyer-tone"]', title: 'トンマナを選びます', text: 'サービス画像やスライドと同じにしておくと、紙で見た人がSNSで再会したとき同じ出品者だと気づきます。' },
-    { sel: '[data-tour="menu-flyer-copy"]', title: 'プロンプトをコピー → ChatGPT に貼る', text: 'A4たてのチラシが1枚出ます。QRコードは画像生成では作れないので、右下の余白にあとから貼ります。' },
+    { sel: '[data-tour="menu-flyer-copy"]', title: 'プロンプトをコピー → ChatGPT に貼る', text: 'A4たてのチラシが1枚出ます。QRコードは、画像のあとに ChatGPT がコード実行で本物を作って右下に重ねます（プロンプトに手順入り）。' },
+    { sel: '[data-tour="menu-flyer-qr"]', title: 'QRが読めなかったときの保険', text: 'ここでこのツールがQR画像を作ります。ChatGPT にチラシ画像と一緒にアップロードして重ねてもらうか、Canva で重ねてください。' },
   ],
 };
 
@@ -364,6 +366,11 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
   const selectedServiceUrl = useMemo(
     () => registeredServices.find(sv => sv.id === selectedServiceId)?.url ?? '',
     [registeredServices, selectedServiceId]
+  );
+  // まとめチラシ用: 選んだサービスの出品ページURL（items と同じ順）
+  const multiFlyerUrls = useMemo(
+    () => multiFlyerIds.map(id => registeredServices.find(sv => sv.id === id)?.url ?? ''),
+    [multiFlyerIds, registeredServices]
   );
   const inputWords = useMemo(() => extractWords(serviceBody), [serviceBody]);
   const hasInput = serviceBody.trim().length > 0;
@@ -793,7 +800,8 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
     if (!flyerContent) return;
     const text = buildFlyerPromptText(
       flyerContent, flyerVersion,
-      flyerVersion === 'ai_auto' ? autoStyleDirective : undefined
+      flyerVersion === 'ai_auto' ? autoStyleDirective : undefined,
+      selectedServiceUrl || undefined
     );
     navigator.clipboard.writeText(text).then(() => {
       setCopiedFlyer(true);
@@ -804,7 +812,7 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
   // まとめチラシは複数サービスにまたがるため、1サービス専用トンマナは渡さない（汎用のおまかせ指定になる）
   const handleCopyMultiFlyerPrompt = () => {
     if (!multiFlyerContent) return;
-    const text = buildMultiFlyerPromptText(multiFlyerContent, flyerVersion);
+    const text = buildMultiFlyerPromptText(multiFlyerContent, flyerVersion, undefined, multiFlyerUrls);
     navigator.clipboard.writeText(text).then(() => {
       setCopiedMultiFlyer(true);
       setTimeout(() => setCopiedMultiFlyer(false), 2000);
@@ -1523,6 +1531,15 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
                         <button type="button" data-tour="menu-flyer-copy" onClick={handleCopyFlyerPrompt} className="btn-dark px-6 py-2.5 text-xs">
                           {copiedFlyer ? 'コピーしました' : 'プロンプトをコピー'}
                         </button>
+                        <details className="mt-4 group" data-tour="menu-flyer-qr">
+                          <summary className="cursor-pointer list-none inline-flex items-center gap-1.5 text-xs font-semibold text-stone-500 hover:text-brand-500 transition-colors [&::-webkit-details-marker]:hidden">
+                            <span aria-hidden className="transition-transform duration-200 group-open:rotate-180">▾</span>
+                            QRが読めなかったときは（このツールでQRを作る）
+                          </summary>
+                          <div className="mt-3">
+                            <QrFallback targets={selectedServiceUrl ? [{ label: flyerContent.headline, url: selectedServiceUrl }] : []} />
+                          </div>
+                        </details>
                         <a
                           href="https://chatgpt.com/"
                           target="_blank"
@@ -1774,8 +1791,8 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
             a: <>結果はサービスごとに保存されています。別のサービスを選ぶと表示が切り替わるだけなので、元のサービスを選び直せば戻ります。「入力と結果をクリア」は、選んでいるサービスの結果だけを消します。</>,
           },
           {
-            q: 'チラシにQRコードが入らない',
-            a: <>QRコードは画像生成では読み取れるものが作れません。右下に白い余白を空けた状態で出力されるので、QRはあとから重ねてください。この機能は検証中で、載せ方はこれから変えていきます。</>,
+            q: 'チラシのQRコードが読み取れない',
+            a: <>プロンプトには「画像ができたあと、コード実行で本物のQRを作って重ねる」手順が入っています。それでも読めないときは、チラシメニューの「QRが読めなかったときは」でこのツールがQR画像を作るので、チラシ画像と一緒に ChatGPT にアップロードして「そのまま重ねて」と頼むか、Canva で重ねてください。画像生成で描かれたQRは読めません。</>,
           },
         ]} />
 
