@@ -13,6 +13,7 @@ import CampaignTweetCard from './CampaignTweetCard';
 import Troubleshoot from './Troubleshoot';
 import SupportGuide from './guide/SupportGuide';
 import Tour, { TOUR_EVENT } from './guide/Tour';
+import { jumpToSection } from '../utils/jumpToSection';
 import NotebookLMGuide from './guide/NotebookLMGuide';
 
 // メニューごとの案内。結果を表示中にヘッダの「画面の案内（1分）」を押すと、そのメニューの案内が開く
@@ -30,7 +31,7 @@ const MENU_TOURS: Record<MenuId, { sel: string; title: string; text: string }[]>
   slidedoc: [
     { sel: '[data-tour="menu-slide-mode"]', title: '作り方を選びます', text: 'まとめて作るなら NotebookLM、1枚ずつ画風をそろえて作るなら ChatGPT。' },
     { sel: '[data-tour="menu-slide-tones"]', title: 'トンマナを1つ選んで「プロンプトをコピー」', text: '迷ったら「AIおまかせ」。サービス本文から配色・書体を設計します。' },
-    { sel: '[data-tour="menu-slide-notebooklm"]', title: 'NotebookLM の貼る場所は3つ。下の絵で動きを見てください', text: '本文とアイコン画像は左の「ソース」。トンマナ・構成のプロンプトは右の「Studio」→「スライド資料」の鉛筆（カスタマイズ）欄。真ん中のチャットには貼りません。' },
+    { sel: '[data-tour="menu-slide-notebooklm"]', title: 'NotebookLM の貼る場所は3つ。動きで見たいときはここを開く', text: '本文とアイコン画像は左の「ソース」。トンマナ・構成のプロンプトは右の「Studio」→「スライド資料」の鉛筆（カスタマイズ）欄。真ん中のチャットには貼りません。' },
     { sel: '[data-tour="menu-slide-steps"]', title: 'できたら PDF でダウンロード → JPG に', text: 'I Love PDF で1枚ずつの画像にして、スキルマーケットのサービス画像に追加します。' },
   ],
   flyer: [
@@ -41,7 +42,8 @@ const MENU_TOURS: Record<MenuId, { sel: string; title: string; text: string }[]>
 };
 
 const SUPPORT_TOUR = [
-  { sel: '[data-tour="support-guide"]', title: '流れはこの絵のとおり', text: 'URLを登録 → ページを開いて本文をコピー → 開いた欄に貼って保存 → 下のメニュー。14秒で1周します。' },
+  { sel: '[data-tour="support-usage"]', title: 'この画面は3段で進みます', text: 'URLを登録して本文を貼る → メニューを選んで作る → 結果をコピーして使う。押すとその段へ飛びます。' },
+  { sel: '[data-tour="support-guide"]', title: '流れを動きで見たいときは、ここを開く', text: 'URLを登録 → ページを開いて本文をコピー → 開いた欄に貼って保存 → 下のメニュー、を14秒の絵で見せます。見るだけのものです。' },
   { sel: '#register-url', title: 'まず、出品ページのURLを貼って登録', text: 'skill.libecity.com/services/… のURLだけ受け付けます。登録すると、その行の下に本文を貼る欄が開きます。' },
   { sel: '#support-body', title: '本文はここに貼ります', text: '自動では取りに行けないので、「ページを開く」で出品ページを開き、本文をコピーして貼ってください。口コミも一緒に貼ると精度が上がります。' },
   { sel: '[data-tour="support-menus"]', title: '本文が入ったら、ここから作ります', text: '宣伝文・サービス資料・チラシ・アンケート。結果はサービスごとに保存され、選び直せば戻ります。' },
@@ -969,11 +971,36 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
           )}
         </div>
 
+        {/* この画面の使い方: 3段。押すとその段へ飛んで、枠を光らせる */}
+        <ol data-tour="support-usage" aria-label="この画面の使い方" className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-8 list-none m-0 p-0">
+          {[
+            { id: 'support-service', title: 'URLを登録して、本文を貼る', hint: '出品ページを開いてコピー → 貼って保存' },
+            { id: 'support-menus', title: 'メニューを選んで作る', hint: '宣伝文・資料・チラシ・アンケート' },
+            { id: 'support-results', title: '結果をコピーして使う', hint: 'つぶやき・ChatGPT・NotebookLM・GAS へ' },
+          ].map((st, i) => (
+            <li key={st.id}>
+              <button type="button" onClick={() => jumpToSection(st.id)} className="w-full text-left card-hoverable px-3 py-2.5 flex items-start gap-2">
+                <span className="shrink-0 w-6 h-6 rounded-full bg-stone-900 text-white text-[11px] font-bold flex items-center justify-center">{i + 1}</span>
+                <span className="min-w-0">
+                  <span className="block text-[12px] font-semibold text-stone-900 leading-snug">{st.title}</span>
+                  <span className="block text-[11px] text-stone-500 leading-snug">{st.hint}</span>
+                </span>
+              </button>
+            </li>
+          ))}
+        </ol>
+
         {/* ① 登録済みサービス（台帳＝登録・一覧・閲覧） */}
-        <div className="mb-6">
+        <div id="support-service" className="mb-6 scroll-mt-24 rounded-2xl">
           <SectionLabel label="対象のサービス" />
-          {/* 使い方を1枚の絵で見せる（URL登録 → 本文コピー → 貼って保存 → メニュー） */}
-          <div data-tour="support-guide"><SupportGuide className="mb-4" /></div>
+          {/* 使い方の絵は求められたときだけ（画面の主役は入力なので、既定では閉じる） */}
+          <details className="mb-3 group" data-tour="support-guide">
+            <summary className="cursor-pointer list-none inline-flex items-center gap-1.5 text-xs font-semibold text-stone-500 hover:text-brand-500 transition-colors [&::-webkit-details-marker]:hidden">
+              <span aria-hidden className="transition-transform duration-200 group-open:rotate-180">▾</span>
+              使い方を動きで見る（URLを登録 → 本文をコピー → 貼って保存 → メニュー）
+            </summary>
+            <div className="mt-3"><SupportGuide /></div>
+          </details>
           <div className="card p-5">
             <div className="flex flex-wrap justify-between items-center gap-2 mb-2">
               <label htmlFor="register-url" className="text-sm font-semibold text-stone-700">
@@ -1146,7 +1173,7 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
         )}
 
         {/* Menu List — この1入力で3つのAIメニューが動く、を強調 */}
-        <div data-tour="support-menus" className="mb-8">
+        <div id="support-menus" data-tour="support-menus" className="mb-8 scroll-mt-24 rounded-2xl">
           <div className="flex items-center gap-2.5 mb-4 px-1">
             <span className="text-[10px] font-semibold text-stone-400 uppercase tracking-[0.2em]">AI メニュー</span>
             <span className="w-1 h-1 rounded-full bg-brand-300"></span>
@@ -1207,7 +1234,7 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
 
         {/* Results Area */}
         {hasResults && (
-          <div ref={resultRef} className="animate-in fade-in slide-in-from-bottom-4 duration-500 mb-8">
+          <div id="support-results" ref={resultRef} className="animate-in fade-in slide-in-from-bottom-4 duration-500 mb-8 scroll-mt-24 rounded-2xl">
             <SectionLabel label="結果" />
 
             {/* 結果タブ（1つだけでもラベルを出して、何の結果かを明示する） */}
@@ -1307,8 +1334,14 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
                   })}
                 </div>
 
-                {/* NotebookLM のどこに何を貼るかを1枚の絵で（本文・画像はソース、指示は Studio のカスタマイズ欄） */}
-                <div data-tour="menu-slide-notebooklm"><NotebookLMGuide className="mb-4" /></div>
+                {/* NotebookLM のどこに何を貼るか。絵は求められたときだけ開く（既定は閉じる） */}
+                <details className="mb-4 group" data-tour="menu-slide-notebooklm">
+                  <summary className="cursor-pointer list-none inline-flex items-center gap-1.5 text-xs font-semibold text-stone-500 hover:text-brand-500 transition-colors [&::-webkit-details-marker]:hidden">
+                    <span aria-hidden className="transition-transform duration-200 group-open:rotate-180">▾</span>
+                    NotebookLM のどこに何を貼るかを動きで見る（本文・画像はソース、指示は Studio のカスタマイズ欄）
+                  </summary>
+                  <div className="mt-3"><NotebookLMGuide /></div>
+                </details>
 
                 {/* Usage guide */}
                 <div className="bg-stone-50 border border-stone-200/80 rounded-2xl p-6 mb-6" data-tour="menu-slide-steps">

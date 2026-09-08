@@ -6,6 +6,7 @@ import ServiceChatEditor, { ChatMessage } from './ServiceChatEditor';
 import { decorateHeadings } from '../utils/skillMarketMarkup';
 import CampaignTweetCard from './CampaignTweetCard';
 import { isCampaignActive } from '../data/campaign';
+import { jumpToSection } from '../utils/jumpToSection';
 import Troubleshoot from './Troubleshoot';
 import ListingPreview from './ListingPreview';
 import PasteFlowGuide from './guide/PasteFlowGuide';
@@ -29,15 +30,7 @@ const USAGE_STEPS = [
   { id: 'result-tweet', title: '出品したら、つぶやく', hint: 'キャンペーンに応募' },
 ];
 
-const jumpToSection = (id: string) => {
-  const el = document.getElementById(id);
-  if (!el) return;
-  el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  el.classList.remove('section-flash');
-  // 同じ段を続けて押しても光るよう、いったん外してから付け直す
-  window.setTimeout(() => el.classList.add('section-flash'), 0);
-  window.setTimeout(() => el.classList.remove('section-flash'), 1900);
-};
+
 
 interface ServiceResultProps {
   idea: SkillIdea;
