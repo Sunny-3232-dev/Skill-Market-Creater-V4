@@ -4,10 +4,9 @@ import { UserInput, SkillIdea, SurveyPattern, ThumbnailPromptVersion, SlideImage
 
 // モデルIDはここだけで管理する（以前は12か所に直書きされていた）。
 // 文章モデルは検証用に ?model=xxx で差し替えられ、localStorage に残る。?model=default で元に戻す。
+// 画像生成はアプリ内では行わない（ChatGPT の GPT Image に貼ってもらう）。文章モデルだけを持つ
 export const MODELS = {
   text: 'gemini-3.5-flash',
-  image: 'gemini-2.5-flash-image',
-  imageHq: 'gemini-3-pro-image-preview',
 } as const;
 const MODEL_OVERRIDE_KEY = 'skill_market_model_override';
 export const resolveTextModel = (): string => {
@@ -1142,43 +1141,6 @@ URL: ${url}
     content: text,
   };
 };
-
-export const generateThumbnail = async (idea: SkillIdea, useHighQuality: boolean = false): Promise<string> => {
-  const ai = createClient();
-  const prompt = getThumbnailPrompt(idea, useHighQuality);
-
-  const model = useHighQuality ? MODELS.imageHq : MODELS.image;
-  
-  const config: any = {
-    imageConfig: {
-      aspectRatio: "3:2"
-    }
-  };
-
-  if (useHighQuality) {
-    config.imageConfig.imageSize = "2K";
-  }
-
-  const response = await ai.models.generateContent({
-    model: model,
-    contents: {
-      parts: [
-        { text: prompt }
-      ]
-    },
-    config: config
-  });
-
-  for (const part of response.candidates?.[0]?.content?.parts || []) {
-    if (part.inlineData) {
-      return `data:image/png;base64,${part.inlineData.data}`;
-    }
-  }
-
-  throw new Error("No image generated");
-};
-
-// --- Promoter Tool Functions ---
 
 export const generatePromotion = async (serviceBody: string, serviceUrl: string): Promise<string[]> => {
   const ai = createClient();

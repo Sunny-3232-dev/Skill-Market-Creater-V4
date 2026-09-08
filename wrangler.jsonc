@@ -38,6 +38,6 @@
     "DAILY_LIMIT_PER_USER": "40",
     "DAILY_LIMIT_GLOBAL": "400",
     // 中継を許すモデル。?model= で切り替えて検証する候補もここに並べる
-    "ALLOWED_MODELS": "gemini-3.5-flash,gemini-3.6-flash,gemini-3.7-flash,gemini-3.8-flash,gemini-3.1-pro-preview,gemini-2.5-flash-image,gemini-3-pro-image-preview,gemini-3-pro-image"
+    "ALLOWED_MODELS": "gemini-3.5-flash,gemini-3.6-flash,gemini-3.7-flash,gemini-3.8-flash,gemini-3.1-pro-preview"
   }
 }

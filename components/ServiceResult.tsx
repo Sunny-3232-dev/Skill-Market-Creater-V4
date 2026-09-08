@@ -353,8 +353,8 @@ const PROMPT_STYLES: Array<{
   {
     id: 'my_style',
     label: 'マイスタイル',
-    description: '参考にしたいサムネイル画像を ChatGPT や Gemini に一緒に添付すると、そのデザインを踏襲した新しいサムネイルを生成できます。アイコンや文章は新しいサービス内容に自動で差し替えられます。',
-    note: 'コピー後、ChatGPT または Gemini を開いて参考画像と一緒に貼り付けてください。',
+    description: '参考にしたいサムネイル画像を ChatGPT に一緒に添付すると、そのデザインを踏襲した新しいサムネイルを生成できます。アイコンや文章は新しいサービス内容に自動で差し替えられます。',
+    note: 'コピー後、ChatGPT を開いて参考画像と一緒に貼り付けてください。',
     fullWidth: true,
   },
 ];
@@ -811,12 +811,9 @@ const ServiceResult: React.FC<ServiceResultProps> = ({ idea, content, onBack, on
           <SectionHead
             eyebrow="つぎに"
             title="サムネイル画像を用意する"
-            description="下のプロンプトをコピーして ChatGPT に貼ると、あなたのサービス内容で画像ができます（Gemini でも可。「画像を作成」と思考モードにしてください）。カードの画像は仕上がりのサンプルです。"
+            description="下のプロンプトをコピーして ChatGPT に貼ると、あなたのサービス内容で画像ができます。画像生成は ChatGPT（GPT Image）を使います。カードの画像は仕上がりのサンプルです。"
             action={
-              <div className="flex gap-2 flex-wrap">
-                <a href="https://chatgpt.com/" target="_blank" rel="noopener noreferrer" className="btn-dark px-5 py-2 text-xs">ChatGPT を開く</a>
-                <a href="https://gemini.google.com/" target="_blank" rel="noopener noreferrer" className="btn-secondary px-5 py-2 text-xs">Gemini を開く</a>
-              </div>
+              <a href="https://chatgpt.com/" target="_blank" rel="noopener noreferrer" className="btn-dark px-5 py-2 text-xs">ChatGPT を開く</a>
             }
           />
           <div className="space-y-4">

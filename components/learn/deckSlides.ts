@@ -183,9 +183,9 @@ export const PUBLISH_SLIDES: DeckSlide[] = [
       <ul class="d-ul">
         <li>標準・シンプル・水彩・ポップ・YouTube風など<b>8種類</b></li>
         <li>迷ったら「<b>AIおまかせ</b>」。サービス専用のトンマナを設計します</li>
-        <li>貼り先は <b>ChatGPT か Gemini</b>。自分のアイコンを添付すれば自然に入ります</li>
+        <li>貼り先は <b>ChatGPT</b>。自分のアイコンを添付すれば自然に入ります</li>
       </ul>
-      <div class="d-note">Geminiのときは2つだけ注意。<b>画像生成モード</b>を選ぶ／<b>「思考モード」</b>に切り替える。</div>`,
+      <div class="d-note">ChatGPT に貼って送るだけ。画像生成は ChatGPT（GPT Image）でそろえます。</div>`,
   },
   {
     html: `
