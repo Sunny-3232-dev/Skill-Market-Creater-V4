@@ -1141,15 +1141,6 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
           </div>
         </div>
 
-        {/* 期間限定: 選択中サービスのURLを入れた状態でつぶやきを作らせる */}
-        {selectedServiceUrl && (
-          <CampaignTweetCard
-            variant="polish"
-            serviceUrl={selectedServiceUrl}
-            className="card p-5 mb-8"
-          />
-        )}
-
         {/* URLを登録しない人向け: 本文だけ貼る（サービス未選択のときだけ） */}
         {!selectedServiceId && (
           <div className="mb-8">
@@ -1677,6 +1668,16 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
               </div>
             )}
           </div>
+        )}
+
+        {/* 期間限定: 選択中サービスのURLを入れた状態でつぶやきを作らせる。
+            作業の流れ（登録 → メニュー → 結果）を遮らないよう、メニューと結果の下に置く */}
+        {selectedServiceUrl && (
+          <CampaignTweetCard
+            variant="polish"
+            serviceUrl={selectedServiceUrl}
+            className="card p-5 mb-8"
+          />
         )}
 
         <Troubleshoot className="mb-8" items={[
