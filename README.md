@@ -2,33 +2,67 @@
 
 スキルマーケット出品者向けのAIツール一式。出品アイデアの提案、出品ページ本文の生成、サムネイル用画像生成プロンプト、宣伝つぶやき、購入者アンケート（Googleフォーム用GASコード）、サービス紹介スライド用プロンプト、紙に印刷して配るチラシ用プロンプトを生成します。
 
-元は Google AI Studio アプリ: https://ai.studio/apps/520ed401-1c8a-4329-8963-d7cc9dbf9c3f
+配信先は2つ。どちらもブラウザにキーを持たせず、同一オリジンの `/api/gemini` で中継する。
+
+- Google AI Studio（本番・利用者向け）: https://ai.studio/apps/520ed401-1c8a-4329-8963-d7cc9dbf9c3f — `server.ts` が中継する
+- Cloudflare Workers（検証メンバー向け）: https://skillmarket.sunconnect.jp — `worker/index.ts` が中継する
 
 ## 技術構成
 
 - Vite + React 19 + TypeScript
 - Tailwind CSS v4（`@tailwindcss/vite` プラグイン。CDNは不使用）
-- `@google/genai`（Gemini API）
+- `@google/genai`（Gemini API）。ブラウザからは `httpOptions.baseUrl` を同一オリジンの `/api/gemini` に向けて呼ぶ
+- 中継サーバー: `server.ts`（Express。AI Studio 用）／`worker/index.ts`（Cloudflare Workers 用）
 
 ## ローカルで動かす
 
-前提: Node.js 20+
+前提: Node.js 22+
 
 1. 依存関係をインストール: `npm install`
-2. プロジェクト直下に `.env` を作成し、Gemini APIキーを設定:
+2. プロジェクト直下に `.env` を作成し、Gemini APIキーを設定（`.env.example` を写す）:
    ```
    GEMINI_API_KEY=your-key-here
    ```
-3. 起動: `npm run dev`
+3. 起動: `npm run dev`（http://localhost:3000。Express が `.env` のキーで中継し、Vite をミドルウェアとして同居させる）
 
 ## セキュリティ上の注意（重要）
 
-`vite.config.ts` の `define` により、**APIキーはクライアントのJSバンドルに埋め込まれます**。
-この構成はローカル開発・Google AI Studio 内での利用専用です。
-
-- このままの構成で**認証なしの公開URLにデプロイしないこと**（キーが第三者に露出します）
-- 公開する場合は下記「Cloudflare で配信する」の構成を使う（Worker がキーを持ち、Access で人を絞る）
+- 既定のビルドは中継モード（`VITE_GEMINI_PROXY=1`）。バンドルにキーは入らない
+- `VITE_GEMINI_PROXY=0`（`npm run dev:direct`）だけは、`vite.config.ts` の `define` で **`.env` のキーをバンドルに埋め込む**旧来の直接呼び出しになる。
+  ローカルの切り分け専用で、この成果物を公開URLに置かないこと
 - `.env` は `.gitignore` 済み。コミットしないこと
+- AI Studio 版は認証なし（共有リンクを開ける人が使える＝作者課金）。費用の歯止めは `server.ts` の `DAILY_LIMIT_GLOBAL`（既定 1000回／日、プロセス内カウンタ）
+
+## Google AI Studio で配信する（server-side 方式）
+
+AI Studio は 2026-05-14 以降、Gemini のキーをブラウザに渡さない「server-side Gemini API」方式が標準になった
+（`metadata.json` の `MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API`）。それ以前に作ったこのアプリは旧仕様の特例で動いていたが
+2026-09-09 に失効（AI Studio 自身のプロキシが 403 を返す）したため、`server.ts` を足して現行方式に揃えた。
+
+AI Studio の Node.js ランタイムが `npm run build` → `npm start` を実行し、Settings → Secrets の `GEMINI_API_KEY` を
+環境変数として注入する。`server.ts` は `dist/` を配信し、`/api/gemini/*` をそのキーで Gemini に中継する。
+
+### 反映の手順（URL は変えない）
+
+1. main に取り込んだら、AI Studio のエージェントに「GitHub の main を pull して。他は変更しないで」と指示する
+2. Settings → Secrets の `GEMINI_API_KEY` に、`skill-market-creator-pro` プロジェクト（Tier 2・請求先 LibecityService）のキーを入れる
+3. プレビューで「アイデアを生成する」まで通ることを確認し、Share で公開状態を更新する
+4. ビルド／デプロイのエラーが出たら、エージェントに「fix any build issues with the current code」と頼む前に、
+   このリポジトリ側で直して pull し直す（エージェントに直させると `package.json` や `vite.config.ts` が黙って書き換わる）
+
+### リハーサル（任意）
+
+本番アプリに触る前に試すなら、`npm run pack` で git 管理下のファイルだけを `skill-market-creator-to-aistudio.zip` に固め、
+AI Studio に新しいアプリとしてインポートして 2〜3 を通す。終わったら捨てアプリは削除する。
+
+### AI Studio が用意する環境変数
+
+| 変数 | 用途 |
+| --- | --- |
+| `GEMINI_API_KEY` | Secrets から注入。`server.ts` だけが使う |
+| `PORT` | 待ち受けポート（未設定なら 3000） |
+| `DISABLE_HMR` | プレビュー中の HMR 停止。`vite.config.ts` で参照。変更しないこと |
+| `NODE_ENV` | `npm start` が `production` を付ける（`dist/` を配信）。それ以外は Vite ミドルウェアの開発モード |
 
 ## 画面の案内（初回チュートリアル・動くマニュアル）
 
@@ -87,7 +121,7 @@ PJ090（oVice看板）から移した2つの仕組み。
 | コマンド | 内容 |
 | --- | --- |
 | `npm run dev:cf` | プロキシビルド → `wrangler dev`（http://localhost:8787。Access なし、`.dev.vars` のキーで中継） |
-| `npm run deploy` | プロキシビルド → デプロイ |
+| `npm run deploy` | フロントだけビルド（`build:cf`。`server.cjs` は含めない）→ デプロイ |
 | `npm run cf:types` | `wrangler.jsonc` を変えたら Env 型を再生成 |
 | `npx wrangler tail` | 中継ログ（`gemini_proxy` にメール・モデル・所要時間が JSON で出る） |
 | `npx wrangler kv key list --namespace-id <KVのid> --remote --prefix quota:` | 本番の利用回数カウンタ（`--remote` を付けないとローカル模擬ストアを見てしまう） |
@@ -96,10 +130,13 @@ PJ090（oVice看板）から移した2つの仕組み。
 
 | コマンド | 内容 |
 | --- | --- |
-| `npm run dev` | 開発サーバ起動 |
+| `npm run dev` | 開発サーバ起動（Express + Vite ミドルウェア。http://localhost:3000） |
+| `npm run dev:direct` | 旧来の直接呼び出しで Vite だけ起動（キーがバンドルに入る。ローカルの切り分け専用） |
 | `npm run lint` | 型チェック（アプリ＋Worker） |
-| `npm run build` | 型チェック + 本番ビルド |
-| `npm run preview` | ビルド成果物のプレビュー |
+| `npm run build` | 型チェック + フロントのビルド + `server.ts` を `dist/server.cjs` に束ねる（AI Studio が実行） |
+| `npm start` | `dist/` を本番モードで配信（AI Studio が実行。ローカルでは `.env` のキーで中継） |
+| `npm run preview` | build → start |
+| `npm run pack` | AI Studio へ手動インポートする zip を作る（git 管理下のファイルのみ） |
 
 ## ハンズオン資料（配布用ページ）
 
