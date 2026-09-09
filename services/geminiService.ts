@@ -9,6 +9,15 @@ export const MODELS = {
   text: 'gemini-3.5-flash',
 } as const;
 const MODEL_OVERRIDE_KEY = 'skill_market_model_override';
+/** ?model= で差し替え中のモデル名。無ければ null */
+export const getModelOverride = (): string | null => {
+  try { return localStorage.getItem(MODEL_OVERRIDE_KEY); } catch { return null; }
+};
+/** 差し替えをやめて標準モデルに戻す（指定モデルが使えなかったときの保険） */
+export const clearModelOverride = (): void => {
+  try { localStorage.removeItem(MODEL_OVERRIDE_KEY); } catch { /* noop */ }
+};
+
 export const resolveTextModel = (): string => {
   try {
     const fromUrl = new URLSearchParams(window.location.search).get('model');

@@ -4,7 +4,7 @@ import Hub from './components/Hub';
 import CreatorTool from './components/CreatorTool';
 import SupportHub from './components/SupportHub';
 import LearnHub from './components/LearnHub';
-import { GEMINI_PROXY_MODE } from './services/geminiService';
+import { GEMINI_PROXY_MODE, MODELS, getModelOverride, clearModelOverride } from './services/geminiService';
 import { requestTour } from './components/guide/Tour';
 
 const getEnvApiKey = (): string => {
@@ -49,6 +49,14 @@ const App: React.FC = () => {
   const handleApiError = useCallback((error: any) => {
     console.error(error);
     const msg = error?.message || "";
+    // ?model= で差し替えたモデルが、そのキー（AI Studio 等）では使えないことがある。
+    // 403/404 なら標準モデルに戻して、もう一度押してもらう
+    const override = getModelOverride();
+    if (override && override !== MODELS.text && /"code":\s*(403|404)|PERMISSION_DENIED|NOT_FOUND|not found/i.test(msg)) {
+      clearModelOverride();
+      notify(`指定のモデル（${override}）はこの環境では使えないため、標準（${MODELS.text}）に戻しました。もう一度お試しください。`, 'error');
+      return;
+    }
     if (msg.includes("Requested entity was not found")) {
       notify("APIのセッションが無効になった可能性があります。ページを再読み込みしてください。", 'error');
     } else {
