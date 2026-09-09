@@ -96,10 +96,28 @@ const verifyAccessJwt = async (token: string, teamDomain: string, aud: string): 
 /** 認証の結果。ok=false のときは返すべき Response を持つ */
 type AuthResult = { ok: true; email: string } | { ok: false; response: Response };
 
+/**
+ * 期限付きの「一時公開モード」。勉強会などで一時的にログイン無しにするための逃げ道。
+ * OPEN_UNTIL（ISO 8601、例 2026-09-30T23:59:59+09:00）より前なら JWT を求めない。
+ * 期限を過ぎると自動で Access 必須に戻る。空・不正な値なら常に閉じる（fail closed）。
+ * なお Access 側にもバイパスのポリシーが必要（README 参照）。ここは Worker 側の錠だけ。
+ */
+const isOpenPeriod = (env: Env): boolean => {
+  const until = (env.OPEN_UNTIL ?? '').trim();
+  if (!until) return false;
+  const t = Date.parse(until);
+  return Number.isFinite(t) && Date.now() < t;
+};
+
 const authenticate = async (request: Request, env: Env): Promise<AuthResult> => {
   if (env.REQUIRE_ACCESS_JWT !== '1') {
     // ローカル開発（wrangler dev）専用。本番の vars では必ず "1"
     return { ok: true, email: 'local-dev' };
+  }
+  if (isOpenPeriod(env)) {
+    // 一時公開中は接続元 IP を利用者の識別子にして、回数上限だけ効かせる
+    const ip = request.headers.get('cf-connecting-ip') ?? 'unknown';
+    return { ok: true, email: `ip:${ip}` };
   }
   if (!env.ACCESS_TEAM_DOMAIN || !env.ACCESS_AUD) {
     // Access が未設定のまま公開されないよう、設定が揃うまでは全部閉じる
@@ -166,6 +184,7 @@ const proxyGemini = async (request: Request, env: Env, email: string, subPath: s
 
   console.log(JSON.stringify({
     event: 'gemini_proxy', email, model, method: m[2], status: upstream.status, ms: Date.now() - started,
+    open: isOpenPeriod(env),
   }));
 
   const outHeaders = new Headers({ 'cache-control': 'no-store' });

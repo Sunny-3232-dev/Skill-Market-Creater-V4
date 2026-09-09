@@ -34,6 +34,9 @@
     // Access アプリケーションの Application Audience (AUD) Tag。Access 作成後に埋める
     "ACCESS_TEAM_DOMAIN": "sunconnect.cloudflareaccess.com",
     "ACCESS_AUD": "98e18024af6ec7f0525371b6383a20ef3564792b18f60632ed56759a4f2903f2",
+    // 期限付きの一時公開モード（勉強会など）。この日時より前は Worker が JWT を求めない。
+    // 空文字なら常に Access 必須。期限を過ぎると自動で閉じる。Access 側のバイパスポリシーは別途（README）
+    "OPEN_UNTIL": "2026-09-30T23:59:59+09:00",
     // 費用の歯止め（Gemini 呼び出し回数／日）
     "DAILY_LIMIT_PER_USER": "40",
     "DAILY_LIMIT_GLOBAL": "400",

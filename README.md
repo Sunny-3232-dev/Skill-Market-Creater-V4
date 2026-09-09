@@ -68,6 +68,20 @@ PJ090（oVice看板）から移した2つの仕組み。
 5. `wrangler.jsonc` の `vars` に `ACCESS_TEAM_DOMAIN`（例 `xxxx.cloudflareaccess.com`）と `ACCESS_AUD` を記入
 6. `npm run deploy`
 
+### 一時的にログイン無しで公開する（勉強会など）
+
+錠は「Access（前段）」と「Worker の JWT 検証」の2つあるので、開けるときは両方、閉じるときも両方を触る。
+
+1. `wrangler.jsonc` の `vars.OPEN_UNTIL` に期限（ISO 8601、例 `2026-09-30T23:59:59+09:00`）を入れて `npm run deploy`
+   - 期限内は Worker が JWT を求めず、利用回数は接続元 IP ごとに数える（`DAILY_LIMIT_PER_USER` がそのまま効く）
+   - 期限を過ぎると Worker 側は自動で Access 必須に戻る
+2. Cloudflare Zero Trust → アクセス制御 → アプリケーション → Skill Market Creator → ポリシーを追加
+   - 名前「一時公開」／アクション「バイパス」／含める「全員」
+   - これで Access のログイン画面が出なくなる（Worker 側は 1 の期限で守られている）
+
+閉じるときは、2 のポリシーを削除し、`OPEN_UNTIL` を `""` に戻して `npm run deploy`。
+ポリシーを消し忘れても、期限を過ぎれば Worker が 403 を返すので中身は見えない。
+
 ### 日常
 
 | コマンド | 内容 |
