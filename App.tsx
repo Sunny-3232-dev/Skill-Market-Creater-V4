@@ -23,6 +23,12 @@ interface ToastState {
 const App: React.FC = () => {
   const [currentTool, setCurrentTool] = useState<ToolType>(ToolType.TOP);
   const [toast, setToast] = useState<ToastState | null>(null);
+  // ?model= で差し替え中のモデル。AI Studio のように URL を触れない環境でも戻せるよう、ヘッダに出す
+  const [modelOverride, setModelOverride] = useState<string | null>(getModelOverride);
+  const resetModel = useCallback(() => {
+    clearModelOverride();
+    setModelOverride(null);
+  }, []);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // ツール切り替え時にスクロール位置をトップにリセット
@@ -54,6 +60,7 @@ const App: React.FC = () => {
     const override = getModelOverride();
     if (override && override !== MODELS.text && /"code":\s*(403|404)|PERMISSION_DENIED|NOT_FOUND|not found/i.test(msg)) {
       clearModelOverride();
+      setModelOverride(null);
       notify(`指定のモデル（${override}）はこの環境では使えないため、標準（${MODELS.text}）に戻しました。もう一度お試しください。`, 'error');
       return;
     }
@@ -103,7 +110,15 @@ const App: React.FC = () => {
           )}
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap justify-center">
+          {modelOverride && modelOverride !== MODELS.text && (
+            <span className="inline-flex items-center gap-2 rounded-full border border-brand-200 bg-brand-50 px-3 py-1 text-[11px] text-stone-700">
+              モデル指定中：{modelOverride}
+              <button type="button" onClick={resetModel} className="font-semibold text-brand-600 hover:text-brand-700 underline underline-offset-2">
+                標準に戻す
+              </button>
+            </span>
+          )}
           {currentTool !== ToolType.TOP && (
             <button
               onClick={() => setCurrentTool(ToolType.TOP)}
