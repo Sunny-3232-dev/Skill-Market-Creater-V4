@@ -1,6 +1,6 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
-import { UserInput, SkillIdea, SurveyPattern, ThumbnailPromptVersion, SlideImagePrompt, FlyerContent, MultiFlyerContent, ProfileFacts } from "../types";
+import { UserInput, SkillIdea, SurveyPattern, ThumbnailPromptVersion, SlideImagePrompt, FlyerContent, FlyerAngle, FlyerAngleId, MultiFlyerContent, ProfileFacts } from "../types";
 
 // モデルIDはここだけで管理する（以前は12か所に直書きされていた）。
 // 文章モデルは検証用に ?model=xxx で差し替えられ、localStorage に残る。?model=default で元に戻す。
@@ -1460,26 +1460,42 @@ export const generateFlyerContent = async (serviceBody: string): Promise<FlyerCo
   const ai = createClient();
 
   const prompt = `
-あなたは紙のチラシ（A4たて）を設計するコピーライターです。
-以下のサービス本文をもとに、チラシ1枚に印刷する文言を作成してください。
-受け取るのはこのサービスをまだ知らない人です。手に取って5秒で「誰の、どんな困りごとを解決するのか」が伝わることを最優先にしてください。
+あなたは紙のチラシ（A5たて）を設計するコピーライターです。
+以下のサービス本文をもとに、チラシに印刷する文言を作成してください。
+
+【配る場面】
+リベシティのオフ会で、会員に手渡しします。
+- 相手はリベシティの会員です。リベシティやスキルマーケットが何かの説明は要りません。
+- ただし、あなたのサービスはまだ知りません。手に取って5秒で「誰の、どんな困りごとを解決するのか」が伝わることを最優先にしてください。
+- その場で読み切らず、持ち帰ってあとで見る人もいます。あとから見ても分かる書き方にしてください。
 
 【ルール】
 - 本文に書かれている情報だけを使う。創作・誇張はしない。
-- 紙は文字を詰め込めない。下の文字数の目安を必ず守り、短く言い切る。
+- A5は小さい。下の文字数を必ず守り、短く言い切る。
 - 読んだ人が自分のことだと感じる言い回しにする。体言止めばかりにしない。
+- 「〜かもしれません」「〜だと思います」のように、自信の無い言い回しは使わない。
 - マークダウン記法（#、* など）と絵文字は使わない。
 - 電話番号・メールアドレス・URL・氏名は書かない（配る本人があとで手を入れる）。
 
-【各項目の目安】
-- headline：いちばん大きく出す見出し。20文字以内。ターゲットの困りごとか、得られる結果を言う。サービス名をそのまま置かない。
-- subCopy：見出しを補う一言。30文字以内。
-- problems：「こんなことで困っていませんか」の箇条書き。3〜4個、各20文字以内。
-- benefits：このサービスでできること。3〜4個、各20文字以内。
-- forWhom：こんな方におすすめ。2〜3個、各20文字以内。
-- flow：依頼から納品までの流れ。3〜4ステップ、各12文字以内。ステップ番号は付けない。
+【angles：切り口の違う見出しを3案】
+同じサービスを3つの切り口で見せます。実際に3枚とも作って見比べてから選ぶので、3案とも本気で作ってください。
+- problem：困りごとから入る。「〜で困っていませんか」のように問いかける。
+- result：手に入る結果から入る。before/after や、できるようになることを言い切る。
+- trust：作り手への信頼から入る。年数・件数・資格など本文にある事実を見出しに使う。事実が無ければ、経験の中身で言い切る。
+各案とも headline は20文字以内、subCopy は30文字以内。見出しにサービス名をそのまま置かない。3案の見出しは、言い回しだけでなく着眼点を変える。
+
+【3案で共通して使う中身】
+- problems：「こんなことで困っていませんか」。3個、各20文字以内。
+- benefits：このサービスでできること。3個、各20文字以内。
+- trust：作り手を信頼できる一行。本文にある年数・件数・資格・経歴・実績だけを使う。30文字以内。
+  該当する事実が本文に無ければ空文字にする（ここは絶対に創作しない）。
+- forWhom：こんな方におすすめ。本文から自然に読み取れるときだけ2〜3個、各20文字以内。読み取れなければ空配列にする。
+- flow：依頼から納品までの流れ。本文に書かれているときだけ3ステップ、各12文字以内。ステップ番号は付けない。書かれていなければ空配列にする。
 - price：本文に価格の記載があれば「3,000円〜」のように短く書く。記載が無ければ空文字にする。
 - cta：最後に置く、行動をうながす一言。20文字以内。
+
+【出力する前に確認すること】
+各項目が上の文字数に収まっているか数え、超えていれば短く言い直してから出力する。
 
 【サービス本文】
 ${body.slice(0, 4000)}
@@ -1494,32 +1510,53 @@ ${body.slice(0, 4000)}
         responseSchema: {
           type: Type.OBJECT,
           properties: {
-            headline: { type: Type.STRING },
-            subCopy: { type: Type.STRING },
+            angles: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  id: { type: Type.STRING, enum: ['problem', 'result', 'trust'] },
+                  headline: { type: Type.STRING },
+                  subCopy: { type: Type.STRING },
+                },
+                required: ['id', 'headline', 'subCopy'],
+              },
+            },
             problems: { type: Type.ARRAY, items: { type: Type.STRING } },
             benefits: { type: Type.ARRAY, items: { type: Type.STRING } },
+            trust: { type: Type.STRING },
             forWhom: { type: Type.ARRAY, items: { type: Type.STRING } },
             flow: { type: Type.ARRAY, items: { type: Type.STRING } },
             price: { type: Type.STRING },
             cta: { type: Type.STRING },
           },
-          required: ['headline', 'subCopy', 'problems', 'benefits', 'forWhom', 'flow', 'price', 'cta'],
+          required: ['angles', 'problems', 'benefits', 'trust', 'forWhom', 'flow', 'price', 'cta'],
         },
       },
     });
     const parsed = JSON.parse(response.text || '{}');
     const list = (v: any): string[] => (Array.isArray(v) ? v.map((x: any) => String(x).trim()).filter(Boolean) : []);
+    // 3案の順番は problem → result → trust に揃える（画面の並びを毎回同じにするため）
+    const rawAngles: any[] = Array.isArray(parsed.angles) ? parsed.angles : [];
+    const angles: FlyerAngle[] = (['problem', 'result', 'trust'] as FlyerAngleId[])
+      .map(id => {
+        const found = rawAngles.find((a: any) => String(a?.id) === id);
+        return found
+          ? { id, headline: String(found.headline || '').trim(), subCopy: String(found.subCopy || '').trim() }
+          : null;
+      })
+      .filter((a): a is FlyerAngle => !!a && !!a.headline);
     const content: FlyerContent = {
-      headline: String(parsed.headline || '').trim(),
-      subCopy: String(parsed.subCopy || '').trim(),
+      angles,
       problems: list(parsed.problems),
       benefits: list(parsed.benefits),
+      trust: String(parsed.trust || '').trim(),
       forWhom: list(parsed.forWhom),
       flow: list(parsed.flow),
       price: String(parsed.price || '').trim(),
       cta: String(parsed.cta || '').trim(),
     };
-    return content.headline ? content : null;
+    return content.angles.length > 0 ? content : null;
   } catch {
     return null;
   }
@@ -1614,9 +1651,10 @@ ${serviceBlocks}
 
 // 紙に印刷して配ることが前提。画面で見る画像との違い（余白・文字の太さ・QRの扱い）をここで縛る。
 // QR は画像生成で描かせない（読み取れない偽物になる）。枠だけ空けさせ、あとからコード実行で本物を重ねる。
-const flyerPrintRules = (qrSpot: string) => `■ 紙に印刷して配る前提のルール（必ず守る）
-・出力は1枚の画像。A4のたて長（比率およそ1:1.41）で作る。プレゼン資料や複数ページにはしない。
-・手に取って読む紙なので、文字は大きく太めにする。細い線・薄いグレーの文字・小さすぎる注釈は使わない。
+const flyerPrintRules = (qrSpot: string, paper: string) => `■ 紙に印刷して配る前提のルール（必ず守る）
+・出力は1枚の画像。たて長で作る。プレゼン資料や複数ページにはしない。
+・仕上がりは${paper}。手に取って読む小さめの紙なので、文字は大きく太めにする。細い線・薄いグレーの文字・小さすぎる注釈は使わない。
+・載せるのは下で指定した文言だけ。余白を惜しまず、要素の間をしっかり空ける。詰め込むと印刷でつぶれて読めない。
 ・紙の外周1割ほどは余白として空け、文字や主要な絵を端ギリギリに置かない（印刷のときに切れるため）。
 ・視線が上から下へ素直に流れる構成にする。要素を斜めに散らしたり、読む順番が分からない配置にしない。
 ・QRコードは画像生成では描かないこと（読み取れない偽物になる）。${qrSpot}
@@ -1624,7 +1662,7 @@ const flyerPrintRules = (qrSpot: string) => `■ 紙に印刷して配る前提�
 ・文字はすべて日本語で、印刷してもくっきり読めるように描く。下に指定した文言だけを正確に、誤字なく入れる。勝手に文章を足さない。
 ・マークダウン記号（#、* など）は画像に出さない。`;
 
-const QR_SPOT_SINGLE = '右下へ、一辺が紙の幅の7分の1ほどの「白い正方形の枠」を空け、そのすぐ下に小さく「詳しくはこちら」と入れる。あとから本物のQRコードを重ねる場所。';
+const QR_SPOT_SINGLE = '右下へ、一辺が紙の幅の5分の1ほどの「白い正方形の枠」を空け、そのすぐ下に小さく「詳しくはこちら」と入れる。あとから本物のQRコードを重ねる場所。';
 const QR_SPOT_MULTI = '各サービスの枠の右端に、枠の高さの8割を一辺とする「白い正方形」を空ける。あとから本物のQRコードを重ねる場所。';
 
 /** 画像ができたあとに、コード実行で本物のQRを作って重ねさせる指示。URL が無ければ空（枠だけ空けて、あとで貼る） */
@@ -1649,47 +1687,84 @@ ${list}`;
 
 const flyerBullets = (items: string[]): string => items.map(v => `・${v}`).join('\n');
 
-/** 1サービス分のチラシプロンプトを組み立てる（ChatGPTにそのまま貼れる形）。 */
+// 切り口ごとに「紙面の主役」を変える。3枚出して見比べたとき、見出しだけでなく紙の重心が変わる。
+export const FLYER_ANGLE_SPECS: Record<FlyerAngleId, { label: string; lead: string; hint: string }> = {
+  problem: {
+    label: '困りごとから',
+    lead: '「これ、自分のことだ」と思ってもらう1枚',
+    hint: '「こんなことで困っていませんか」を紙面の主役にする。このブロックをいちばん大きく取り、アクセント色で囲んで目立たせる。',
+  },
+  result: {
+    label: '結果から',
+    lead: '手に入るものを先に見せる1枚',
+    hint: '「このサービスでできること」を紙面の主役にする。このブロックをいちばん大きく取り、アイコン付きの箱で並べて目立たせる。',
+  },
+  trust: {
+    label: '信頼から',
+    lead: '「この人なら任せられる」と思ってもらう1枚',
+    hint: '作り手への信頼を紙面の主役にする。見出しのすぐ下に信頼の一行を大きく置き、全体は落ち着いた組みにして実績が伝わるようにする。',
+  },
+};
+
+/** 1サービス分のチラシプロンプトを組み立てる（ChatGPTにそのまま貼れる形）。切り口ごとに1本ずつ作る。 */
 export const buildFlyerPromptText = (
   content: FlyerContent,
+  angle: FlyerAngle,
   toneVersion: ThumbnailPromptVersion,
   autoStyle?: string,
   serviceUrl?: string
 ): string => {
   const designSpec = resolveChatToneSpec(toneVersion, autoStyle);
-  const priceLine = content.price ? `\n【価格】\n${content.price}` : '';
-  const qrStep = flyerQrStep([{ label: content.headline, url: serviceUrl ?? '' }], false);
+  const qrStep = flyerQrStep([{ label: angle.headline, url: serviceUrl ?? '' }], false);
 
-  return `ChatGPTの画像生成（GPT Image）で、紙に印刷して配るチラシを1枚作ります。A4たての片面チラシです。
+  // 任意の項目は中身があるときだけ紙面に載せる。A5は小さいので、空の枠を作らせない
+  const layout = ['見出しとサブコピー。紙の上3分の1を使い、いちばん目立たせる。'];
+  layout.push('「こんなことで困っていませんか」。チェックマークか吹き出しで並べる。');
+  layout.push('「このサービスでできること」。アイコン付きの箱で並べる。');
+  if (content.trust) layout.push('信頼の一行。作り手の実績として、落ち着いた見た目で1行だけ置く。');
+  if (content.forWhom.length) layout.push('「こんな方におすすめ」。短く、軽い見た目で。');
+  if (content.flow.length) layout.push('「ご依頼の流れ」。1→2→3と矢印でつなぐ。');
+  if (content.price) layout.push('価格。読み落とされない位置に、短く置く。');
+  layout.push('行動をうながす一言。最下部に帯を敷いて置き、その右にQR用の白い正方形の枠を空ける。');
 
+  const blocks = [
+    `【見出し（いちばん大きく）】\n${angle.headline}`,
+    `【サブコピー】\n${angle.subCopy}`,
+    `【こんなことで困っていませんか】\n${flyerBullets(content.problems)}`,
+    `【このサービスでできること】\n${flyerBullets(content.benefits)}`,
+  ];
+  if (content.trust) blocks.push(`【信頼の一行】\n${content.trust}`);
+  if (content.forWhom.length) blocks.push(`【こんな方におすすめ】\n${flyerBullets(content.forWhom)}`);
+  if (content.flow.length) blocks.push(`【ご依頼の流れ】\n${content.flow.map((v, i) => `${i + 1}. ${v}`).join('\n')}`);
+  if (content.price) blocks.push(`【価格】\n${content.price}`);
+  blocks.push(`【行動をうながす一言（最下部の帯）】\n${content.cta}`);
+
+  // 参照モードのときだけ、先にサムネイルを添付させる。他のトンマナは仕様だけで作らせる
+  const attachStep = toneVersion === 'my_style'
+    ? `
+■ 先にやること
+このチャットに、このサービスのサムネイル画像を添付してから、この指示を送ってください。
+添付した画像の配色・書体の雰囲気・世界観を、このチラシでもそのまま使います。
+紙で受け取った人が、あとでサービスページを開いたときに同じ出品者だと分かるようにするためです。
+添付が無いときは、下のデザイン仕様だけで作ってかまいません。
+`
+    : '';
+
+  return `ChatGPTの画像生成（GPT Image）で、紙に印刷して配るチラシを1枚作ります。A5（148×210mm）たての片面チラシです。
+${attachStep}
 ■ デザイン仕様（この仕様どおりに作る）
 ${designSpec}
 
-${flyerPrintRules(QR_SPOT_SINGLE)}
+${flyerPrintRules(QR_SPOT_SINGLE, 'A5（148×210mm）')}
+
+■ この1枚の主役
+${FLYER_ANGLE_SPECS[angle.id].hint}
 
 ■ 紙面の構成（上から順に）
-1. 見出しとサブコピー。紙の上3分の1を使い、いちばん目立たせる。
-2. 「こんなことで困っていませんか」。チェックマークか吹き出しで並べる。
-3. 「このサービスでできること」。アイコン付きの箱で並べ、ここを紙面の主役にする。
-4. 「こんな方におすすめ」。短く、軽い見た目で。
-5. 「ご依頼の流れ」。1→2→3と矢印でつなぐ。価格の指定があればその近くで目立たせる。
-6. 行動をうながす一言。最下部に帯を敷いて置き、その右にQR用の白い正方形の枠を空ける。
+${layout.map((v, i) => `${i + 1}. ${v}`).join('\n')}
 
 ■ 紙に入れる文字（この文言だけを正確に）
-【見出し（いちばん大きく）】
-${content.headline}
-【サブコピー】
-${content.subCopy}
-【こんなことで困っていませんか】
-${flyerBullets(content.problems)}
-【このサービスでできること】
-${flyerBullets(content.benefits)}
-【こんな方におすすめ】
-${flyerBullets(content.forWhom)}
-【ご依頼の流れ】
-${content.flow.map((v, i) => `${i + 1}. ${v}`).join('\n')}${priceLine}
-【行動をうながす一言（最下部の帯）】
-${content.cta}${qrStep}`;
+${blocks.join('\n')}${qrStep}`;
 };
 
 // 枠の数によって紙面の割り方を変える。全部同じグリッドにすると、2件はスカスカ、6件は窮屈になる。
@@ -1726,7 +1801,7 @@ export const buildMultiFlyerPromptText = (
 ■ デザイン仕様（この仕様どおりに作る）
 ${designSpec}
 
-${flyerPrintRules(QR_SPOT_MULTI)}
+${flyerPrintRules(QR_SPOT_MULTI, 'A4（210×297mm）')}
 
 ■ 紙面の構成（上から順に）
 1. 見出しとサブコピー。紙の上4分の1を使い、「この人に何を頼めるのか」が一目で分かるようにする。

@@ -64,15 +64,25 @@ export interface SlideImagePrompt {
 // ===== チラシ（紙に印刷して配る）用 =====
 // ChatGPTの画像生成に渡す「紙に描き込む文言」。
 // トンマナ（共通デザイン仕様）と紙面ルールはコピー時に buildFlyerPromptText で差し込む。
+// チラシの切り口。紙は刷ってみるまで良し悪しが分からないので、中身は共通のまま
+// 「どこを主役にするか」だけ変えた3案を作り、実際に画像を出してから選んでもらう。
+export type FlyerAngleId = 'problem' | 'result' | 'trust';
+
+export interface FlyerAngle {
+  id: FlyerAngleId;
+  headline: string;  // 一番大きく出す見出し
+  subCopy: string;   // 見出しを補う一言
+}
+
 export interface FlyerContent {
-  headline: string;    // 一番大きく出す見出し
-  subCopy: string;     // 見出しを補う一言
-  problems: string[];  // こんなことで困っていませんか
-  benefits: string[];  // このサービスでできること
-  forWhom: string[];   // こんな方におすすめ
-  flow: string[];      // ご依頼の流れ（1要素＝1ステップ）
-  price: string;       // 価格の表記（本文に記載が無ければ空文字）
-  cta: string;         // 行動をうながす一言
+  angles: FlyerAngle[];  // 切り口の違う3案（見出しとサブコピー、紙面の主役が変わる）
+  problems: string[];    // こんなことで困っていませんか
+  benefits: string[];    // このサービスでできること
+  trust: string;         // 作り手を信頼できる一行（本文に根拠が無ければ空文字）
+  forWhom: string[];     // こんな方におすすめ（本文から読み取れなければ空配列）
+  flow: string[];        // ご依頼の流れ（本文に書かれていなければ空配列）
+  price: string;         // 価格の表記（本文に記載が無ければ空文字）
+  cta: string;           // 行動をうながす一言
 }
 
 // まとめチラシの1枠分（1サービス＝1枠）

@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
-import { generatePromotion, generateSurveyPatterns, getSlideDocPrompt, extractServiceTitle, generateAutoSlideStyle, generateSlideImageContents, buildSlideImagePromptText, getFormBannerPrompt, generateFlyerContent, generateMultiFlyerContent, buildFlyerPromptText, buildMultiFlyerPromptText } from '../services/geminiService';
+import { generatePromotion, generateSurveyPatterns, getSlideDocPrompt, extractServiceTitle, generateAutoSlideStyle, generateSlideImageContents, buildSlideImagePromptText, getFormBannerPrompt, generateFlyerContent, generateMultiFlyerContent, buildFlyerPromptText, buildMultiFlyerPromptText, FLYER_ANGLE_SPECS } from '../services/geminiService';
 import { extractWords } from '../utils/textProcessing';
-import { SkillIdea, SurveyPattern, SurveyQuestionDef, ThumbnailPromptVersion, SlideImagePrompt, FlyerContent, MultiFlyerContent } from '../types';
+import { SkillIdea, SurveyPattern, SurveyQuestionDef, ThumbnailPromptVersion, SlideImagePrompt, FlyerContent, FlyerAngle, FlyerAngleId, MultiFlyerContent } from '../types';
 import { MegaphoneIcon, ClipboardListIcon, PresentationIcon, FlyerIcon } from './icons';
 import { PromptPreview } from './promptPreviews';
 import LoadingOverlay from './LoadingOverlay';
@@ -36,8 +36,8 @@ const MENU_TOURS: Record<MenuId, { sel: string; title: string; text: string }[]>
     { sel: '[data-tour="menu-slide-steps"]', title: 'できたら PDF でダウンロード → JPG に', text: 'I Love PDF で1枚ずつの画像にして、スキルマーケットのサービス画像に追加します。' },
   ],
   flyer: [
-    { sel: '[data-tour="menu-flyer-tone"]', title: 'トンマナを選びます', text: 'サービス画像やスライドと同じにしておくと、紙で見た人がSNSで再会したとき同じ出品者だと気づきます。' },
-    { sel: '[data-tour="menu-flyer-copy"]', title: 'プロンプトをコピー → ChatGPT に貼る', text: 'A4たてのチラシが1枚出ます。QRコードは、画像のあとに ChatGPT がコード実行で本物を作って右下に重ねます（プロンプトに手順入り）。' },
+    { sel: '[data-tour="menu-flyer-tone"]', title: 'トンマナは「マイスタイル」が既定です', text: 'ChatGPTにサービスのサムネイル画像を先に添付すると、その配色・雰囲気のままチラシになります。紙で見た人が、あとでサービスページを開いたとき同じ出品者だと気づきます。' },
+    { sel: '[data-tour="menu-flyer-copy"]', title: '切り口ちがいの3案。1本ずつ ChatGPT に貼る', text: '困りごと・結果・信頼のどこを主役にするかが違います。3枚出して、良かった1枚を刷ってください。A5たてで、QRは画像のあとにコード実行で本物が重なります。' },
     { sel: '[data-tour="menu-flyer-qr"]', title: 'QRが読めなかったときの保険', text: 'ここでこのツールがQR画像を作ります。ChatGPT にチラシ画像と一緒にアップロードして重ねてもらうか、Canva で重ねてください。' },
   ],
 };
@@ -142,6 +142,11 @@ const SectionLabel: React.FC<{ label: string }> = ({ label }) => (
 // 絵文字が単独行になるのを防ぐ：
 //  1) 絵文字だけの行は直前の文末にくっつけて戻す
 //  2) 「。」での改行は、直後が絵文字だけで行末になる場合は割らない（文末絵文字を残す）
+// チラシは「見出し1つ」から「切り口3案」に作りが変わった。旧形式で保存されていたものは
+// 画面が組み立てられないので読み捨て、作り直してもらう。
+const normalizeFlyerContent = (v: FlyerContent | null | undefined): FlyerContent | null =>
+  v && Array.isArray(v.angles) && v.angles.length > 0 ? v : null;
+
 // トンマナ（画風）を見本つきで選ぶグリッド。スライド資料とチラシで共用する。
 const ToneGrid: React.FC<{
   value: ThumbnailPromptVersion;
@@ -269,6 +274,8 @@ interface PersistedState {
   flyerContent: FlyerContent | null;
   flyerMode: 'single' | 'multi';
   flyerVersion: ThumbnailPromptVersion;
+  // A5は小さいので、この2つは既定で載せない（載せたい人だけ足す）
+  flyerExtras: { forWhom: boolean; flow: boolean };
   // まとめチラシはサービスをまたぐので、サービス別バケットではなく全体で1つ持つ
   multiFlyerIds: string[];
   multiFlyerContent: MultiFlyerContent | null;
@@ -318,14 +325,17 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
   const [copiedSlideNo, setCopiedSlideNo] = useState<number | null>(null);
 
   // チラシ（紙に印刷して配る）
-  const [flyerContent, setFlyerContent] = useState<FlyerContent | null>(init.flyerContent ?? null);
+  const [flyerContent, setFlyerContent] = useState<FlyerContent | null>(normalizeFlyerContent(init.flyerContent));
   // まとめチラシは当面出さない（まず1種類で様子を見る）。保存値に関わらず single に固定し、状態と処理は残す
   const [flyerMode, setFlyerMode] = useState<'single' | 'multi'>('single');
-  const [flyerVersion, setFlyerVersion] = useState<ThumbnailPromptVersion>(init.flyerVersion ?? 'ai_auto');
+  const [flyerVersion, setFlyerVersion] = useState<ThumbnailPromptVersion>(init.flyerVersion ?? 'my_style');
+  const [flyerExtras, setFlyerExtras] = useState<{ forWhom: boolean; flow: boolean }>(
+    init.flyerExtras ?? { forWhom: false, flow: false }
+  );
   const [multiFlyerIds, setMultiFlyerIds] = useState<string[]>(Array.isArray(init.multiFlyerIds) ? init.multiFlyerIds : []);
   const [multiFlyerContent, setMultiFlyerContent] = useState<MultiFlyerContent | null>(init.multiFlyerContent ?? null);
   const [isMultiFlyerLoading, setIsMultiFlyerLoading] = useState(false);
-  const [copiedFlyer, setCopiedFlyer] = useState(false);
+  const [copiedAngleId, setCopiedAngleId] = useState<FlyerAngleId | null>(null);
   const [copiedMultiFlyer, setCopiedMultiFlyer] = useState(false);
 
   // 出品済みサービスのURL登録
@@ -383,13 +393,13 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
         posts, patterns, patternsOriginal, selectedPatternId, showCode, slideDocReady,
         autoStyleDirective, slideMode, slideVersion, slidePrompts,
         registeredServices, selectedServiceId, resultsByServiceId,
-        flyerContent, flyerMode, flyerVersion, multiFlyerIds, multiFlyerContent,
+        flyerContent, flyerMode, flyerVersion, flyerExtras, multiFlyerIds, multiFlyerContent,
       };
       localStorage.setItem(STORAGE_KEY, JSON.stringify(s));
     } catch (e) {
       console.warn('Failed to save support state', e);
     }
-  }, [serviceBody, activeMenu, posts, patterns, patternsOriginal, selectedPatternId, showCode, slideDocReady, autoStyleDirective, slideMode, slideVersion, slidePrompts, registeredServices, selectedServiceId, resultsByServiceId, flyerContent, flyerMode, flyerVersion, multiFlyerIds, multiFlyerContent]);
+  }, [serviceBody, activeMenu, posts, patterns, patternsOriginal, selectedPatternId, showCode, slideDocReady, autoStyleDirective, slideMode, slideVersion, slidePrompts, registeredServices, selectedServiceId, resultsByServiceId, flyerContent, flyerMode, flyerVersion, flyerExtras, multiFlyerIds, multiFlyerContent]);
 
   // ---- サービスごとの生成物を保存: 表示中の結果を選択中サービスのバケットへ同期 ----
   useEffect(() => {
@@ -569,7 +579,7 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
     setErrorMenu(null);
     setAutoStyleDirective(r.autoStyleDirective ?? '');
     setSlidePrompts(Array.isArray(r.slidePrompts) ? r.slidePrompts : []);
-    setFlyerContent(r.flyerContent ?? null);
+    setFlyerContent(normalizeFlyerContent(r.flyerContent));
   };
 
   const handleSelectService = (sv: RegisteredService) => {
@@ -745,7 +755,7 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
       setFlyerContent(content);
       if (!autoStyleDirective && auto.trim()) setAutoStyleDirective(auto.trim());
       setFlyerMode('single');
-      setCopiedFlyer(false);
+      setCopiedAngleId(null);
       setActiveMenu('flyer');
       setTimeout(scrollToResults, 100);
     } catch (error) {
@@ -796,16 +806,22 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
     }
   };
 
-  const handleCopyFlyerPrompt = () => {
+  const handleCopyFlyerPrompt = (angle: FlyerAngle) => {
     if (!flyerContent) return;
+    // 「おすすめ」「流れ」は載せると決めたときだけ紙に入れる（A5に8ブロックは詰め込みすぎになる）
+    const forPrompt: FlyerContent = {
+      ...flyerContent,
+      forWhom: flyerExtras.forWhom ? flyerContent.forWhom : [],
+      flow: flyerExtras.flow ? flyerContent.flow : [],
+    };
     const text = buildFlyerPromptText(
-      flyerContent, flyerVersion,
+      forPrompt, angle, flyerVersion,
       flyerVersion === 'ai_auto' ? autoStyleDirective : undefined,
       selectedServiceUrl || undefined
     );
     navigator.clipboard.writeText(text).then(() => {
-      setCopiedFlyer(true);
-      setTimeout(() => setCopiedFlyer(false), 2000);
+      setCopiedAngleId(angle.id);
+      setTimeout(() => setCopiedAngleId(prev => (prev === angle.id ? null : prev)), 2000);
     });
   };
 
@@ -912,8 +928,8 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
     {
       id: 'flyer' as MenuId,
       title: 'チラシを作る（検証中）',
-      description: '紙に印刷して配るチラシのプロンプトを用意。1サービス分のA4たてチラシが作れます。',
-      highlight: 'A4たて・印刷向け',
+      description: 'オフ会で手渡す前提の、A5たて1枚のチラシ。切り口を変えた3案のプロンプトを用意します。',
+      highlight: 'A5たて・3案・印刷向け',
       icon: <FlyerIcon />,
       onRun: handleRunFlyer,
     },
@@ -1476,16 +1492,17 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
                 <div className="mb-5">
                   <h3 className="text-lg font-bold text-stone-900">チラシをつくる（検証中）</h3>
                   <p className="text-xs text-stone-500 mt-1">
-                    紙に印刷して配るためのプロンプトです。ChatGPTの画像生成（GPT Image）に貼ると、A4たてのチラシが1枚出てきます。
+                    オフ会で手渡す前提の、A5（148×210mm）1枚のチラシです。切り口を変えた
+                    <span className="font-medium text-stone-600">3案</span>を用意しました。ChatGPTの画像生成（GPT Image）に1本ずつ貼って、出てきた3枚から良かった1枚を刷ってください。
                     QRコードは、画像のあとに <span className="font-medium text-stone-600">ChatGPT がコード実行で本物を作って右下に重ねます</span>（プロンプトに手順入り）。
                   </p>
                 </div>
 
-                {/* トンマナ選択（スライド資料と同じ8種） */}
+                {/* トンマナ選択。既定はサムネイル画像に合わせる「マイスタイル」 */}
                 <div className="mb-3">
                   <h4 className="text-base font-bold text-stone-900">トンマナを選ぶ</h4>
                   <p className="text-xs text-stone-500 mt-1">
-                    サービス画像やスライド資料と同じトンマナにしておくと、紙で見た人がSNSやサービスページで再会したときに同じ出品者だと気づきます。
+                    既定は「マイスタイル（参照モード）」です。ChatGPTに<span className="font-medium text-stone-600">サービスのサムネイル画像を先に添付</span>してからプロンプトを貼ると、その配色・雰囲気のままチラシになります。紙で見た人が、あとでサービスページを開いたときに同じ出品者だと気づきます。
                   </p>
                 </div>
                 <div data-tour="menu-flyer-tone"><ToneGrid value={flyerVersion} onChange={setFlyerVersion} className="mb-3" /></div>
@@ -1496,33 +1513,85 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
                     : '「AIおまかせ」は汎用のおまかせ指定になります。')}
                 </p>
 
-                {/* このサービスで1枚 */}
                 {flyerMode === 'single' && (
                   flyerContent ? (
                     <>
-                      <div className="card p-5 mb-4">
-                        <FlyerPreviewRow label="見出し"><span className="text-sm font-bold text-stone-900">{flyerContent.headline}</span></FlyerPreviewRow>
-                        <FlyerPreviewRow label="サブコピー">{flyerContent.subCopy}</FlyerPreviewRow>
+                      {/* 3案で共通して使う中身。ここは切り口が変わっても同じ */}
+                      <div className="card p-5 mb-5">
+                        <p className="text-[10px] font-semibold text-stone-400 uppercase tracking-[0.2em] mb-3">3案 共通の中身</p>
                         <FlyerPreviewRow label="お困りごと">{flyerContent.problems.join(' ／ ')}</FlyerPreviewRow>
                         <FlyerPreviewRow label="できること">{flyerContent.benefits.join(' ／ ')}</FlyerPreviewRow>
-                        <FlyerPreviewRow label="おすすめ">{flyerContent.forWhom.join(' ／ ')}</FlyerPreviewRow>
-                        <FlyerPreviewRow label="ご依頼の流れ">{flyerContent.flow.map((f, i) => `${i + 1}. ${f}`).join(' → ')}</FlyerPreviewRow>
+                        <FlyerPreviewRow label="信頼の一行">
+                          {flyerContent.trust
+                            ? flyerContent.trust
+                            : <span className="text-stone-400">本文に年数・件数・資格などが見つからなかったので、入れていません。出品文の「信頼と実績」に事実を足すと、紙の説得力が上がります。</span>}
+                        </FlyerPreviewRow>
                         {flyerContent.price && <FlyerPreviewRow label="価格">{flyerContent.price}</FlyerPreviewRow>}
                         <FlyerPreviewRow label="最後の一言">{flyerContent.cta}</FlyerPreviewRow>
                       </div>
-                      <div className="flex flex-wrap items-center gap-2 mb-8">
-                        <button type="button" data-tour="menu-flyer-copy" onClick={handleCopyFlyerPrompt} className="btn-dark px-6 py-2.5 text-xs">
-                          {copiedFlyer ? 'コピーしました' : 'プロンプトをコピー'}
-                        </button>
-                        <details className="mt-4 group" data-tour="menu-flyer-qr">
-                          <summary className="cursor-pointer list-none inline-flex items-center gap-1.5 text-xs font-semibold text-stone-500 hover:text-brand-500 transition-colors [&::-webkit-details-marker]:hidden">
-                            <span aria-hidden className="transition-transform duration-200 group-open:rotate-180">▾</span>
-                            QRが読めなかったときは（このツールでQRを作る）
-                          </summary>
-                          <div className="mt-3">
-                            <QrFallback targets={selectedServiceUrl ? [{ label: flyerContent.headline, url: selectedServiceUrl }] : []} />
+
+                      {/* A5は小さいので、この2つは既定で載せない。入れたい人だけ足す */}
+                      <div className="card p-5 mb-5">
+                        <p className="text-[10px] font-semibold text-stone-400 uppercase tracking-[0.2em] mb-1">紙に足すもの（任意）</p>
+                        <p className="text-[11px] text-stone-400 leading-relaxed mb-3">
+                          A5は小さいので、既定では入れていません。入れるほど1つあたりの文字は小さくなります。
+                        </p>
+                        <div className="flex flex-col gap-3">
+                          <label className={`flex items-start gap-2.5 text-xs leading-relaxed ${flyerContent.forWhom.length === 0 ? 'text-stone-300' : 'text-stone-600 cursor-pointer'}`}>
+                            <input
+                              type="checkbox"
+                              className="mt-0.5 accent-rose-600"
+                              disabled={flyerContent.forWhom.length === 0}
+                              checked={flyerExtras.forWhom && flyerContent.forWhom.length > 0}
+                              onChange={(e) => setFlyerExtras(prev => ({ ...prev, forWhom: e.target.checked }))}
+                            />
+                            <span>
+                              <span className="font-semibold">こんな方におすすめ</span>
+                              <span className="block text-stone-400">
+                                {flyerContent.forWhom.length > 0 ? flyerContent.forWhom.join(' ／ ') : '本文から読み取れませんでした'}
+                              </span>
+                            </span>
+                          </label>
+                          <label className={`flex items-start gap-2.5 text-xs leading-relaxed ${flyerContent.flow.length === 0 ? 'text-stone-300' : 'text-stone-600 cursor-pointer'}`}>
+                            <input
+                              type="checkbox"
+                              className="mt-0.5 accent-rose-600"
+                              disabled={flyerContent.flow.length === 0}
+                              checked={flyerExtras.flow && flyerContent.flow.length > 0}
+                              onChange={(e) => setFlyerExtras(prev => ({ ...prev, flow: e.target.checked }))}
+                            />
+                            <span>
+                              <span className="font-semibold">ご依頼の流れ</span>
+                              <span className="block text-stone-400">
+                                {flyerContent.flow.length > 0 ? flyerContent.flow.map((f, i) => `${i + 1}. ${f}`).join(' → ') : '本文に書かれていませんでした'}
+                              </span>
+                            </span>
+                          </label>
+                        </div>
+                      </div>
+
+                      {/* 切り口ちがいの3案。見出しと「紙面の主役」が変わる */}
+                      <div data-tour="menu-flyer-copy" className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-5 items-stretch">
+                        {flyerContent.angles.map((angle) => (
+                          <div key={angle.id} className="card p-5 flex flex-col">
+                            <span className="self-start text-[10px] font-semibold text-brand-600 bg-brand-50 px-2 py-0.5 rounded-full mb-2">
+                              {FLYER_ANGLE_SPECS[angle.id].label}
+                            </span>
+                            <p className="text-sm font-bold text-stone-900 leading-snug mb-1">{angle.headline}</p>
+                            <p className="text-xs text-stone-500 leading-relaxed mb-3">{angle.subCopy}</p>
+                            <p className="text-[11px] text-stone-400 leading-relaxed mb-4 flex-grow">{FLYER_ANGLE_SPECS[angle.id].lead}</p>
+                            <button
+                              type="button"
+                              onClick={() => handleCopyFlyerPrompt(angle)}
+                              className="btn-dark w-full px-4 py-2.5 text-xs"
+                            >
+                              {copiedAngleId === angle.id ? 'コピーしました' : 'この案のプロンプトをコピー'}
+                            </button>
                           </div>
-                        </details>
+                        ))}
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-2 mb-4">
                         <a
                           href="https://chatgpt.com/"
                           target="_blank"
@@ -1533,6 +1602,16 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
                           ChatGPT を開く
                         </a>
                       </div>
+
+                      <details className="group mb-8" data-tour="menu-flyer-qr">
+                        <summary className="cursor-pointer list-none inline-flex items-center gap-1.5 text-xs font-semibold text-stone-500 hover:text-brand-500 transition-colors [&::-webkit-details-marker]:hidden">
+                          <span aria-hidden className="transition-transform duration-200 group-open:rotate-180">▾</span>
+                          QRが読めなかったときは（このツールでQRを作る）
+                        </summary>
+                        <div className="mt-3">
+                          <QrFallback targets={selectedServiceUrl ? [{ label: flyerContent.angles[0].headline, url: selectedServiceUrl }] : []} />
+                        </div>
+                      </details>
                     </>
                   ) : (
                     <p className="text-sm text-stone-500 mb-8">上のメニューの「チラシを作る」から、選択中のサービスのチラシ文言を作ってください。</p>
@@ -1543,13 +1622,13 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
                 <div className="bg-stone-50 border border-stone-200/80 rounded-2xl p-6 mb-6">
                   <h4 className="text-sm font-bold text-stone-900 mb-3">印刷して配るまでの手順</h4>
                   <ol className="text-xs text-stone-600 space-y-2 list-decimal list-inside leading-relaxed mb-4">
-                    <li>「ChatGPT を開く」から新しいチャットを開き、コピーしたプロンプトを貼る（既存のサービス画像を先に添付すると、雰囲気をそろえやすくなります）</li>
+                    <li>「ChatGPT を開く」から新しいチャットを開き、<span className="font-medium text-stone-700">サービスのサムネイル画像を先に添付</span>する</li>
+                    <li>3案のうち1つをコピーして貼る。同じチャットで3案とも試すと、絵柄のそろった3枚を見比べられます</li>
                     <li>出てきた画像を確認する。文字が崩れていたら「◯◯の文字が崩れているので直して」と伝えれば描き直せます</li>
-                    <li>画像を保存し、右下に空けた白い枠にサービスページのQRコードを貼る</li>
-                    <li>お名前・連絡先を入れて完成。コンビニ印刷や印刷所で刷って配りましょう</li>
+                    <li>良かった1枚にお名前・連絡先を入れて完成。<span className="font-medium text-stone-700">A4に2枚並べて印刷し、半分に切るとA5が2枚</span>できます</li>
                   </ol>
                   <p className="text-[11px] text-stone-400 leading-relaxed">
-                    生成される画像の縦横比はA4ちょうどにはなりません。印刷前にA4に合わせて余白を足すか、少し切り取って調整してください。
+                    画像の縦横比は2:3で、A5（1:1.41）ちょうどにはなりません。A5の幅に合わせると下がはみ出るので、外周に空けた余白ごと切り落としてください。
                     文字は画像として描かれるので、印刷前に誤字がないか必ず自分の目で確認してください。
                   </p>
                 </div>
