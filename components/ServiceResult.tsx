@@ -219,16 +219,9 @@ const CopySection: React.FC<{
   onSave?: (newContent: string) => void;
   minRows?: number;
 }> = ({ title, content, onSave, minRows = 3 }) => {
-  const [copied, setCopied] = useState(false);
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState(content);
 
-  const handleCopy = () => {
-    navigator.clipboard.writeText(content).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    });
-  };
   const startEdit = () => { setValue(content); setEditing(true); };
   const applyEdit = () => {
     if (!value.trim()) return;
@@ -244,7 +237,6 @@ const CopySection: React.FC<{
       <div className="flex justify-between items-center mb-3 gap-2">
         <div className="flex items-center gap-2 flex-wrap min-w-0">
           <h4 className="font-semibold text-stone-900 text-sm">{title}</h4>
-          {copied && <span className="text-[11px] text-brand-600 animate-in fade-in duration-200">→ 出品画面の「{title}」欄に貼り付け</span>}
         </div>
         <div className="flex items-center gap-2">
           {editing ? (
@@ -260,10 +252,7 @@ const CopySection: React.FC<{
               </button>
             </>
           ) : (
-            <>
-              {onSave && <EditButton onClick={startEdit} />}
-              <CopyButton copied={copied} onClick={handleCopy} />
-            </>
+            onSave ? <EditButton onClick={startEdit} /> : null
           )}
         </div>
       </div>
@@ -409,7 +398,6 @@ const PromptCard: React.FC<{
 
 const ServiceResult: React.FC<ServiceResultProps> = ({ idea, content, onBack, onSaveContent, ensureKeySet, onHandleApiError }) => {
   const [isAllCopied, setIsAllCopied] = useState(false);
-  const [isDetailCopied, setIsDetailCopied] = useState(false);
   const [expandedPrompt, setExpandedPrompt] = useState<ThumbnailPromptVersion | null>(null);
   const [copiedVersion, setCopiedVersion] = useState<ThumbnailPromptVersion | null>(null);
   const [showTip, setShowTip] = useState(false);
@@ -515,13 +503,6 @@ const ServiceResult: React.FC<ServiceResultProps> = ({ idea, content, onBack, on
     navigator.clipboard.writeText(decorateHeadings(rebuiltContent)).then(() => {
       setIsAllCopied(true);
       setTimeout(() => setIsAllCopied(false), 2000);
-    });
-  };
-
-  const handleCopyDetail = () => {
-    navigator.clipboard.writeText(decorateHeadings(rebuiltDetail)).then(() => {
-      setIsDetailCopied(true);
-      setTimeout(() => setIsDetailCopied(false), 2000);
     });
   };
 
@@ -645,7 +626,7 @@ const ServiceResult: React.FC<ServiceResultProps> = ({ idea, content, onBack, on
           <SectionHead
             eyebrow="まず"
             title="内容を確認して、直す"
-            description="AIが作った出品文です。各カードの「編集」で手直しできます。まとめて直すなら、画面下の AI 編集に「もっと短く」「価格を上げて」のように頼んでください。スキルマーケットに貼るのは、直し終わってからです。"
+            description="AIが作った出品文です。各カードの「編集」で手直しできます。まとめて直すなら、画面下の AI 編集に「もっと短く」「価格を上げて」のように頼んでください。コピーは、直し終わってから次の「スキルマーケットに貼る」でまとめて行います。"
           />
           <div className="space-y-5">
           <div className="card p-5">
@@ -664,7 +645,6 @@ const ServiceResult: React.FC<ServiceResultProps> = ({ idea, content, onBack, on
             <div className="flex justify-between items-center mb-3 gap-2">
               <div className="flex items-center gap-2 flex-wrap min-w-0">
                 <h4 className="font-semibold text-stone-900 text-sm">サービス詳細</h4>
-                {isDetailCopied && <span className="text-[11px] text-brand-600 animate-in fade-in duration-200">→ 出品画面の「サービス詳細」欄に貼り付け</span>}
               </div>
               <div className="flex items-center gap-2">
                 {editingDetail ? (
@@ -684,18 +664,10 @@ const ServiceResult: React.FC<ServiceResultProps> = ({ idea, content, onBack, on
                     </button>
                   </>
                 ) : (
-                  <>
-                    <EditButton onClick={() => { setDetailDraft(parsed.detail); setEditingDetail(true); }} />
-                    <CopyButton copied={isDetailCopied} onClick={handleCopyDetail} />
-                  </>
+                  <EditButton onClick={() => { setDetailDraft(parsed.detail); setEditingDetail(true); }} />
                 )}
               </div>
             </div>
-            {!editingDetail && (
-              <p className="text-[11px] text-stone-400 mb-3 leading-relaxed">
-                コピーすると見出しが <code className="text-stone-500">&lt;strong&gt;</code> で囲まれ、スキルマーケットに貼ったとき太字になります。
-              </p>
-            )}
             {editingDetail ? (
               <>
                 <textarea
