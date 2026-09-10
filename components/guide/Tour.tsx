@@ -25,6 +25,8 @@ const Tour: React.FC<TourProps> = ({ steps, open, onClose }) => {
   const [index, setIndex] = useState(0);
   const [hole, setHole] = useState<Box | null>(null);
   const [card, setCard] = useState<{ top: number; left: number } | null>(null);
+  // 歩を移るときだけ穴を滑らせる。スクロール追従中に効かせると、穴が指すものから遅れて付いてくる
+  const [animate, setAnimate] = useState(true);
 
   // 見えている次の歩を探す。無ければ -1
   const nextVisible = useCallback((from: number): number => {
@@ -34,29 +36,37 @@ const Tour: React.FC<TourProps> = ({ steps, open, onClose }) => {
     return -1;
   }, [steps]);
 
+  // いまの位置で穴と説明カードを置き直す。スクロールのたびに呼ぶので、測るだけで動かさない
+  const place = useCallback((i: number) => {
+    const el = document.querySelector(steps[i].sel);
+    if (!isVisible(el)) return;
+    const r = el.getBoundingClientRect();
+    const pad = 6;
+    setHole({ top: r.top - pad, left: r.left - pad, width: r.width + pad * 2, height: r.height + pad * 2 });
+    const cw = Math.min(352, window.innerWidth - 24);
+    const ch = 180; // カードのおおよその高さ。下に入らなければ上に出す
+    let top = r.bottom + 14;
+    if (top + ch > window.innerHeight - 12) top = r.top - ch - 14;
+    // 指している要素が画面の外へ出ても、説明カードだけは画面内に残す
+    top = Math.min(Math.max(12, top), Math.max(12, window.innerHeight - ch - 12));
+    const left = Math.min(Math.max(12, r.left), window.innerWidth - cw - 12);
+    setCard({ top, left });
+  }, [steps]);
+
   const measure = useCallback((i: number) => {
     const el = document.querySelector(steps[i].sel);
     if (!isVisible(el)) return;
     el.scrollIntoView({ block: 'center' });
     // 貼り付くヘッダーがあると直後は位置がずれるので、少し待って測る
-    window.setTimeout(() => {
-      const r = el.getBoundingClientRect();
-      const pad = 6;
-      setHole({ top: r.top - pad, left: r.left - pad, width: r.width + pad * 2, height: r.height + pad * 2 });
-      const cw = Math.min(352, window.innerWidth - 24);
-      const ch = 180; // カードのおおよその高さ。下に入らなければ上に出す
-      let top = r.bottom + 14;
-      if (top + ch > window.innerHeight - 12) top = Math.max(12, r.top - ch - 14);
-      const left = Math.min(Math.max(12, r.left), window.innerWidth - cw - 12);
-      setCard({ top, left });
-    }, 80);
-  }, [steps]);
+    window.setTimeout(() => place(i), 80);
+  }, [steps, place]);
 
   const show = useCallback((from: number) => {
     const i = nextVisible(from);
     if (i === -1) { onClose(); return; }
     setIndex(i);
     setHole(null);
+    setAnimate(true);
     measure(i);
   }, [nextVisible, measure, onClose]);
 
@@ -71,11 +81,18 @@ const Tour: React.FC<TourProps> = ({ steps, open, onClose }) => {
       if (e.key === 'Escape') onClose();
       if (e.key === 'ArrowRight' || e.key === 'Enter') { e.preventDefault(); show(index + 1); }
     };
-    const onResize = () => measure(index);
+    // 画面を動かしても穴が指す場所からずれないように、そのつど測り直す。
+    // スクロールのイベントは上に伝わらないので、capture で拾う（本文は内側の枠がスクロールする）
+    const follow = () => { setAnimate(false); place(index); };
     document.addEventListener('keydown', onKey);
-    window.addEventListener('resize', onResize);
-    return () => { document.removeEventListener('keydown', onKey); window.removeEventListener('resize', onResize); };
-  }, [open, index, show, measure, onClose]);
+    window.addEventListener('scroll', follow, true);
+    window.addEventListener('resize', follow);
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      window.removeEventListener('scroll', follow, true);
+      window.removeEventListener('resize', follow);
+    };
+  }, [open, index, show, place, onClose]);
 
   if (!open || steps.length === 0) return null;
   const step = steps[index];
@@ -87,7 +104,7 @@ const Tour: React.FC<TourProps> = ({ steps, open, onClose }) => {
       {hole && (
         <div
           aria-hidden
-          className="absolute rounded-xl pointer-events-none transition-all duration-300 ease-smooth"
+          className={`absolute rounded-xl pointer-events-none ${animate ? 'transition-all duration-300 ease-smooth' : ''}`}
           style={{ ...hole, boxShadow: '0 0 0 9999px rgba(28, 25, 23, 0.55)' }}
         />
       )}
@@ -96,7 +113,7 @@ const Tour: React.FC<TourProps> = ({ steps, open, onClose }) => {
         role="dialog"
         aria-live="polite"
         aria-label={step.title}
-        className="absolute bg-white rounded-2xl shadow-card-hover border border-stone-200/60 p-5 flex flex-col gap-2 transition-all duration-300 ease-smooth"
+        className={`absolute bg-white rounded-2xl shadow-card-hover border border-stone-200/60 p-5 flex flex-col gap-2 ${animate ? 'transition-all duration-300 ease-smooth' : ''}`}
         style={{ width: 'min(22rem, calc(100vw - 24px))', top: card?.top ?? 24, left: card?.left ?? 24, opacity: card ? 1 : 0 }}
       >
         <div className="flex items-center justify-between">
