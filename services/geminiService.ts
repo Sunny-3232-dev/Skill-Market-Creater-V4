@@ -1453,7 +1453,7 @@ export const getFormBannerPrompt = (formTitle: string): string => `ChatGPTの画
 // スライド資料と同じ考え方で、「紙に載せる文言」はAIに作らせ、
 // トンマナ（画風）と紙面ルールはクライアント側でプロンプトに差し込む。
 
-/** サービス本文から、A4たてのチラシ1枚に印刷する文言を作る。 */
+/** サービス本文から、A5たてのチラシに印刷する文言を作る。切り口ちがいの見出し3案と、3案で共通の中身を返す。 */
 export const generateFlyerContent = async (serviceBody: string): Promise<FlyerContent | null> => {
   const body = serviceBody?.trim();
   if (!body) return null;
