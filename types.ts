@@ -62,27 +62,108 @@ export interface SlideImagePrompt {
 }
 
 // ===== チラシ（紙に印刷して配る）用 =====
-// ChatGPTの画像生成に渡す「紙に描き込む文言」。
-// トンマナ（共通デザイン仕様）と紙面ルールはコピー時に buildFlyerPromptText で差し込む。
-// チラシの切り口。紙は刷ってみるまで良し悪しが分からないので、中身は共通のまま
-// 「どこを主役にするか」だけ変えた3案を作り、実際に画像を出してから選んでもらう。
+// 1回の生成で「デザインの判断」と「紙に描き込む文言」を両方 AI に決めさせる（段A）。
+// A5 の物理ルール・帯の比率・QR の扱いはクライアント側の buildFlyerPromptText が固定で差し込む（段B）。
+// 判断の根拠は プロのチラシ20点の分析（チラシ再設計_01_参考デザイン分析.md）。
+// チラシの切り口。紙は刷ってみるまで良し悪しが分からないので、デザイン方針は共通のまま
+// 「見出しと、本文の帯で何を主役にするか」だけ変えた3案を作り、実際に画像を出してから選んでもらう。
 export type FlyerAngleId = 'problem' | 'result' | 'trust';
 
 export interface FlyerAngle {
   id: FlyerAngleId;
-  headline: string;  // 一番大きく出す見出し
-  subCopy: string;   // 見出しを補う一言
+  headline: string;    // 一番大きく出す見出し
+  emphasis: string[];  // 見出しの中で差し色にする語（1〜2語。見出しに含まれる語だけ）
+  subCopy: string;     // 見出しを補う一言
+}
+
+// デザイン方針の系統。プロの作例から取り出した11型。主色の傾向・書体・装飾がひとまとまりで決まる。
+export type FlyerStyleFamily =
+  | 'trust'         // 信頼・専門（士業・コンサル・IT・BtoB・キャリア相談）
+  | 'gentle'        // 寄り添い・やさしさ（相談・カウンセリング・福祉・シニア向け）
+  | 'family'        // 子ども・家族
+  | 'care_elegant'  // 健康・施術（上品型。整体・ヨガ・パーソナル指導）
+  | 'care_promo'    // 健康・施術（集客型。初回割引で来店を取りに行く）
+  | 'beauty'        // 美容・上質（美容・写真・ブランディング）
+  | 'expert'        // 個人の専門家（顔＋実績数字。出品者の大半）
+  | 'quiet'         // 静か・弔い（終活・供養・グリーフケア）
+  | 'handmade'      // かわいい・手づくり（ハンドメイド・イラスト・占い）
+  | 'clean'         // 清潔・作業（掃除・整理収納・代行）
+  | 'bold';         // 強い・期間限定（キャンペーン全般）
+
+export type FlyerHeadlineType =
+  | 'round_bold'         // 極太の丸ゴシック（やさしい・子ども・にぎやか）
+  | 'square_bold'        // 太い角ゴシック（信頼・専門・力強い）
+  | 'mincho_bold'        // 太めの明朝（上品・和・食・落ち着き）
+  | 'handwritten'        // 手書き風の丸い書体（手づくり・かわいい）
+  | 'thin_latin_mincho'; // 細い欧文＋明朝（美容・上質）
+
+export type FlyerHeroVisual =
+  | 'provider_portrait'  // 提供者本人（添付アイコンを再現。無ければ代役の人物）
+  | 'product'            // 成果物・商品（資料、作品、料理など）
+  | 'scene'              // サービスの場面（相談中、作業中、レッスン中）
+  | 'illustration';      // イラスト・モチーフ（写真的でない方が合うとき）
+
+export type FlyerHeroCut = 'diagonal' | 'curve' | 'circle' | 'full' | 'wave';
+
+// 紙面の部品。プロの作例で繰り返し使われていたもの。系統に合わせて使う／使わないを決める。
+export type FlyerDevice =
+  | 'badge'          // 丸バッジ（価格・限定・実績を写真に重ねる）
+  | 'yellow_marker'  // 黄色マーカー（本文の要点1か所）
+  | 'three_cards'    // 3カード（アイコン＋題＋1行）
+  | 'big_number'     // 実績数字を文字の2〜3倍で
+  | 'reassurance'    // 不安払拭の1行
+  | 'band_heading';  // 帯見出し（帯の切り替わりを1行で宣言）
+
+export interface FlyerColor {
+  name: string;  // 日本語の色名（例「くすみピンク」）
+  hex: string;   // #RRGGBB
+  why: string;   // その色にした理由（1行。画面に見せる）
+}
+
+export interface FlyerAnalysis {
+  family: FlyerStyleFamily;
+  audience: string;       // 誰向けか（1行）
+  formality: number;      // 1（くだけた）〜5（かたい）
+  warmth: number;         // 1（クール）〜5（あたたかい）
+  energy: number;         // 1（静か）〜5（勢い）
+  sellingWhat: 'person' | 'skill' | 'product' | 'experience';
+}
+
+export interface FlyerDesign {
+  dominantColor: FlyerColor;
+  accentColor: FlyerColor;
+  headlineType: FlyerHeadlineType;
+  decoration: 'none' | 'light' | 'standard' | 'lively';
+  heroVisual: FlyerHeroVisual;
+  heroSubject: string;    // 主役ビジュアルの具体（例「ノートPCに向かって微笑む提供者」）
+  heroCut: FlyerHeroCut;
+  devices: FlyerDevice[];
+  avoid: FlyerDevice[];
+  moodWords: string[];    // 雰囲気を表す語 2〜3
+}
+
+export interface FlyerCard {
+  icon: string;   // アイコンのモチーフ（名詞。例「手のひら」「時計」）
+  title: string;  // 短い題
+  body: string;   // 1行の説明
+}
+
+export interface FlyerCopy {
+  audienceLabel: string;                 // 最上部のピル「〜の方へ」
+  angles: FlyerAngle[];                  // 切り口3案
+  problems: string[];                    // こんなことで困っていませんか（3つ）
+  cards: FlyerCard[];                    // できること（3枚）
+  bigNumber: { value: string; label: string } | null;  // 実績数字（本文に無ければ null）
+  trustLines: string[];                  // 経歴・資格・経験（本文にある事実だけ。最大3）
+  reassurance: string;                   // 不安払拭の1行（帯3と帯4のあいだに置く）
+  cta: { firstStep: string; price: string; note: string };  // 最初の一歩・価格・添え書き
 }
 
 export interface FlyerContent {
-  angles: FlyerAngle[];  // 切り口の違う3案（見出しとサブコピー、紙面の主役が変わる）
-  problems: string[];    // こんなことで困っていませんか
-  benefits: string[];    // このサービスでできること
-  trust: string;         // 作り手を信頼できる一行（本文に根拠が無ければ空文字）
-  forWhom: string[];     // こんな方におすすめ（本文から読み取れなければ空配列）
-  flow: string[];        // ご依頼の流れ（本文に書かれていなければ空配列）
-  price: string;         // 価格の表記（本文に記載が無ければ空文字）
-  cta: string;           // 行動をうながす一言
+  version: 2;             // 旧形式（見出し3案＋箇条書き）と区別する。旧データは読み捨てる
+  analysis: FlyerAnalysis;
+  design: FlyerDesign;
+  copy: FlyerCopy;
 }
 
 // まとめチラシの1枠分（1サービス＝1枠）

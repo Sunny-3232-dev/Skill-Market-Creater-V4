@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
-import { generatePromotion, generateSurveyPatterns, getSlideDocPrompt, extractServiceTitle, generateAutoSlideStyle, generateSlideImageContents, buildSlideImagePromptText, getFormBannerPrompt, generateFlyerContent, generateMultiFlyerContent, buildFlyerPromptText, buildMultiFlyerPromptText, FLYER_ANGLE_SPECS } from '../services/geminiService';
+import { generatePromotion, generateSurveyPatterns, getSlideDocPrompt, extractServiceTitle, generateAutoSlideStyle, generateSlideImageContents, buildSlideImagePromptText, buildSlideImageBatchPromptText, getFormBannerPrompt, generateFlyerContent, generateMultiFlyerContent, buildFlyerPromptText, buildMultiFlyerPromptText, FLYER_ANGLE_SPECS, FLYER_FAMILY_SPECS, FLYER_QR_URL_PLACEHOLDER, buildFlyerQrFollowupText } from '../services/geminiService';
 import { extractWords } from '../utils/textProcessing';
-import { SkillIdea, SurveyPattern, SurveyQuestionDef, ThumbnailPromptVersion, SlideImagePrompt, FlyerContent, FlyerAngle, FlyerAngleId, MultiFlyerContent } from '../types';
+import { SkillIdea, SurveyPattern, SurveyQuestionDef, ThumbnailPromptVersion, SlideImagePrompt, FlyerContent, FlyerAngle, FlyerAngleId, FlyerHeadlineType, FlyerHeroVisual, FlyerHeroCut, FlyerDevice, MultiFlyerContent } from '../types';
 import { MegaphoneIcon, ClipboardListIcon, PresentationIcon, FlyerIcon } from './icons';
 import { PromptPreview } from './promptPreviews';
 import LoadingOverlay from './LoadingOverlay';
@@ -30,14 +30,14 @@ const MENU_TOURS: Record<MenuId, { sel: string; title: string; text: string }[]>
     { sel: '[data-tour="menu-survey-banner"]', title: 'フォーム上部のバナー画像はこのプロンプトで', text: 'ChatGPT に貼ると、フォームのヘッダー画像ができます。' },
   ],
   slidedoc: [
-    { sel: '[data-tour="menu-slide-mode"]', title: '作り方を選びます', text: 'まとめて作るなら NotebookLM、1枚ずつ画風をそろえて作るなら ChatGPT。' },
+    { sel: '[data-tour="menu-slide-mode"]', title: '作り方を選びます', text: 'まとめて作るなら NotebookLM、画風をそろえて作るなら ChatGPT。ChatGPT は「1枚ずつ貼る」と「まとめて1回で貼る（試験的）」を選べます。' },
     { sel: '[data-tour="menu-slide-tones"]', title: 'トンマナを1つ選んで「プロンプトをコピー」', text: '迷ったら「AIおまかせ」。サービス本文から配色・書体を設計します。' },
     { sel: '[data-tour="menu-slide-notebooklm"]', title: 'NotebookLM の貼る場所は3つ。動きで見たいときはここを開く', text: '本文とアイコン画像は左の「ソース」。トンマナ・構成のプロンプトは右の「Studio」→「スライド資料」の鉛筆（カスタマイズ）欄。真ん中のチャットには貼りません。' },
     { sel: '[data-tour="menu-slide-steps"]', title: 'できたら PDF でダウンロード → JPG に', text: 'I Love PDF で1枚ずつの画像にして、スキルマーケットのサービス画像に追加します。' },
   ],
   flyer: [
-    { sel: '[data-tour="menu-flyer-tone"]', title: 'トンマナは「マイスタイル」が既定です', text: 'ChatGPTにサービスのサムネイル画像を先に添付すると、その配色・雰囲気のままチラシになります。紙で見た人が、あとでサービスページを開いたとき同じ出品者だと気づきます。' },
-    { sel: '[data-tour="menu-flyer-copy"]', title: '切り口ちがいの3案。1本ずつ ChatGPT に貼る', text: '困りごと・結果・信頼のどこを主役にするかが違います。3枚出して、良かった1枚を刷ってください。A5たてで、QRは画像のあとにコード実行で本物が重なります。' },
+    { sel: '[data-tour="menu-flyer-plan"]', title: 'デザインの方針は、本文から AI が決めます', text: '誰向けか・主色1色・見出しの書体・主役のビジュアルを、サービスの内容に合わせて決めています。プロのチラシ20点から取り出した型に沿っています。気に入らなければ作り直せます。' },
+    { sel: '[data-tour="menu-flyer-copy"]', title: '切り口ちがいの3案。1本ずつ ChatGPT に貼る', text: '困りごと・結果・信頼のどこを主役にするかが違います。デザインの方針は3案とも同じなので、並べて見比べられます。3枚出して、良かった1枚を刷ってください。' },
     { sel: '[data-tour="menu-flyer-qr"]', title: 'QRが読めなかったときの保険', text: 'ここでこのツールがQR画像を作ります。ChatGPT にチラシ画像と一緒にアップロードして重ねてもらうか、Canva で重ねてください。' },
   ],
 };
@@ -58,6 +58,8 @@ interface SupportHubProps {
 }
 
 type MenuId = 'promoter' | 'survey' | 'slidedoc' | 'flyer';
+// ChatGPT に貼る形。one_by_one=1枚ずつ貼る（既定）／batch=全枚分を1本にまとめて1回で貼る（試験的）
+type SlideChatMode = 'one_by_one' | 'batch';
 
 // URLから取得して登録した自分の出品済みサービス
 interface RegisteredService {
@@ -142,10 +144,23 @@ const SectionLabel: React.FC<{ label: string }> = ({ label }) => (
 // 絵文字が単独行になるのを防ぐ：
 //  1) 絵文字だけの行は直前の文末にくっつけて戻す
 //  2) 「。」での改行は、直後が絵文字だけで行末になる場合は割らない（文末絵文字を残す）
-// チラシは「見出し1つ」から「切り口3案」に作りが変わった。旧形式で保存されていたものは
-// 画面が組み立てられないので読み捨て、作り直してもらう。
+// チラシは「文言だけAIが作る」形式から「デザイン方針＋文言」の形式（version 2）に変わった。
+// 旧形式で保存されていたものは画面が組み立てられないので読み捨て、作り直してもらう。
 const normalizeFlyerContent = (v: FlyerContent | null | undefined): FlyerContent | null =>
-  v && Array.isArray(v.angles) && v.angles.length > 0 ? v : null;
+  v && (v as any).version === 2 && Array.isArray(v.copy?.angles) && v.copy.angles.length > 0 && Array.isArray(v.copy.cards) ? v : null;
+
+// デザイン方針を画面に見せるときの日本語ラベル（プロンプト側の説明文は geminiService にある）
+const FLYER_HEADLINE_TYPE_LABEL: Record<FlyerHeadlineType, string> = {
+  round_bold: '極太の丸ゴシック', square_bold: '太い角ゴシック', mincho_bold: '太めの明朝', handwritten: '手書き風', thin_latin_mincho: '細めの明朝',
+};
+const FLYER_HERO_VISUAL_LABEL: Record<FlyerHeroVisual, string> = {
+  provider_portrait: '提供者本人（アイコンを再現）', product: '成果物・商品', scene: 'サービスの場面', illustration: 'イラスト',
+};
+const FLYER_HERO_CUT_LABEL: Record<FlyerHeroCut, string> = { diagonal: '斜めに切る', curve: '曲線で切る', circle: '円形', full: '帯いっぱい', wave: '波形' };
+const FLYER_DECORATION_LABEL: Record<FlyerContent['design']['decoration'], string> = { none: '無し', light: '控えめ', standard: '標準', lively: 'にぎやか' };
+const FLYER_DEVICE_LABEL: Record<FlyerDevice, string> = {
+  badge: '丸バッジ', yellow_marker: '黄色マーカー', three_cards: '3カード', big_number: '実績数字を大きく', reassurance: '不安払拭の1行', band_heading: '帯見出し',
+};
 
 // トンマナ（画風）を見本つきで選ぶグリッド。スライド資料とチラシで共用する。
 const ToneGrid: React.FC<{
@@ -187,6 +202,16 @@ const FlyerPreviewRow: React.FC<{ label: string; children: React.ReactNode }> = 
     <div className="text-xs text-stone-700 leading-relaxed min-w-0">{children}</div>
   </div>
 );
+
+// 見出しの中で差し色にする語を、画面でも同じ色で見せる（紙でどこが目立つかを先に分かるように）
+const renderEmphasized = (headline: string, words: string[], hex: string): React.ReactNode => {
+  const targets = words.filter(w => w && headline.includes(w));
+  if (targets.length === 0) return headline;
+  const pattern = new RegExp(`(${targets.map(w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})`, 'g');
+  return headline.split(pattern).map((part, i) =>
+    targets.includes(part) ? <span key={i} style={{ color: hex }}>{part}</span> : <React.Fragment key={i}>{part}</React.Fragment>
+  );
+};
 
 const EMOJI_CLASS = '\\p{Extended_Pictographic}\\uFE0F\\u200D';
 const formatTweet = (raw: string): string => {
@@ -266,6 +291,8 @@ interface PersistedState {
   slideDocReady: boolean;
   autoStyleDirective: string;
   slideMode: 'notebooklm' | 'chatgpt';
+  // ChatGPT に貼る形。1枚ずつ貼るか、全枚分を1本にまとめて1回で貼るか（後者は試験的）
+  slideChatMode: SlideChatMode;
   slideVersion: ThumbnailPromptVersion;
   slidePrompts: SlideImagePrompt[];
   registeredServices: RegisteredService[];
@@ -274,8 +301,8 @@ interface PersistedState {
   flyerContent: FlyerContent | null;
   flyerMode: 'single' | 'multi';
   flyerVersion: ThumbnailPromptVersion;
-  // A5は小さいので、この2つは既定で載せない（載せたい人だけ足す）
-  flyerExtras: { forWhom: boolean; flow: boolean };
+  // 配色をサービスのサムネイルに合わせるか（合わせないときは AI が決めた主色・差し色を使う）
+  flyerMatchThumbnail: boolean;
   // まとめチラシはサービスをまたぐので、サービス別バケットではなく全体で1つ持つ
   multiFlyerIds: string[];
   multiFlyerContent: MultiFlyerContent | null;
@@ -317,25 +344,27 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
 
   // スライド資料: NotebookLMで一括 / ChatGPTで1枚ずつ の切り替え
   const [slideMode, setSlideMode] = useState<'notebooklm' | 'chatgpt'>(init.slideMode ?? 'notebooklm');
+  // ChatGPT に貼る形。既定は実績のある「1枚ずつ」。「まとめて1回」は Images 2.0 の複数枚一括生成向けで試験的
+  const [slideChatMode, setSlideChatMode] = useState<SlideChatMode>(init.slideChatMode === 'batch' ? 'batch' : 'one_by_one');
   const [slideVersion, setSlideVersion] = useState<ThumbnailPromptVersion>(init.slideVersion ?? 'ai_auto');
   const [slidePrompts, setSlidePrompts] = useState<SlideImagePrompt[]>(
     Array.isArray(init.slidePrompts) ? init.slidePrompts : []
   );
   const [isSlideGenLoading, setIsSlideGenLoading] = useState(false);
   const [copiedSlideNo, setCopiedSlideNo] = useState<number | null>(null);
+  const [copiedSlideBatch, setCopiedSlideBatch] = useState(false);
 
   // チラシ（紙に印刷して配る）
   const [flyerContent, setFlyerContent] = useState<FlyerContent | null>(normalizeFlyerContent(init.flyerContent));
   // まとめチラシは当面出さない（まず1種類で様子を見る）。保存値に関わらず single に固定し、状態と処理は残す
   const [flyerMode, setFlyerMode] = useState<'single' | 'multi'>('single');
   const [flyerVersion, setFlyerVersion] = useState<ThumbnailPromptVersion>(init.flyerVersion ?? 'my_style');
-  const [flyerExtras, setFlyerExtras] = useState<{ forWhom: boolean; flow: boolean }>(
-    init.flyerExtras ?? { forWhom: false, flow: false }
-  );
+  const [flyerMatchThumbnail, setFlyerMatchThumbnail] = useState<boolean>(init.flyerMatchThumbnail ?? false);
   const [multiFlyerIds, setMultiFlyerIds] = useState<string[]>(Array.isArray(init.multiFlyerIds) ? init.multiFlyerIds : []);
   const [multiFlyerContent, setMultiFlyerContent] = useState<MultiFlyerContent | null>(init.multiFlyerContent ?? null);
   const [isMultiFlyerLoading, setIsMultiFlyerLoading] = useState(false);
   const [copiedAngleId, setCopiedAngleId] = useState<FlyerAngleId | null>(null);
+  const [copiedQrFollowup, setCopiedQrFollowup] = useState(false);
   const [copiedMultiFlyer, setCopiedMultiFlyer] = useState(false);
 
   // 出品済みサービスのURL登録
@@ -391,15 +420,15 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
       const s: PersistedState = {
         serviceBody, activeMenu,
         posts, patterns, patternsOriginal, selectedPatternId, showCode, slideDocReady,
-        autoStyleDirective, slideMode, slideVersion, slidePrompts,
+        autoStyleDirective, slideMode, slideChatMode, slideVersion, slidePrompts,
         registeredServices, selectedServiceId, resultsByServiceId,
-        flyerContent, flyerMode, flyerVersion, flyerExtras, multiFlyerIds, multiFlyerContent,
+        flyerContent, flyerMode, flyerVersion, flyerMatchThumbnail, multiFlyerIds, multiFlyerContent,
       };
       localStorage.setItem(STORAGE_KEY, JSON.stringify(s));
     } catch (e) {
       console.warn('Failed to save support state', e);
     }
-  }, [serviceBody, activeMenu, posts, patterns, patternsOriginal, selectedPatternId, showCode, slideDocReady, autoStyleDirective, slideMode, slideVersion, slidePrompts, registeredServices, selectedServiceId, resultsByServiceId, flyerContent, flyerMode, flyerVersion, flyerExtras, multiFlyerIds, multiFlyerContent]);
+  }, [serviceBody, activeMenu, posts, patterns, patternsOriginal, selectedPatternId, showCode, slideDocReady, autoStyleDirective, slideMode, slideChatMode, slideVersion, slidePrompts, registeredServices, selectedServiceId, resultsByServiceId, flyerContent, flyerMode, flyerVersion, flyerMatchThumbnail, multiFlyerIds, multiFlyerContent]);
 
   // ---- サービスごとの生成物を保存: 表示中の結果を選択中サービスのバケットへ同期 ----
   useEffect(() => {
@@ -742,18 +771,14 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
     setLoadingMenu('flyer');
     setErrorMenu(null);
     try {
-      const [content, auto] = await Promise.all([
-        generateFlyerContent(serviceBody),
-        autoStyleDirective ? Promise.resolve(autoStyleDirective) : generateAutoSlideStyle(serviceBody),
-      ]);
+      const content = await generateFlyerContent(serviceBody);
       if (token !== runTokenRef.current) return; // キャンセル済み
       if (!content) {
         setErrorMenu('flyer');
-        notify('チラシの文言を作れませんでした。本文を増やして再度お試しください。', 'error');
+        notify('チラシの方針と文言を作れませんでした。本文を増やして再度お試しください。', 'error');
         return;
       }
       setFlyerContent(content);
-      if (!autoStyleDirective && auto.trim()) setAutoStyleDirective(auto.trim());
       setFlyerMode('single');
       setCopiedAngleId(null);
       setActiveMenu('flyer');
@@ -808,17 +833,10 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
 
   const handleCopyFlyerPrompt = (angle: FlyerAngle) => {
     if (!flyerContent) return;
-    // 「おすすめ」「流れ」は載せると決めたときだけ紙に入れる（A5に8ブロックは詰め込みすぎになる）
-    const forPrompt: FlyerContent = {
-      ...flyerContent,
-      forWhom: flyerExtras.forWhom ? flyerContent.forWhom : [],
-      flow: flyerExtras.flow ? flyerContent.flow : [],
-    };
-    const text = buildFlyerPromptText(
-      forPrompt, angle, flyerVersion,
-      flyerVersion === 'ai_auto' ? autoStyleDirective : undefined,
-      selectedServiceUrl || undefined
-    );
+    const text = buildFlyerPromptText(flyerContent, angle, {
+      matchThumbnail: flyerMatchThumbnail,
+      serviceUrl: selectedServiceUrl || undefined,
+    });
     navigator.clipboard.writeText(text).then(() => {
       setCopiedAngleId(angle.id);
       setTimeout(() => setCopiedAngleId(prev => (prev === angle.id ? null : prev)), 2000);
@@ -844,6 +862,19 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
     navigator.clipboard.writeText(text).then(() => {
       setCopiedSlideNo(slide.no);
       setTimeout(() => setCopiedSlideNo(prev => (prev === slide.no ? null : prev)), 2000);
+    });
+  };
+
+  // 【試験的】全枚分を1本にまとめたプロンプトをコピーする（ChatGPT の複数枚一括生成に1回で貼る）
+  const handleCopySlideBatchPrompt = () => {
+    if (slidePrompts.length === 0) return;
+    const text = buildSlideImageBatchPromptText(
+      slidePrompts, slideVersion,
+      slideVersion === 'ai_auto' ? autoStyleDirective : undefined
+    );
+    navigator.clipboard.writeText(text).then(() => {
+      setCopiedSlideBatch(true);
+      setTimeout(() => setCopiedSlideBatch(false), 2000);
     });
   };
 
@@ -928,8 +959,8 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
     {
       id: 'flyer' as MenuId,
       title: 'チラシを作る（検証中）',
-      description: 'オフ会で手渡す前提の、A5たて1枚のチラシ。切り口を変えた3案のプロンプトを用意します。',
-      highlight: 'A5たて・3案・印刷向け',
+      description: 'オフ会で手渡す前提の、A5たて1枚のチラシ。本文からデザインの方針をAIが決め、切り口を変えた3案のプロンプトを用意します。',
+      highlight: 'A5たて・方針はAIが設計・3案',
       icon: <FlyerIcon />,
       onRun: handleRunFlyer,
     },
@@ -1295,13 +1326,13 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
               <div>
                 <div className="mb-5">
                   <h3 className="text-lg font-bold text-stone-900">スライド資料をつくる</h3>
-                  <p className="text-xs text-stone-500 mt-1">作り方を選べます。まとめて作るなら NotebookLM、1枚ずつ画風をそろえて作るなら ChatGPT。トンマナ（画風）はどちらも同じ{SLIDE_DOC_VERSIONS.length}種から選べます。</p>
+                  <p className="text-xs text-stone-500 mt-1">作り方を選べます。まとめて作るなら NotebookLM、画風をそろえて作るなら ChatGPT（1枚ずつ貼る／まとめて1回で貼る）。トンマナ（画風）はどちらも同じ{SLIDE_DOC_VERSIONS.length}種から選べます。</p>
                 </div>
 
                 {/* 作り方の切り替え */}
                 <div className="flex flex-wrap gap-2 mb-6">
                   <button type="button" data-tour="menu-slide-mode" onClick={() => setSlideMode('notebooklm')} aria-pressed={slideMode === 'notebooklm'} className={`px-4 py-2 text-xs ${slideMode === 'notebooklm' ? 'seg-active' : 'seg'}`}>NotebookLMで一括</button>
-                  <button type="button" onClick={() => setSlideMode('chatgpt')} aria-pressed={slideMode === 'chatgpt'} className={`px-4 py-2 text-xs ${slideMode === 'chatgpt' ? 'seg-active' : 'seg'}`}>ChatGPTで1枚ずつ</button>
+                  <button type="button" onClick={() => setSlideMode('chatgpt')} aria-pressed={slideMode === 'chatgpt'} className={`px-4 py-2 text-xs ${slideMode === 'chatgpt' ? 'seg-active' : 'seg'}`}>ChatGPTで作る</button>
                 </div>
 
                 {slideMode === 'notebooklm' && (
@@ -1400,21 +1431,32 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
                 {slideMode === 'chatgpt' && (
                 <div>
                   <div className="mb-5">
-                    <h4 className="text-base font-bold text-stone-900">トンマナを選んで、1枚ずつのプロンプトを作る</h4>
-                    <p className="text-xs text-stone-500 mt-1">ChatGPTの画像生成（GPT Image）用です。<span className="font-medium text-stone-600">画風・配色・書体は全画像で統一しつつ、レイアウトは各ページの内容に最適化</span>する指示にしています。同じチャットに上から順に貼ってください。</p>
+                    <h4 className="text-base font-bold text-stone-900">トンマナを選んで、ChatGPT に貼るプロンプトを作る</h4>
+                    <p className="text-xs text-stone-500 mt-1">ChatGPTの画像生成（GPT Image）用です。<span className="font-medium text-stone-600">画風・配色・書体は全画像で統一しつつ、レイアウトは各ページの内容に最適化</span>する指示にしています。</p>
                   </div>
+
+                  {/* 貼り方の切り替え。1枚ずつ（実績あり）／まとめて1回（Images 2.0 の複数枚一括生成向け・試験的） */}
+                  <div className="flex flex-wrap items-center gap-2 mb-2" data-tour="menu-slide-chat-mode">
+                    <button type="button" onClick={() => setSlideChatMode('one_by_one')} aria-pressed={slideChatMode === 'one_by_one'} className={`px-4 py-2 text-xs ${slideChatMode === 'one_by_one' ? 'seg-active' : 'seg'}`}>1枚ずつ貼る</button>
+                    <button type="button" onClick={() => setSlideChatMode('batch')} aria-pressed={slideChatMode === 'batch'} className={`px-4 py-2 text-xs ${slideChatMode === 'batch' ? 'seg-active' : 'seg'}`}>まとめて1回で貼る<span className="ml-1.5 text-[10px] font-semibold opacity-70">試験的</span></button>
+                  </div>
+                  <p className="text-[11px] text-stone-400 mb-5">
+                    {slideChatMode === 'one_by_one'
+                      ? '同じチャットに上から順に貼ります。1枚ずつ確認しながら進めたいときはこちら。'
+                      : 'ChatGPT の複数枚一括生成（Images 2.0 以降・有料プラン）向けに、全枚分を1本にまとめます。1回で作れる枚数には上限があるので、止まったら「続き」と送ってください。1枚ずつと同じ設計内容を使うので、作り直しは不要です。'}
+                  </p>
 
                   {/* トンマナ選択（サンプル画像ボタン。NotebookLMと同じ8種） */}
                   <ToneGrid value={slideVersion} onChange={setSlideVersion} className="mb-3" />
                   <p className="text-[11px] text-stone-400 mb-4">
-                    選んだトンマナはコピーに即反映されます（切り替えても作り直しは不要）。
+                    選んだトンマナと貼り方はコピーに即反映されます（切り替えても作り直しは不要）。
                     {slideVersion === 'ai_auto' && (autoStyleDirective ? '「AIおまかせ」はこのサービス専用に設計済みのトンマナを使います。' : '「AIおまかせ」は汎用のおまかせ指定になります（専用設計は「作成する」で行われます）。')}
                   </p>
 
                   <div className="flex flex-wrap items-center gap-2 mb-6">
                     {slidePrompts.length === 0 && (
                       <button type="button" onClick={handleGenerateSlidePrompts} disabled={isSlideGenLoading} className="btn-primary px-6 py-2.5 text-xs">
-                        {isSlideGenLoading ? '画像プロンプトを設計中…' : '1枚ずつのプロンプトを作る'}
+                        {isSlideGenLoading ? '画像の中身を設計中…' : '各画像に入れる文字を設計する'}
                       </button>
                     )}
                     <a
@@ -1428,7 +1470,7 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
                     </a>
                   </div>
 
-                  {slidePrompts.length > 0 && (
+                  {slidePrompts.length > 0 && slideChatMode === 'one_by_one' && (
                     <>
                       <p className="text-xs text-stone-500 mb-3 font-medium">上から順番に、同じ ChatGPT のチャットへ貼り付けて画像を生成してください（全{slidePrompts.length}枚）。</p>
                       <div className="space-y-3 mb-8">
@@ -1458,7 +1500,7 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
                         })}
                       </div>
 
-                      {/* Usage guide (ChatGPT) */}
+                      {/* Usage guide (ChatGPT / 1枚ずつ) */}
                       <div className="bg-stone-50 border border-stone-200/80 rounded-2xl p-6 mb-6">
                         <h4 className="text-sm font-bold text-stone-900 mb-3">ChatGPTで1枚ずつ作る手順</h4>
                         <ol className="text-xs text-stone-600 space-y-2 list-decimal list-inside leading-relaxed mb-4">
@@ -1469,6 +1511,66 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
                           <li>気になる箇所は「ここだけ直して」と同じチャットで微調整</li>
                           <li>各画像をダウンロードし、<span className="font-semibold">スキルマーケットのサービス画像に追加</span></li>
                         </ol>
+                        <a
+                          href="https://chatgpt.com/"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(e) => { e.preventDefault(); window.open('https://chatgpt.com/', '_blank', 'noopener,noreferrer'); }}
+                          className="btn-dark px-4 py-2 text-xs"
+                        >
+                          ChatGPT を開く
+                        </a>
+                      </div>
+                    </>
+                  )}
+
+                  {slidePrompts.length > 0 && slideChatMode === 'batch' && (
+                    <>
+                      {/* 全枚分を1本にまとめたプロンプト。1回貼れば ChatGPT が番号順に全枚を生成する */}
+                      <div className="card p-5 mb-5" data-tour="menu-slide-batch">
+                        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 mb-3">
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center gap-2 mb-1">
+                              <h5 className="text-sm font-bold text-stone-900">全{slidePrompts.length}枚をまとめて1回で作るプロンプト</h5>
+                              <span className="text-[10px] font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full shrink-0">試験的</span>
+                            </div>
+                            <p className="text-xs text-stone-500 leading-relaxed">
+                              1本のプロンプトに、共通のデザイン仕様と画像1〜{slidePrompts.length}の文言をすべて入れています。ChatGPT に1回貼ると、独立した{slidePrompts.length}枚の画像が番号順にできます。
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={handleCopySlideBatchPrompt}
+                            className={`text-xs font-semibold px-5 py-2 rounded-full transition-colors shrink-0 ${copiedSlideBatch ? 'bg-brand-50 text-brand-600' : 'bg-stone-900 text-white hover:bg-stone-700'}`}
+                          >
+                            {copiedSlideBatch ? 'コピー済み' : 'まとめてコピー'}
+                          </button>
+                        </div>
+                        <ol className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1.5">
+                          {slidePrompts.map((slide) => (
+                            <li key={slide.no} className="flex items-center gap-2 min-w-0 text-xs">
+                              <span className="shrink-0 w-5 h-5 rounded-full bg-stone-900 text-white text-[10px] font-bold flex items-center justify-center">{slide.no}</span>
+                              <span className="text-[10px] font-semibold text-brand-600 bg-brand-50 px-2 py-0.5 rounded-full shrink-0">{slide.label}</span>
+                              <span className="text-stone-700 truncate">{slide.title}</span>
+                            </li>
+                          ))}
+                        </ol>
+                      </div>
+
+                      {/* Usage guide (ChatGPT / まとめて1回) */}
+                      <div className="bg-stone-50 border border-stone-200/80 rounded-2xl p-6 mb-6">
+                        <h4 className="text-sm font-bold text-stone-900 mb-3">ChatGPTでまとめて1回で作る手順</h4>
+                        <ol className="text-xs text-stone-600 space-y-2 list-decimal list-inside leading-relaxed mb-4">
+                          <li>「ChatGPT を開く」ボタンから新しいチャットを開く（画像生成／GPT Image 対応モデル。複数枚の一括生成は有料プランで使えます）</li>
+                          <li>参考にしたい画像（既存サムネ等）があれば、先に添付するとより狙い通りの画風になります</li>
+                          <li><span className="font-semibold">「まとめてコピー」したプロンプトを1回送信</span> → 画像1から順に、全{slidePrompts.length}枚が独立した画像で出てきます</li>
+                          <li>途中で止まったら「<span className="font-semibold">続き</span>」と送る。1枚にまとまってしまったら「<span className="font-semibold">独立した{slidePrompts.length}枚の画像として作り直して</span>」と送る</li>
+                          <li>気になる1枚は「画像3だけ、ここを直して」のように番号で指定して微調整</li>
+                          <li>各画像をダウンロードし、<span className="font-semibold">スキルマーケットのサービス画像に追加</span></li>
+                        </ol>
+                        <p className="text-[11px] text-stone-400 leading-relaxed mb-4">
+                          うまく画風がそろわない・文字が崩れるときは、上の「1枚ずつ貼る」に切り替えてください（同じ設計内容をそのまま使えます）。
+                        </p>
                         <a
                           href="https://chatgpt.com/"
                           target="_blank"
@@ -1492,92 +1594,122 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
                 <div className="mb-5">
                   <h3 className="text-lg font-bold text-stone-900">チラシをつくる（検証中）</h3>
                   <p className="text-xs text-stone-500 mt-1">
-                    オフ会で手渡す前提の、A5（148×210mm）1枚のチラシです。切り口を変えた
-                    <span className="font-medium text-stone-600">3案</span>を用意しました。ChatGPTの画像生成（GPT Image）に1本ずつ貼って、出てきた3枚から良かった1枚を刷ってください。
+                    オフ会で手渡す前提の、A5（148×210mm）1枚のチラシです。本文から<span className="font-medium text-stone-600">誰向けか・主色・書体・主役のビジュアル</span>を AI が決め、
+                    切り口を変えた<span className="font-medium text-stone-600">3案</span>を用意しました。ChatGPTの画像生成（GPT Image）に1本ずつ貼って、出てきた3枚から良かった1枚を刷ってください。
                     QRコードは、画像のあとに <span className="font-medium text-stone-600">ChatGPT がコード実行で本物を作って右下に重ねます</span>（プロンプトに手順入り）。
                   </p>
                 </div>
 
-                {/* トンマナ選択。既定はサムネイル画像に合わせる「マイスタイル」 */}
-                <div className="mb-3">
-                  <h4 className="text-base font-bold text-stone-900">トンマナを選ぶ</h4>
-                  <p className="text-xs text-stone-500 mt-1">
-                    既定は「マイスタイル（参照モード）」です。ChatGPTに<span className="font-medium text-stone-600">サービスのサムネイル画像を先に添付</span>してからプロンプトを貼ると、その配色・雰囲気のままチラシになります。紙で見た人が、あとでサービスページを開いたときに同じ出品者だと気づきます。
-                  </p>
-                </div>
-                <div data-tour="menu-flyer-tone"><ToneGrid value={flyerVersion} onChange={setFlyerVersion} className="mb-3" /></div>
-                <p className="text-[11px] text-stone-400 mb-6">
-                  選んだトンマナはコピーに即反映されます（切り替えても作り直しは不要）。
-                  {flyerVersion === 'ai_auto' && (autoStyleDirective
-                    ? '「AIおまかせ」はこのサービス専用に設計済みのトンマナを使います。'
-                    : '「AIおまかせ」は汎用のおまかせ指定になります。')}
-                </p>
-
                 {flyerMode === 'single' && (
                   flyerContent ? (
                     <>
-                      {/* 3案で共通して使う中身。ここは切り口が変わっても同じ */}
-                      <div className="card p-5 mb-5">
-                        <p className="text-[10px] font-semibold text-stone-400 uppercase tracking-[0.2em] mb-3">3案 共通の中身</p>
-                        <FlyerPreviewRow label="お困りごと">{flyerContent.problems.join(' ／ ')}</FlyerPreviewRow>
-                        <FlyerPreviewRow label="できること">{flyerContent.benefits.join(' ／ ')}</FlyerPreviewRow>
-                        <FlyerPreviewRow label="信頼の一行">
-                          {flyerContent.trust
-                            ? flyerContent.trust
-                            : <span className="text-stone-400">本文に年数・件数・資格などが見つからなかったので、入れていません。出品文の「信頼と実績」に事実を足すと、紙の説得力が上がります。</span>}
+                      {/* AIが決めたデザイン方針。プリセットから選ばせず、本文から主色・書体・主役を決める */}
+                      <div className="card p-5 mb-5" data-tour="menu-flyer-plan">
+                        <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+                          <p className="text-[10px] font-semibold text-stone-400 uppercase tracking-[0.2em]">デザインの方針（本文から AI が決めました）</p>
+                          <button type="button" onClick={handleRunFlyer} disabled={isLoading} className="btn-secondary px-3 py-1.5 text-[11px]">方針と文言を作り直す</button>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2 mb-4">
+                          <span className="text-[11px] font-semibold text-brand-600 bg-brand-50 px-2 py-0.5 rounded-full">{FLYER_FAMILY_SPECS[flyerContent.analysis.family].label}</span>
+                          <span className="text-xs text-stone-600">{flyerContent.analysis.audience}</span>
+                          {flyerContent.design.moodWords.map(w => (
+                            <span key={w} className="text-[11px] text-stone-500 border border-stone-200 px-2 py-0.5 rounded-full">{w}</span>
+                          ))}
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+                          {[{ label: '主色', c: flyerContent.design.dominantColor }, { label: '差し色', c: flyerContent.design.accentColor }].map(({ label, c }) => (
+                            <div key={label} className="flex items-start gap-3">
+                              <span className="shrink-0 w-10 h-10 rounded-lg border border-stone-200" style={{ backgroundColor: c.hex }} aria-hidden />
+                              <div className="min-w-0">
+                                <p className="text-xs font-semibold text-stone-800">
+                                  {label}：{c.name} <span className="font-mono text-[11px] text-stone-400">{c.hex}</span>
+                                </p>
+                                {c.why && <p className="text-[11px] text-stone-500 leading-relaxed">{c.why}</p>}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                        <FlyerPreviewRow label="見出しの書体">
+                          {FLYER_HEADLINE_TYPE_LABEL[flyerContent.design.headlineType]}／装飾：{FLYER_DECORATION_LABEL[flyerContent.design.decoration]}
                         </FlyerPreviewRow>
-                        {flyerContent.price && <FlyerPreviewRow label="価格">{flyerContent.price}</FlyerPreviewRow>}
-                        <FlyerPreviewRow label="最後の一言">{flyerContent.cta}</FlyerPreviewRow>
+                        <FlyerPreviewRow label="主役のビジュアル">
+                          {FLYER_HERO_VISUAL_LABEL[flyerContent.design.heroVisual]}
+                          {flyerContent.design.heroSubject ? `：${flyerContent.design.heroSubject}` : ''}
+                          （{FLYER_HERO_CUT_LABEL[flyerContent.design.heroCut]}）
+                        </FlyerPreviewRow>
+                        <FlyerPreviewRow label="使う部品">
+                          {flyerContent.design.devices.length ? flyerContent.design.devices.map(d => FLYER_DEVICE_LABEL[d]).join('／') : '無し（線・面・余白だけ）'}
+                        </FlyerPreviewRow>
+                        <label className="mt-4 flex items-start gap-2.5 text-xs leading-relaxed text-stone-600 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            className="mt-0.5 accent-rose-600"
+                            checked={flyerMatchThumbnail}
+                            onChange={(e) => setFlyerMatchThumbnail(e.target.checked)}
+                          />
+                          <span>
+                            <span className="font-semibold">配色はサービスのサムネイルに合わせる</span>
+                            <span className="block text-stone-400">
+                              ChatGPTにサムネイル画像も添付してもらい、上の主色・差し色の代わりにサムネイルの色で組みます。紙で見た人が、あとでサービスページを開いたとき同じ出品者だと気づきます。
+                            </span>
+                          </span>
+                        </label>
                       </div>
 
-                      {/* A5は小さいので、この2つは既定で載せない。入れたい人だけ足す */}
+                      {/* 3案で共通して使う中身。切り口が変わっても同じ */}
                       <div className="card p-5 mb-5">
-                        <p className="text-[10px] font-semibold text-stone-400 uppercase tracking-[0.2em] mb-1">紙に足すもの（任意）</p>
-                        <p className="text-[11px] text-stone-400 leading-relaxed mb-3">
-                          A5は小さいので、既定では入れていません。入れるほど1つあたりの文字は小さくなります。
-                        </p>
-                        <div className="flex flex-col gap-3">
-                          <label className={`flex items-start gap-2.5 text-xs leading-relaxed ${flyerContent.forWhom.length === 0 ? 'text-stone-300' : 'text-stone-600 cursor-pointer'}`}>
-                            <input
-                              type="checkbox"
-                              className="mt-0.5 accent-rose-600"
-                              disabled={flyerContent.forWhom.length === 0}
-                              checked={flyerExtras.forWhom && flyerContent.forWhom.length > 0}
-                              onChange={(e) => setFlyerExtras(prev => ({ ...prev, forWhom: e.target.checked }))}
-                            />
-                            <span>
-                              <span className="font-semibold">こんな方におすすめ</span>
-                              <span className="block text-stone-400">
-                                {flyerContent.forWhom.length > 0 ? flyerContent.forWhom.join(' ／ ') : '本文から読み取れませんでした'}
-                              </span>
-                            </span>
-                          </label>
-                          <label className={`flex items-start gap-2.5 text-xs leading-relaxed ${flyerContent.flow.length === 0 ? 'text-stone-300' : 'text-stone-600 cursor-pointer'}`}>
-                            <input
-                              type="checkbox"
-                              className="mt-0.5 accent-rose-600"
-                              disabled={flyerContent.flow.length === 0}
-                              checked={flyerExtras.flow && flyerContent.flow.length > 0}
-                              onChange={(e) => setFlyerExtras(prev => ({ ...prev, flow: e.target.checked }))}
-                            />
-                            <span>
-                              <span className="font-semibold">ご依頼の流れ</span>
-                              <span className="block text-stone-400">
-                                {flyerContent.flow.length > 0 ? flyerContent.flow.map((f, i) => `${i + 1}. ${f}`).join(' → ') : '本文に書かれていませんでした'}
-                              </span>
-                            </span>
-                          </label>
+                        <p className="text-[10px] font-semibold text-stone-400 uppercase tracking-[0.2em] mb-3">3案 共通の中身</p>
+                        <FlyerPreviewRow label="対象者ラベル">{flyerContent.copy.audienceLabel}</FlyerPreviewRow>
+                        <FlyerPreviewRow label="お困りごと">{flyerContent.copy.problems.join(' ／ ')}</FlyerPreviewRow>
+                        <FlyerPreviewRow label="できること">{flyerContent.copy.cards.map(c => `${c.title}（${c.body}）`).join(' ／ ')}</FlyerPreviewRow>
+                        <FlyerPreviewRow label="実績数字">
+                          {flyerContent.copy.bigNumber
+                            ? <>{flyerContent.copy.bigNumber.value} <span className="text-stone-400">{flyerContent.copy.bigNumber.label}</span></>
+                            : <span className="text-stone-400">本文に件数・年数などの数字が見つからなかったので、入れていません。出品文の「信頼と実績」に数字を足すと、紙の説得力が上がります。</span>}
+                        </FlyerPreviewRow>
+                        {flyerContent.copy.trustLines.length > 0 && (
+                          <FlyerPreviewRow label="経歴・資格">{flyerContent.copy.trustLines.join(' ／ ')}</FlyerPreviewRow>
+                        )}
+                        {flyerContent.copy.reassurance && <FlyerPreviewRow label="不安払拭">{flyerContent.copy.reassurance}</FlyerPreviewRow>}
+                        <FlyerPreviewRow label="最初の一歩">
+                          {flyerContent.copy.cta.firstStep}
+                          {flyerContent.copy.cta.price ? `　${flyerContent.copy.cta.price}` : ''}
+                          {flyerContent.copy.cta.note ? <span className="text-stone-400">　{flyerContent.copy.cta.note}</span> : null}
+                        </FlyerPreviewRow>
+                      </div>
+
+                      {/* QRにするURL。未登録だとプロンプトの URL 欄が空のままになり、ChatGPT が先に URL を聞き返す */}
+                      <div className={`rounded-xl border px-4 py-3 mb-5 text-xs leading-relaxed ${selectedServiceUrl ? 'border-stone-200 bg-stone-50 text-stone-600' : 'border-amber-200 bg-amber-50 text-amber-800'}`}>
+                        <span className="font-semibold">QRコードにするURL：</span>
+                        {selectedServiceUrl
+                          ? <>{selectedServiceUrl}<span className="block text-stone-400">プロンプトに入っています。ChatGPT が画像のあとにコード実行で本物のQRを作り、右下の白い枠に重ねて完成画像を出します。</span></>
+                          : <>未登録<span className="block">出品ページのURLを登録すると自動で入ります。このまま使う場合は、プロンプト末尾の「{FLYER_QR_URL_PLACEHOLDER}」をURLに書き換えてから送ってください（空欄のままだと ChatGPT が先にURLを聞き返します）。</span></>}
+                        {/* ChatGPT は画像生成で返答を終え、QRを重ねる手順に自動では進まない。画像が出たあとに、この2本目を貼ってもらう */}
+                        <div className="mt-3 flex flex-wrap items-center gap-3">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              navigator.clipboard.writeText(buildFlyerQrFollowupText(selectedServiceUrl || undefined)).then(() => {
+                                setCopiedQrFollowup(true);
+                                setTimeout(() => setCopiedQrFollowup(false), 2000);
+                              });
+                            }}
+                            className="btn-secondary px-3 py-1.5 text-[11px]"
+                          >
+                            {copiedQrFollowup ? 'コピーしました' : '2本目：QRを重ねる指示をコピー'}
+                          </button>
+                          <span className="text-[11px] text-stone-500">画像が出たら、同じチャットにこれを貼ります。ChatGPT は画像を出したところで一度止まるためです。</span>
                         </div>
                       </div>
 
                       {/* 切り口ちがいの3案。見出しと「紙面の主役」が変わる */}
                       <div data-tour="menu-flyer-copy" className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-5 items-stretch">
-                        {flyerContent.angles.map((angle) => (
+                        {flyerContent.copy.angles.map((angle) => (
                           <div key={angle.id} className="card p-5 flex flex-col">
                             <span className="self-start text-[10px] font-semibold text-brand-600 bg-brand-50 px-2 py-0.5 rounded-full mb-2">
                               {FLYER_ANGLE_SPECS[angle.id].label}
                             </span>
-                            <p className="text-sm font-bold text-stone-900 leading-snug mb-1">{angle.headline}</p>
+                            <p className="text-sm font-bold text-stone-900 leading-snug mb-1">{renderEmphasized(angle.headline, angle.emphasis, flyerContent.design.accentColor.hex)}</p>
                             <p className="text-xs text-stone-500 leading-relaxed mb-3">{angle.subCopy}</p>
                             <p className="text-[11px] text-stone-400 leading-relaxed mb-4 flex-grow">{FLYER_ANGLE_SPECS[angle.id].lead}</p>
                             <button
@@ -1609,7 +1741,7 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
                           QRが読めなかったときは（このツールでQRを作る）
                         </summary>
                         <div className="mt-3">
-                          <QrFallback targets={selectedServiceUrl ? [{ label: flyerContent.angles[0].headline, url: selectedServiceUrl }] : []} />
+                          <QrFallback targets={selectedServiceUrl ? [{ label: flyerContent.copy.angles[0].headline, url: selectedServiceUrl }] : []} />
                         </div>
                       </details>
                     </>
@@ -1622,9 +1754,15 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
                 <div className="bg-stone-50 border border-stone-200/80 rounded-2xl p-6 mb-6">
                   <h4 className="text-sm font-bold text-stone-900 mb-3">印刷して配るまでの手順</h4>
                   <ol className="text-xs text-stone-600 space-y-2 list-decimal list-inside leading-relaxed mb-4">
-                    <li>「ChatGPT を開く」から新しいチャットを開き、<span className="font-medium text-stone-700">サービスのサムネイル画像を先に添付</span>する</li>
-                    <li>3案のうち1つをコピーして貼る。同じチャットで3案とも試すと、絵柄のそろった3枚を見比べられます</li>
-                    <li>出てきた画像を確認する。文字が崩れていたら「◯◯の文字が崩れているので直して」と伝えれば描き直せます</li>
+                    <li>
+                      「ChatGPT を開く」から新しいチャットを開く。
+                      {flyerContent?.design.heroVisual === 'provider_portrait'
+                        ? <><span className="font-medium text-stone-700">出品者のアイコン画像（顔写真かイラスト）を先に添付</span>すると、紙面の主役の位置にその人物が描かれます。</>
+                        : 'この方針では主役は提供者本人ではないので、アイコンの添付は不要です。'}
+                      「配色をサムネイルに合わせる」にチェックした場合は、サムネイル画像も添付します
+                    </li>
+                    <li>3案のうち1つをコピーして貼る。同じチャットで3案とも試すと、デザインのそろった3枚を見比べられます</li>
+                    <li>画像が出たら、上の「2本目：QRを重ねる指示をコピー」を同じチャットに貼る。ChatGPT がコード実行で本物のQRを右下に重ねた完成画像（ファイル）を出し、読み取り結果も報告します。文字が崩れていたら「◯◯の文字が崩れているので直して」で描き直せます</li>
                     <li>良かった1枚にお名前・連絡先を入れて完成。<span className="font-medium text-stone-700">A4に2枚並べて印刷し、半分に切るとA5が2枚</span>できます</li>
                   </ol>
                   <p className="text-[11px] text-stone-400 leading-relaxed">
@@ -1815,7 +1953,7 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
           title={
             loadingMenu === 'promoter' ? '投稿のたたき台を20本用意しています'
             : loadingMenu === 'slidedoc' ? 'スライド資料のデザインを準備しています'
-            : loadingMenu === 'flyer' ? 'チラシに載せる文言を組み立てています'
+            : loadingMenu === 'flyer' ? 'チラシのデザイン方針と文言を決めています'
             : 'アンケートを設計しています'
           }
           sourceWords={inputWords}

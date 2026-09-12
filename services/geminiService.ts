@@ -1,6 +1,6 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
-import { UserInput, SkillIdea, SurveyPattern, ThumbnailPromptVersion, SlideImagePrompt, FlyerContent, FlyerAngle, FlyerAngleId, MultiFlyerContent, ProfileFacts } from "../types";
+import { UserInput, SkillIdea, SurveyPattern, ThumbnailPromptVersion, SlideImagePrompt, FlyerContent, FlyerAngle, FlyerAngleId, FlyerStyleFamily, FlyerHeadlineType, FlyerHeroVisual, FlyerHeroCut, FlyerDevice, FlyerColor, FlyerCard, FlyerDesign, MultiFlyerContent, ProfileFacts } from "../types";
 
 // モデルIDはここだけで管理する（以前は12か所に直書きされていた）。
 // 文章モデルは検証用に ?model=xxx で差し替えられ、localStorage に残る。?model=default で元に戻す。
@@ -624,6 +624,36 @@ const resolveChatToneSpec = (
     ? autoStyle.trim()
     : (CHATGPT_STYLE_OVERRIDES[toneVersion] ?? SLIDE_STYLE_DIRECTIVES[toneVersion]);
 
+// ChatGPTに貼るプロンプトの共通部分。「1枚ずつ」「まとめて1回」のどちらでも同じ文面を使い、
+// 画風・配色・書体・世界観が全画像でそろうようにする。
+const buildSlideImageCommonBlock = (designSpec: string, mode: 'one_by_one' | 'batch'): string => {
+  const outputRule = mode === 'batch'
+    ? '・各画像は、それぞれ独立した1枚の画像（横長／landscape）。プレゼン資料・PowerPoint・複数ページにはしない。'
+    : '・出力は1枚の画像（横長／landscape）。プレゼン資料・PowerPoint・複数ページにはしない。';
+  return `■ 全画像で共通のデザイン仕様（毎回この仕様どおりに作り、画風・配色・書体・世界観は全画像で必ず統一する）
+${designSpec.trim()}
+
+■ 画像ルール
+${outputRule}
+・アスペクト比：3:2（横長）。推奨サイズは 幅660×高さ440px（スキルマーケットのサービス画像規格）。全画像で同じ比率にする。
+・レイアウト構成は「そのページの役割」に最適化する。他の画像と同じ版面のコピーにはしない（共通に保つのは画風・配色・書体・世界観だけ）。
+・文字はすべて日本語で、画像内にくっきり読めるように描く。下に指定した文言だけを正確に入れ、誤字なく、勝手に文章を足さない。
+・キャラクターやアイコン画像をこのチャットに添付している場合は、全画像には入れず、表紙・CTAなど要所でのみ世界観を壊さない範囲で自然に使う。
+・マークダウン記号（#、* など）は画像に出さない。`;
+};
+
+// 1枚分の「レイアウト＋描き込む文字」。見出し行（heading）だけをモードごとに変える
+const buildSlideImagePageBlock = (slide: SlideImagePrompt, heading: string): string => {
+  const layout = SLIDE_ROLE_LAYOUTS[slide.role] ?? 'このページの内容に合った、読みやすいレイアウトにする。';
+  return `■ ${heading}
+・レイアウト：${layout}
+（画像に入れる文字）
+【見出し（大きく）】
+${slide.title}
+【本文】
+${slide.body}`;
+};
+
 // 1枚分の中身＋選択トンマナから、ChatGPTにそのまま貼れる画像生成プロンプトを組み立てる。
 // ★改善点：共通デザイン仕様（画風・配色・書体・世界観）は毎回明記して統一する一方、
 //   レイアウト構成は各ページの役割に最適化させ、「前と同じ版面のコピー」を明確に禁止する。
@@ -636,26 +666,8 @@ export const buildSlideImagePromptText = (
 ): string => {
   const designSpec = resolveChatToneSpec(toneVersion, autoStyle);
   const roleLabel = SLIDE_ROLE_LABELS[slide.role] ?? `${slide.no}枚目`;
-  const layout = SLIDE_ROLE_LAYOUTS[slide.role] ?? 'このページの内容に合った、読みやすいレイアウトにする。';
-
-  const commonBlock = `■ 全画像で共通のデザイン仕様（毎回この仕様どおりに作り、画風・配色・書体・世界観は全画像で必ず統一する）
-${designSpec}
-
-■ 画像ルール
-・出力は1枚の画像（横長／landscape）。プレゼン資料・PowerPoint・複数ページにはしない。
-・アスペクト比：3:2（横長）。推奨サイズは 幅660×高さ440px（スキルマーケットのサービス画像規格）。全画像で同じ比率にする。
-・レイアウト構成は「このページの役割」に最適化する。前の画像と同じ版面のコピーにはしない（共通に保つのは画風・配色・書体・世界観だけ）。
-・文字はすべて日本語で、画像内にくっきり読めるように描く。下に指定した文言だけを正確に入れ、誤字なく、勝手に文章を足さない。
-・キャラクターやアイコン画像をこのチャットに添付している場合は、全画像には入れず、表紙・CTAなど要所でのみ世界観を壊さない範囲で自然に使う。
-・マークダウン記号（#、* など）は画像に出さない。`;
-
-  const pageBlock = `■ このページ（${slide.no}枚目：${roleLabel}）
-・レイアウト：${layout}
-（画像に入れる文字）
-【見出し（大きく）】
-${slide.title}
-【本文】
-${slide.body}`;
+  const commonBlock = buildSlideImageCommonBlock(designSpec, 'one_by_one');
+  const pageBlock = buildSlideImagePageBlock(slide, `このページ（${slide.no}枚目：${roleLabel}）`);
 
   if (slide.no === 1) {
     return `ChatGPTの画像生成（GPT Image）で、サービス紹介画像を1枚ずつ作ります（全${total}枚）。まず1枚目です。これは「1枚のグラフィック画像」です。
@@ -669,6 +681,36 @@ ${pageBlock}`;
 ${commonBlock}
 
 ${pageBlock}`;
+};
+
+// 【試験的】全枚分を1本にまとめ、ChatGPT（Images 2.0 以降の複数枚一括生成）に1回で貼るプロンプト。
+// 枚数だけ書くと「N案入りのコラージュ1枚」にまとめられやすいので、
+// 「独立したN枚」「番号順に確認なしで続ける」「止まったら番号を明記して続ける」を先頭で強く指定する。
+// 1回で作れる枚数には上限がある（有料プラン・8枚前後）ため、上限に当たったときの続け方も書いておく。
+export const buildSlideImageBatchPromptText = (
+  slides: SlideImagePrompt[],
+  toneVersion: ThumbnailPromptVersion,
+  autoStyle?: string
+): string => {
+  const total = slides.length;
+  const designSpec = resolveChatToneSpec(toneVersion, autoStyle);
+  const commonBlock = buildSlideImageCommonBlock(designSpec, 'batch');
+  const roleOf = (s: SlideImagePrompt) => SLIDE_ROLE_LABELS[s.role] ?? `${s.no}枚目`;
+  const lineup = slides.map(s => `画像${s.no}＝${roleOf(s)}`).join('、');
+  const pages = slides.map(s => buildSlideImagePageBlock(s, `画像${s.no}（${roleOf(s)}）`)).join('\n\n');
+
+  return `ChatGPTの画像生成（GPT Image）で、サービス紹介画像を全${total}枚、この1回の指示でまとめて作ります（${lineup}）。
+
+■ 出力の形式（最優先で守る）
+・${total}枚の「それぞれ独立した画像」を、画像1から画像${total}まで番号順に生成する。
+・${total}枚を1枚にまとめない。コラージュ・グリッド・一覧・分割レイアウト・スライド資料（PDF／PowerPoint）にはしない。
+・各画像には、その番号の「画像に入れる文字」だけを描き込む。別の番号の文言を混ぜない。
+・私が「次」と言わなくても、確認を挟まずに続けて生成する。途中で止まった場合は、最後に作った画像の番号を明記し、残りを続けて作る。
+・1回で作れる枚数の上限に当たった場合は、作れるところまで作り、私が「続き」と送ったら次の番号から同じデザイン仕様で続ける。
+
+${commonBlock}
+
+${pages}`;
 };
 
 const getApiKey = (): string => {
@@ -1450,56 +1492,138 @@ export const getFormBannerPrompt = (formTitle: string): string => `ChatGPTの画
 ・マークダウン記号（#、* など）は画像に出さない。`;
 
 // ===== チラシ（紙に印刷して配って認知を広げる）用 =====
-// スライド資料と同じ考え方で、「紙に載せる文言」はAIに作らせ、
-// トンマナ（画風）と紙面ルールはクライアント側でプロンプトに差し込む。
+// 2段構え。段A（この関数）は Gemini に「デザインの判断」と「紙に描き込む文言」を一度に決めさせる。
+// 段B（buildFlyerPromptText）は、A5 の物理ルール・帯の比率・QR の扱いを固定で差し込み、GPT Image 用の本文に組み立てる。
+// 判断の物差しはプロのチラシ20点の分析（チラシ再設計_01_参考デザイン分析.md）。プリセットのトンマナから選ばせるのをやめ、
+// 「業種と感情から主色1色を決める」「個人サービスは人を主役にする」「CTAは最初の一歩」をサービスごとにAIに判断させる。
 
-/** サービス本文から、A5たてのチラシに印刷する文言を作る。切り口ちがいの見出し3案と、3案で共通の中身を返す。 */
+// 系統ごとの視覚仕様。段Aには判断材料として渡し、段Bでは選ばれた系統の説明文として使う。
+export const FLYER_FAMILY_SPECS: Record<FlyerStyleFamily, {
+  label: string;
+  fit: string;       // どんなサービスに向くか
+  colors: string;    // 主色の傾向
+  headline: string;  // 見出し書体
+  cut: string;       // 写真の切り方
+  decoration: string;
+}> = {
+  trust:        { label: '信頼・専門',          fit: '士業・コンサル・IT・BtoB・キャリア相談', colors: '深緑／紺／チャコール＋白', headline: '太い角ゴシック（白抜き）', cut: '斜めの直線', decoration: 'ほぼ無し。バッジもマーカーも使わない' },
+  gentle:       { label: '寄り添い・やさしさ',  fit: '相談・カウンセリング・福祉・シニア向け', colors: '淡いピンク／ミント／クリーム／落ち着いた緑', headline: '丸ゴシック か 明朝', cut: '曲線・円形', decoration: 'ドットや点描を少し' },
+  family:       { label: '子ども・家族',        fit: '子ども向けレッスン・家庭向け', colors: '黄＋ピンク＋オレンジ', headline: '極太の丸ゴシック', cut: '円形・自由形', decoration: '数字入りの丸、アイコン多め' },
+  care_elegant: { label: '健康・施術（上品型）', fit: '整体・ヨガ・パーソナル指導・鍼灸', colors: 'くすみピンク＋和柄／紺＋黄', headline: '太めの明朝 か 太ゴシック', cut: '提供者の顔を右上に', decoration: '症状チップ・声を控えめに' },
+  care_promo:   { label: '健康・施術（集客型）', fit: '初回割引で来店を取りに行くとき', colors: '赤＋黄', headline: '極太の丸ゴシック・袋文字', cut: '写真は補助', decoration: '高コントラスト、吹き出し' },
+  beauty:       { label: '美容・上質',          fit: '美容・写真撮影・ブランディング', colors: '水色＋ピンク＋白', headline: '細い欧文＋明朝', cut: '波形', decoration: '余白を主役に' },
+  expert:       { label: '個人の専門家',        fit: '個人が専門性を売るサービス全般（出品者の大半）', colors: 'オレンジなど暖色1色＋白', headline: '太ゴシック（黒）＋差し色の強調', cut: '提供者の顔写真（正面〜斜め、笑顔）', decoration: '月桂樹つきの実績数字、LINEのQR' },
+  quiet:        { label: '静か・弔い',          fit: '終活・供養・グリーフケア', colors: '藤色＋セピア', headline: '明朝', cut: '写真をぼかして重ねる', decoration: '白い円で悩みを散らす' },
+  handmade:     { label: 'かわいい・手づくり',  fit: 'ハンドメイド・イラスト・占い', colors: 'ラベンダー／黄緑＋パステル', headline: '手書き風の丸い書体', cut: 'イラスト中心', decoration: '有機的な色の塊' },
+  clean:        { label: '清潔・作業',          fit: '掃除・整理収納・代行', colors: '水色＋白', headline: '太ゴシック（青）', cut: '作業中の写真＋before/after', decoration: '泡・光' },
+  bold:         { label: '強い・期間限定',      fit: '期間限定キャンペーン全般', colors: '赤＋黒＋黄', headline: '超極太ゴシック', cut: '商品の切り抜き', decoration: '期間バッジ' },
+};
+
+const FLYER_FAMILY_IDS = Object.keys(FLYER_FAMILY_SPECS) as FlyerStyleFamily[];
+const FLYER_HEADLINE_TYPES: FlyerHeadlineType[] = ['round_bold', 'square_bold', 'mincho_bold', 'handwritten', 'thin_latin_mincho'];
+const FLYER_HERO_VISUALS: FlyerHeroVisual[] = ['provider_portrait', 'product', 'scene', 'illustration'];
+const FLYER_HERO_CUTS: FlyerHeroCut[] = ['diagonal', 'curve', 'circle', 'full', 'wave'];
+const FLYER_DEVICES: FlyerDevice[] = ['badge', 'yellow_marker', 'three_cards', 'big_number', 'reassurance', 'band_heading'];
+
+/** サービス本文から、A5たて片面チラシの「デザイン方針」と「紙に描き込む文言」を一度に作る。 */
 export const generateFlyerContent = async (serviceBody: string): Promise<FlyerContent | null> => {
   const body = serviceBody?.trim();
   if (!body) return null;
   const ai = createClient();
 
+  const familyTable = FLYER_FAMILY_IDS
+    .map(id => {
+      const f = FLYER_FAMILY_SPECS[id];
+      return `- ${id}（${f.label}）：向く＝${f.fit}／主色＝${f.colors}／見出し＝${f.headline}／写真＝${f.cut}／装飾＝${f.decoration}`;
+    })
+    .join('\n');
+
   const prompt = `
-あなたは紙のチラシ（A5たて）を設計するコピーライターです。
-以下のサービス本文をもとに、チラシに印刷する文言を作成してください。
+あなたは紙のチラシを専門にするアートディレクター兼コピーライターです。
+以下のサービス本文をもとに、A5（148×210mm）たて片面チラシの「デザイン方針」と「紙に描き込む文言」を決めてください。
+出力はあとで画像生成AIへの指示に組み立てられます。あなたの判断がそのまま紙になります。
 
 【配る場面】
 リベシティのオフ会で、会員に手渡しします。
 - 相手はリベシティの会員です。リベシティやスキルマーケットが何かの説明は要りません。
-- ただし、あなたのサービスはまだ知りません。手に取って5秒で「誰の、どんな困りごとを解決するのか」が伝わることを最優先にしてください。
-- その場で読み切らず、持ち帰ってあとで見る人もいます。あとから見ても分かる書き方にしてください。
+- ただし、あなたのサービスはまだ知りません。手に取って5秒で「誰向けの、何をしてくれる人か」が伝わることを最優先にしてください。
+- 持ち帰ってあとで見る人もいます。あとから見ても分かる書き方にしてください。
 
-【ルール】
-- 本文に書かれている情報だけを使う。創作・誇張はしない。
+【プロのチラシに共通する作り方（この物差しで判断する）】
+1. 主色は1色。業種と伝えたい感情から決め、紙面は「主色＋白＋差し色1色」だけで組む。最下部の帯は主色のベタ塗り。
+2. 最上部に「誰向けか」のラベルを置く。見出しより先に、自分宛かどうかを判断させる。
+3. 個人が売るサービスは「人」が主役。提供者の顔を見せ、名前と肩書きが最初に来る。実績があれば数字を文字の2〜3倍で置く。
+4. 見出しは「対象／悩み」＋「約束」の2段か、1段の言い切り。見出しの中の1〜2語だけ差し色で強調して、読む順番を作る。
+5. 本文は「3つ」に揃える。3カード（アイコン＋題＋1行）にすると、読み手は比較せずに読める。
+6. 不安払拭を1つ入れる（「初めての方でも安心」「途中で相談できます」など）。反論処理を紙面でやる。
+7. 行動の呼びかけは「リスクの低い最初の一歩」にする。体験・お試し・初回・無料相談。「お問い合わせください」で終わらせない。
+8. 装飾の量は系統で決める。信頼・専門はほぼ無し、子ども・集客は多め。迷ったら減らす。
+
+【デザイン方針の系統（この11型から1つ選ぶ。fit と本文の相性で決める）】
+${familyTable}
+選び方の補足：
+- 個人が自分の専門性を売っている（相談・添削・作成代行・レッスン）なら、まず expert を検討する。相手がフォーマル（経営者・士業）なら trust、相手が不安や痛みを抱えているなら gentle か care_elegant に寄せる。
+- care_promo と bold は、本文に期間限定や大きな割引の記載があるときだけ選ぶ。
+- 色は系統の傾向を出発点にして、このサービスの題材に合う具体的な1色を hex で決める。系統が同じでも、題材が違えば色は変えてよい。
+
+【文言のルール】
+- 本文に書かれている情報だけを使う。創作・誇張はしない。数字・資格・年数は本文にあるものだけ。
 - A5は小さい。下の文字数を必ず守り、短く言い切る。
 - 読んだ人が自分のことだと感じる言い回しにする。体言止めばかりにしない。
-- 「〜かもしれません」「〜だと思います」のように、自信の無い言い回しは使わない。
+- 「〜かもしれません」「〜だと思います」のように自信の無い言い回しは使わない。
 - マークダウン記法（#、* など）と絵文字は使わない。
 - 電話番号・メールアドレス・URL・氏名は書かない（配る本人があとで手を入れる）。
+- 数字と記号は半角（12年、800通、5,000円）。全角数字は使わない。
+- 日本語の文の中にローマ字や英単語を混ぜない（「2児 de 母」のような混入は誤り）。
 
-【angles：切り口の違う見出しを3案】
-同じサービスを3つの切り口で見せます。実際に3枚とも作って見比べてから選ぶので、3案とも本気で作ってください。
-- problem：困りごとから入る。「〜で困っていませんか」のように問いかける。
-- result：手に入る結果から入る。before/after や、できるようになることを言い切る。
-- trust：作り手への信頼から入る。年数・件数・資格など本文にある事実を見出しに使う。事実が無ければ、経験の中身で言い切る。
-各案とも headline は20文字以内、subCopy は30文字以内。見出しにサービス名をそのまま置かない。3案の見出しは、言い回しだけでなく着眼点を変える。
+【出力する項目】
+analysis：
+- family：上の11型から1つ
+- audience：誰向けか。1行、30文字以内（例「開業3年以内の個人事業主」）
+- formality／warmth／energy：それぞれ1〜5の整数
+- sellingWhat：person（提供者の専門性）／skill（技術・作業）／product（成果物・商品）／experience（体験・レッスン）
 
-【3案で共通して使う中身】
-- problems：「こんなことで困っていませんか」。3個、各20文字以内。
-- benefits：このサービスでできること。3個、各20文字以内。
-- trust：作り手を信頼できる一行。本文にある年数・件数・資格・経歴・実績だけを使う。30文字以内。
-  該当する事実が本文に無ければ空文字にする（ここは絶対に創作しない）。
-- forWhom：こんな方におすすめ。本文から自然に読み取れるときだけ2〜3個、各20文字以内。読み取れなければ空配列にする。
-- flow：依頼から納品までの流れ。本文に書かれているときだけ3ステップ、各12文字以内。ステップ番号は付けない。書かれていなければ空配列にする。
-- price：本文に価格の記載があれば「3,000円〜」のように短く書く。記載が無ければ空文字にする。
-- cta：最後に置く、行動をうながす一言。20文字以内。
+design：
+- dominantColor：主色。name（日本語の色名）・hex（#RRGGBB）・why（その色にした理由。1行、40文字以内）。最下部の帯にこの色をベタ塗りして白い文字を乗せるので、白が読める濃さにする（#FCE4EC のような淡いパステルは不可。やさしい系統でも、くすみピンク #C97B8B やセージグリーン #6E9A80 のように一段濃い色を選ぶ。淡い色は使わない）
+- accentColor：差し色。name・hex・why。主色と明度差をつけ、見出しの強調語と丸バッジに使える色
+- headlineType：round_bold／square_bold／mincho_bold／handwritten／thin_latin_mincho から1つ
+- decoration：none／light／standard／lively から1つ
+- heroVisual：provider_portrait／product／scene／illustration から1つ。sellingWhat が person のとき、また相手が不安や痛みを抱えて「人」で選ぶサービス（施術・相談・レッスン・添削）のときは provider_portrait にする。成果物そのものが売りのとき（作品・料理・デザイン）だけ product を選ぶ
+- heroSubject：主役ビジュアルの具体を1行、30文字以内（例「ノートPCに向かって微笑む提供者」「木の机に並んだ手づくりの器」）。provider_portrait のときは表情と仕草だけを書き、性別・年齢・髪型・服装など見た目は書かない（見た目は添付されたアイコンに従うため）
+- heroCut：diagonal／curve／circle／full／wave から1つ
+- devices：使う部品。badge／yellow_marker／three_cards／big_number／reassurance／band_heading から、系統に合うものだけ。three_cards と reassurance は原則入れる。big_number は bigNumber を出すときは入れる（無いときだけ外す）
+- avoid：使わない部品。devices と重複させない
+- moodWords：雰囲気を表す語を2〜3語（例「誠実」「静か」「あたたかい」）
+
+copy：
+- audienceLabel：最上部のラベル。「〜の方へ」「〜向け」の形で18文字以内。「リベシティ」「リベ会員」は入れない（相手は皆そうなので、それ以外の絞り込みを書く）
+- angles：切り口の違う見出しを3案。実際に3枚とも作って見比べるので、3案とも本気で作る
+  - problem：困りごとから入る。「〜で困っていませんか」「〜を諦めていませんか」のように問いかける
+  - result：手に入る結果から入る。できるようになることを言い切る
+  - trust：作り手への信頼から入る。年数・件数・資格など本文の事実を見出しに使う。事実が無ければ経験の中身で言い切る
+  各案とも headline は18文字以内（2行に折ってよい）、subCopy は28文字以内。emphasis は headline の中に実際に含まれる語を1〜2語。見出しにサービス名をそのまま置かない。3案は言い回しだけでなく着眼点を変える
+- problems：「こんなことで困っていませんか」。3個、各16文字以内
+- cards：「このサービスでできること」を3枚。icon はアイコンのモチーフ（名詞、8文字以内）、title は10文字以内、body は22文字以内
+- bigNumber：実績の数字。value は8文字以内（例「2,300名」「800通」）、label は12文字以内で、何の数かが分かる名詞にする。本文にある言葉を使い、別の職名や役割に言い換えない（例：本文が「52名のアイコンを描いた」なら「アイコン制作」、本文が「書類選考を担当」なら「書類選考の担当」）。年数より件数・人数・通数のような量を優先し、両方あれば量を bigNumber に、年数は trustLines に回す。本文に人数・件数・年数のどれかがあれば必ず入れる（36名のように小さく見える数でも、無いより信頼が伝わる）。本文に数字の実績が無いときだけ null
+- trustLines：経歴・資格・経験の事実。本文にあるものだけ、最大3行、各20文字以内。無ければ空配列
+- reassurance：不安払拭の1行。24文字以内
+- cta：firstStep は最初の一歩（14文字以内）。本文に安い・短いプラン（添削のみ、お試し、初回、単発）があれば、それを最初の一歩にする（例「まずは添削だけ」「初回60分お試し」）。無ければ無料の一歩（例「無料で15分相談」）。「お問い合わせ」「ご相談ください」だけの行にしない。price はその一歩の価格を短く（12文字以内。例「5,000円」「3,000円〜」）、本文に価格が無ければ空文字。note は添え書き（18文字以内。例「「チラシを見た」とお伝えください」「標準プランは15,000円」）
 
 【出力する前に確認すること】
-各項目が上の文字数に収まっているか数え、超えていれば短く言い直してから出力する。
+- 各項目が上の文字数に収まっているか数え、超えていれば短く言い直してから出力する
+- emphasis の語が headline に含まれているか確認する
+- 数字・資格・年数が本文に無いのに書いていないか、本文の言葉を別の言葉に言い換えていないか確認する
+- 誤字（例：経歴を「経暦」）が無いか確認する
 
 【サービス本文】
 ${body.slice(0, 4000)}
 `;
+
+  const colorSchema = {
+    type: Type.OBJECT,
+    properties: { name: { type: Type.STRING }, hex: { type: Type.STRING }, why: { type: Type.STRING } },
+    required: ['name', 'hex', 'why'],
+  };
 
   try {
     const response = await ai.models.generateContent({
@@ -1510,56 +1634,198 @@ ${body.slice(0, 4000)}
         responseSchema: {
           type: Type.OBJECT,
           properties: {
-            angles: {
-              type: Type.ARRAY,
-              items: {
-                type: Type.OBJECT,
-                properties: {
-                  id: { type: Type.STRING, enum: ['problem', 'result', 'trust'] },
-                  headline: { type: Type.STRING },
-                  subCopy: { type: Type.STRING },
-                },
-                required: ['id', 'headline', 'subCopy'],
+            analysis: {
+              type: Type.OBJECT,
+              properties: {
+                family: { type: Type.STRING, enum: FLYER_FAMILY_IDS },
+                audience: { type: Type.STRING },
+                formality: { type: Type.INTEGER },
+                warmth: { type: Type.INTEGER },
+                energy: { type: Type.INTEGER },
+                sellingWhat: { type: Type.STRING, enum: ['person', 'skill', 'product', 'experience'] },
               },
+              required: ['family', 'audience', 'formality', 'warmth', 'energy', 'sellingWhat'],
             },
-            problems: { type: Type.ARRAY, items: { type: Type.STRING } },
-            benefits: { type: Type.ARRAY, items: { type: Type.STRING } },
-            trust: { type: Type.STRING },
-            forWhom: { type: Type.ARRAY, items: { type: Type.STRING } },
-            flow: { type: Type.ARRAY, items: { type: Type.STRING } },
-            price: { type: Type.STRING },
-            cta: { type: Type.STRING },
+            design: {
+              type: Type.OBJECT,
+              properties: {
+                dominantColor: colorSchema,
+                accentColor: colorSchema,
+                headlineType: { type: Type.STRING, enum: FLYER_HEADLINE_TYPES },
+                decoration: { type: Type.STRING, enum: ['none', 'light', 'standard', 'lively'] },
+                heroVisual: { type: Type.STRING, enum: FLYER_HERO_VISUALS },
+                heroSubject: { type: Type.STRING },
+                heroCut: { type: Type.STRING, enum: FLYER_HERO_CUTS },
+                devices: { type: Type.ARRAY, items: { type: Type.STRING, enum: FLYER_DEVICES } },
+                avoid: { type: Type.ARRAY, items: { type: Type.STRING, enum: FLYER_DEVICES } },
+                moodWords: { type: Type.ARRAY, items: { type: Type.STRING } },
+              },
+              required: ['dominantColor', 'accentColor', 'headlineType', 'decoration', 'heroVisual', 'heroSubject', 'heroCut', 'devices', 'avoid', 'moodWords'],
+            },
+            copy: {
+              type: Type.OBJECT,
+              properties: {
+                audienceLabel: { type: Type.STRING },
+                angles: {
+                  type: Type.ARRAY,
+                  items: {
+                    type: Type.OBJECT,
+                    properties: {
+                      id: { type: Type.STRING, enum: ['problem', 'result', 'trust'] },
+                      headline: { type: Type.STRING },
+                      emphasis: { type: Type.ARRAY, items: { type: Type.STRING } },
+                      subCopy: { type: Type.STRING },
+                    },
+                    required: ['id', 'headline', 'emphasis', 'subCopy'],
+                  },
+                },
+                problems: { type: Type.ARRAY, items: { type: Type.STRING } },
+                cards: {
+                  type: Type.ARRAY,
+                  items: {
+                    type: Type.OBJECT,
+                    properties: { icon: { type: Type.STRING }, title: { type: Type.STRING }, body: { type: Type.STRING } },
+                    required: ['icon', 'title', 'body'],
+                  },
+                },
+                bigNumber: {
+                  type: Type.OBJECT,
+                  nullable: true,
+                  properties: { value: { type: Type.STRING }, label: { type: Type.STRING } },
+                  required: ['value', 'label'],
+                },
+                trustLines: { type: Type.ARRAY, items: { type: Type.STRING } },
+                reassurance: { type: Type.STRING },
+                cta: {
+                  type: Type.OBJECT,
+                  properties: { firstStep: { type: Type.STRING }, price: { type: Type.STRING }, note: { type: Type.STRING } },
+                  required: ['firstStep', 'price', 'note'],
+                },
+              },
+              required: ['audienceLabel', 'angles', 'problems', 'cards', 'bigNumber', 'trustLines', 'reassurance', 'cta'],
+            },
           },
-          required: ['angles', 'problems', 'benefits', 'trust', 'forWhom', 'flow', 'price', 'cta'],
+          required: ['analysis', 'design', 'copy'],
         },
       },
     });
-    const parsed = JSON.parse(response.text || '{}');
-    const list = (v: any): string[] => (Array.isArray(v) ? v.map((x: any) => String(x).trim()).filter(Boolean) : []);
-    // 3案の順番は problem → result → trust に揃える（画面の並びを毎回同じにするため）
-    const rawAngles: any[] = Array.isArray(parsed.angles) ? parsed.angles : [];
-    const angles: FlyerAngle[] = (['problem', 'result', 'trust'] as FlyerAngleId[])
-      .map(id => {
-        const found = rawAngles.find((a: any) => String(a?.id) === id);
-        return found
-          ? { id, headline: String(found.headline || '').trim(), subCopy: String(found.subCopy || '').trim() }
-          : null;
-      })
-      .filter((a): a is FlyerAngle => !!a && !!a.headline);
-    const content: FlyerContent = {
-      angles,
-      problems: list(parsed.problems),
-      benefits: list(parsed.benefits),
-      trust: String(parsed.trust || '').trim(),
-      forWhom: list(parsed.forWhom),
-      flow: list(parsed.flow),
-      price: String(parsed.price || '').trim(),
-      cta: String(parsed.cta || '').trim(),
-    };
-    return content.angles.length > 0 ? content : null;
+    return normalizeFlyerResponse(JSON.parse(response.text || '{}'));
   } catch {
     return null;
   }
+};
+
+// 全角の数字・英字・記号を半角に寄せる（モデルが「１２年」「５，０００円」と返すことがある。紙面では半角で揃える）
+const toHalfWidth = (v: string): string =>
+  v.replace(/[０-９Ａ-Ｚａ-ｚ]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0xFEE0)).replace(/，/g, ',').replace(/．/g, '.');
+
+// 主色は最下部の帯にベタ塗りして白い文字を乗せる。淡すぎる色が返ってきたら、色味（色相・彩度）は保ったまま明度だけ下げる
+const ensureDarkEnough = (hex: string): string => {
+  const [r, g, b] = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16) / 255);
+  // 判定は相対輝度で行う（HSL の明度は人の見た目の濃さとずれる。#E67E22 のオレンジや #9581B8 のラベンダーは白文字が読めるので触らない）
+  const lin = (v: number) => (v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4));
+  const luminance = 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
+  if (luminance <= 0.5) return hex; // 十分に濃い
+  const max = Math.max(r, g, b), min = Math.min(r, g, b);
+  let l = (max + min) / 2;
+  const d = max - min;
+  let sat = d === 0 ? 0 : d / (1 - Math.abs(2 * l - 1));
+  let h = 0;
+  if (d !== 0) {
+    if (max === r) h = ((g - b) / d + (g < b ? 6 : 0)) / 6;
+    else if (max === g) h = ((b - r) / d + 2) / 6;
+    else h = ((r - g) / d + 4) / 6;
+  }
+  // 明度 0.45 まで下げる。灰色にならないよう彩度は 0.35 以上、どぎつくならないよう 0.5 以下に収める（くすみ色になる）
+  l = 0.45;
+  sat = Math.min(0.5, Math.max(sat, 0.35));
+  const hue2rgb = (p: number, q: number, t: number) => {
+    if (t < 0) t += 1; if (t > 1) t -= 1;
+    if (t < 1 / 6) return p + (q - p) * 6 * t;
+    if (t < 1 / 2) return q;
+    if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
+    return p;
+  };
+  const q = l < 0.5 ? l * (1 + sat) : l + sat - l * sat;
+  const pp = 2 * l - q;
+  const out = [hue2rgb(pp, q, h + 1 / 3), hue2rgb(pp, q, h), hue2rgb(pp, q, h - 1 / 3)];
+  return '#' + out.map(v => Math.round(v * 255).toString(16).padStart(2, '0').toUpperCase()).join('');
+};
+
+// Gemini の返答を型に揃える。列挙値の外れ・空欄・並び順のばらつきをここで吸収し、画面と段Bが前提にできる形にする。
+export const normalizeFlyerResponse = (parsed: any): FlyerContent | null => {
+  const str = (v: any): string => toHalfWidth(String(v ?? '').trim());
+  const list = (v: any): string[] => (Array.isArray(v) ? v.map(str).filter(Boolean) : []);
+  const clamp = (v: any): number => Math.min(5, Math.max(1, Math.round(Number(v) || 3)));
+  const pick = <T extends string>(v: any, allowed: readonly T[], fallback: T): T =>
+    (allowed as readonly string[]).includes(str(v)) ? (str(v) as T) : fallback;
+  const hex = (v: any, fallback: string): string => (/^#[0-9a-fA-F]{6}$/.test(str(v)) ? str(v).toUpperCase() : fallback);
+  const color = (v: any, fallbackHex: string, mustBeDark = false): FlyerColor => ({
+    name: str(v?.name) || '指定なし',
+    hex: mustBeDark ? ensureDarkEnough(hex(v?.hex, fallbackHex)) : hex(v?.hex, fallbackHex),
+    why: str(v?.why),
+  });
+
+  const a = parsed?.analysis ?? {};
+  const d = parsed?.design ?? {};
+  const c = parsed?.copy ?? {};
+
+  // 3案の順番は problem → result → trust に揃える（画面の並びを毎回同じにするため）
+  const rawAngles: any[] = Array.isArray(c.angles) ? c.angles : [];
+  const angles: FlyerAngle[] = (['problem', 'result', 'trust'] as FlyerAngleId[])
+    .map(id => {
+      const found = rawAngles.find((x: any) => str(x?.id) === id);
+      if (!found) return null;
+      const headline = str(found.headline);
+      // 差し色にする語は、見出しに実際に含まれるものだけ残す（無い語を指定すると画像側で勝手に足される）
+      const emphasis = list(found.emphasis).filter(w => headline.includes(w)).slice(0, 2);
+      return { id, headline, emphasis, subCopy: str(found.subCopy) };
+    })
+    .filter((x): x is FlyerAngle => !!x && !!x.headline);
+  if (angles.length === 0) return null;
+
+  const devices = Array.from(new Set(list(d.devices))).filter((x): x is FlyerDevice => (FLYER_DEVICES as string[]).includes(x));
+  const avoid = list(d.avoid).filter((x): x is FlyerDevice => (FLYER_DEVICES as string[]).includes(x) && !devices.includes(x as FlyerDevice));
+  const bigNumber = c.bigNumber && str(c.bigNumber.value) ? { value: str(c.bigNumber.value), label: str(c.bigNumber.label) } : null;
+  const cards: FlyerCard[] = (Array.isArray(c.cards) ? c.cards : [])
+    .map((x: any) => ({ icon: str(x?.icon), title: str(x?.title), body: str(x?.body) }))
+    .filter((x: FlyerCard) => x.title)
+    .slice(0, 3);
+  if (cards.length === 0) return null;
+
+  return {
+    version: 2,
+    analysis: {
+      family: pick(a.family, FLYER_FAMILY_IDS, 'expert'),
+      audience: str(a.audience),
+      formality: clamp(a.formality),
+      warmth: clamp(a.warmth),
+      energy: clamp(a.energy),
+      sellingWhat: pick(a.sellingWhat, ['person', 'skill', 'product', 'experience'] as const, 'person'),
+    },
+    design: {
+      dominantColor: color(d.dominantColor, '#2F4F4F', true),
+      accentColor: color(d.accentColor, '#C0392B'),
+      headlineType: pick(d.headlineType, FLYER_HEADLINE_TYPES, 'square_bold'),
+      decoration: pick(d.decoration, ['none', 'light', 'standard', 'lively'] as const, 'light'),
+      heroVisual: pick(d.heroVisual, FLYER_HERO_VISUALS, 'provider_portrait'),
+      heroSubject: str(d.heroSubject),
+      heroCut: pick(d.heroCut, FLYER_HERO_CUTS, 'circle'),
+      devices,
+      avoid,
+      moodWords: list(d.moodWords).slice(0, 3),
+    },
+    copy: {
+      audienceLabel: str(c.audienceLabel),
+      angles,
+      problems: list(c.problems).slice(0, 3),
+      cards,
+      bigNumber,
+      trustLines: list(c.trustLines).slice(0, 3),
+      reassurance: str(c.reassurance),
+      cta: { firstStep: str(c.cta?.firstStep), price: str(c.cta?.price), note: str(c.cta?.note) },
+    },
+  };
 };
 
 /** 複数サービスを1枚にまとめるチラシの文言を作る。 */
@@ -1657,114 +1923,255 @@ const flyerPrintRules = (qrSpot: string, paper: string) => `■ 紙に印刷し�
 ・載せるのは下で指定した文言だけ。余白を惜しまず、要素の間をしっかり空ける。詰め込むと印刷でつぶれて読めない。
 ・紙の外周1割ほどは余白として空け、文字や主要な絵を端ギリギリに置かない（印刷のときに切れるため）。
 ・視線が上から下へ素直に流れる構成にする。要素を斜めに散らしたり、読む順番が分からない配置にしない。
-・QRコードは画像生成では描かないこと（読み取れない偽物になる）。${qrSpot}
+・QRコードは、この指示の最後にある手順で、画像を作ったあとにコード実行で本物を生成して重ねる（画像生成で描いたQRは読み取れないため）。画像生成の段階では QR を描かず、${qrSpot}
 ・URL・メールアドレス・電話番号・氏名は書かない（配る本人があとで入れる）。
 ・文字はすべて日本語で、印刷してもくっきり読めるように描く。下に指定した文言だけを正確に、誤字なく入れる。勝手に文章を足さない。
+・指定に無い文字は1文字も足さない。手書き風の添え書き・スローガン・英字・ロゴ風の文字も入れない（画像生成は雰囲気づくりで文字を足しがちだが、紙面では誤情報になる）。
+・絵も、主役ビジュアルと3カードのアイコン以外は足さない。挿絵・写真風の人物・葉や花などの飾りは、上の「装飾」の指定を超えて置かない。
 ・マークダウン記号（#、* など）は画像に出さない。`;
 
-const QR_SPOT_SINGLE = '右下へ、一辺が紙の幅の5分の1ほどの「白い正方形の枠」を空け、そのすぐ下に小さく「詳しくはこちら」と入れる。あとから本物のQRコードを重ねる場所。';
-const QR_SPOT_MULTI = '各サービスの枠の右端に、枠の高さの8割を一辺とする「白い正方形」を空ける。あとから本物のQRコードを重ねる場所。';
+const QR_SPOT_SINGLE = '右下へ、一辺が紙の幅の5分の1ほどの「白い正方形の枠」を空け、そのすぐ下に小さく「詳しくはこちら」と入れる。あとの手順で本物のQRコードを重ねる場所。';
+const QR_SPOT_MULTI = '各サービスの枠の右端に、枠の高さの8割を一辺とする「白い正方形」を空ける。あとの手順で本物のQRコードを重ねる場所。';
 
-/** 画像ができたあとに、コード実行で本物のQRを作って重ねさせる指示。URL が無ければ空（枠だけ空けて、あとで貼る） */
+// URL が未登録のときに、プロンプトの中で「ここに貼る」と示す空欄。画面側でも同じ文言を探して注意を出す
+export const FLYER_QR_URL_PLACEHOLDER = '＜ここに出品ページのURLを貼ってください＞';
+
+/** 画像ができたあとに、コード実行で本物のQRを作って重ねさせる指示。
+ *  1枚ものは URL が無くても手順を必ず入れる（無いとQRの無いチラシで終わってしまう）。URL は空欄にして貼ってもらう。
+ *  まとめチラシは URL の無いサービスを載せられないので、1件も無ければ空。 */
 const flyerQrStep = (targets: { label: string; url: string }[], multi: boolean): string => {
   const valid = targets.filter(t => t.url.trim());
-  if (valid.length === 0) return '';
-  const list = valid.map(t => (multi ? `・${t.label}：${t.url}` : t.url)).join('\n');
+  if (valid.length === 0 && multi) return '';
+  const list = valid.length === 0
+    ? FLYER_QR_URL_PLACEHOLDER
+    : valid.map(t => (multi ? `・${t.label}：${t.url}` : t.url)).join('\n');
   const where = multi
     ? '各サービスの枠の右端に空けた白い正方形の中に、対応するサービスのQRを収める（枠の順番どおりに）'
     : '右下に空けた白い正方形の枠の中に収める';
   return `
 
-■ QRコードの入れ方（画像生成では描かず、コード実行で本物を作って重ねる）
+■ QRコードの入れ方（ここまでやって完成。QRの無い画像で終わらせない）
 1. まず上の仕様で画像を1枚作る。白い正方形の枠は空けたままにする。
 2. 次に Python（コード実行）で、下のURLのQRコードを作る。誤り訂正レベルはM、周囲に4モジュール分の白い余白を付ける。
 3. 作ったQRを、${where}大きさに縮小して重ね、完成した画像を1枚出力する。QRの余白は消さない。
 ・QRは必ずコードで生成すること。画像生成で描いたQRは読み取れない。
 ・生成した画像をコードから読めない場合は、その旨を短く伝えること。こちらが画像をアップロードしたら、同じ手順でQRを重ねる。
+・下のURLが空欄のままなら、先に「QRにするURLを教えてください」と聞き、URLをもらってから手順2に進む。
 【QRにするURL】
 ${list}`;
 };
 
 const flyerBullets = (items: string[]): string => items.map(v => `・${v}`).join('\n');
 
-// 切り口ごとに「紙面の主役」を変える。3枚出して見比べたとき、見出しだけでなく紙の重心が変わる。
-export const FLYER_ANGLE_SPECS: Record<FlyerAngleId, { label: string; lead: string; hint: string }> = {
-  problem: {
-    label: '困りごとから',
-    lead: '「これ、自分のことだ」と思ってもらう1枚',
-    hint: '「こんなことで困っていませんか」を紙面の主役にする。このブロックをいちばん大きく取り、アクセント色で囲んで目立たせる。',
-  },
-  result: {
-    label: '結果から',
-    lead: '手に入るものを先に見せる1枚',
-    hint: '「このサービスでできること」を紙面の主役にする。このブロックをいちばん大きく取り、アイコン付きの箱で並べて目立たせる。',
-  },
-  trust: {
-    label: '信頼から',
-    lead: '「この人なら任せられる」と思ってもらう1枚',
-    hint: '作り手への信頼を紙面の主役にする。見出しのすぐ下に信頼の一行を大きく置き、全体は落ち着いた組みにして実績が伝わるようにする。',
-  },
+/** 画像が出たあとに続けて貼る、QRを重ねさせる短い指示。
+ *  ChatGPT は画像生成で返答を終えてしまい、1本目に書いた手順2へ自動では進まない（2026-09-12 実測）。
+ *  この一言を送ると、コード実行が直前の生成画像を読み、読み取れるQRを重ねた完成画像を出す。 */
+export const buildFlyerQrFollowupText = (serviceUrl?: string): string => {
+  const url = serviceUrl?.trim() || FLYER_QR_URL_PLACEHOLDER;
+  return `手順2に進んでください。いま作った画像に、Python（コード実行）で次のURLのQRコード（誤り訂正レベルM、周囲に4モジュール分の白い余白）を作り、右下に空けた白い正方形の枠の中に収まる大きさに縮小して重ね、完成した画像を1枚出力してください。
+QRにするURL：${url}
+生成した画像をコードから読めない場合は、その旨を短く伝えてください。こちらが画像をアップロードしたら、同じ手順でQRを重ねてください。
+重ねたあと、その完成画像のQRをコードで読み取って、デコードした文字列を1行で報告してください。`;
+};
+
+// ===== 段B：段Aの判断を、GPT Image にそのまま貼れる文面に組み立てる =====
+// 印刷ルール・帯の比率・QR の扱いはここで固定する（崩れると刷り直しになるので AI に書かせない）。
+
+// 切り口ごとに「本文の帯（帯3）で何を主役にするか」を変える。3枚出して見比べたとき、見出しだけでなく紙の重心が変わる。
+export const FLYER_ANGLE_SPECS: Record<FlyerAngleId, { label: string; lead: string }> = {
+  problem: { label: '困りごとから', lead: '「これ、自分のことだ」と思ってもらう1枚。本文の帯は困りごと3つが主役' },
+  result:  { label: '結果から',     lead: '手に入るものを先に見せる1枚。本文の帯はできること3カードが主役' },
+  trust:   { label: '信頼から',     lead: '「この人なら任せられる」と思ってもらう1枚。本文の帯は実績と経歴が主役' },
+};
+
+const FLYER_HEADLINE_TYPE_TEXT: Record<FlyerHeadlineType, string> = {
+  round_bold: '極太の丸ゴシック。角が丸く、やわらかい印象',
+  square_bold: '太い角ゴシック。まっすぐで力強い印象',
+  mincho_bold: '太めの明朝。上品で落ち着いた印象',
+  handwritten: '手書き風の丸い書体。手づくり感のある印象',
+  thin_latin_mincho: '細めの明朝。余白と一緒に上質さを出す。太らせない',
+};
+
+const FLYER_HERO_CUT_TEXT: Record<FlyerHeroCut, string> = {
+  diagonal: '斜めの直線で切り取り、見出し側に少し食い込ませる',
+  curve: 'ゆるやかな曲線で切り取る',
+  circle: '円形に切り取る',
+  full: '帯いっぱいに敷き、見出しをその上に重ねる（文字の下だけ薄く暗くして読ませる）',
+  wave: '波形の縁で切り取る',
+};
+
+const FLYER_DECORATION_TEXT: Record<FlyerDesign['decoration'], string> = {
+  none: '装飾は入れない。線・面・余白だけで組む。バッジ・マーカー・吹き出し・飾りの図形は無し（3カードの中の小さなアイコンだけ可）',
+  light: '装飾は最小限。区切り線と薄い面だけ。アイコンは3カードの中だけ',
+  standard: '3カードのアイコンと丸バッジを使ってよい（帯見出しは「使う部品」にあるときだけ）。効果線・キラキラは使わない',
+  lively: 'アイコン・丸バッジ・吹き出し・数字入りの丸でにぎやかに（部品の使う／使わないは下の指定に従う）。それでも効果線・放射線は使わない',
+};
+
+const FLYER_DEVICE_TEXT: Record<FlyerDevice, string> = {
+  badge: '丸バッジ（主役ビジュアルに重ねる円の中に、価格か実績を白抜きで）',
+  yellow_marker: '黄色マーカー（本文の中で1か所だけ、語の下に黄色の帯）',
+  three_cards: '3カード（アイコン＋題＋1行を、同じ大きさの箱で横に3つ）',
+  big_number: '実績数字（数字だけ周りの文字の3倍の大きさ。単位と説明は小さく添える）',
+  reassurance: '不安払拭の1行（帯と帯のあいだに、やわらかい言い回しで）',
+  band_heading: '帯見出し（帯の切り替わりに、主色の細い帯へ白抜きで1行）',
+};
+
+// 主役ビジュアルの描き方。提供者本人を主役にするときは、添付アイコンを再現させる（サムネイル機能の「提供者の代役に動物を立てない」と同じ考え方）。
+const flyerHeroVisualText = (design: FlyerDesign): string => {
+  const subject = design.heroSubject ? `（${design.heroSubject}）` : '';
+  switch (design.heroVisual) {
+    case 'provider_portrait':
+      return `提供者本人${subject}。このチャットに添付したアイコン画像の人物を、同じ顔立ち・髪型・服装のまま胸から上で描く（写真ならその人の雰囲気を保ったイラスト調にしてよい）。添付が無ければ、このサービスの提供者として自然な人物を1人描く。動物やマスコットを代役にしない`;
+    case 'product':
+      return `成果物・商品${subject}。本物らしく、主役として大きく`;
+    case 'scene':
+      return `サービスの場面${subject}。何をしてくれる人かが一目で分かる瞬間を切り取る`;
+    case 'illustration':
+      return `モチーフのイラスト${subject}。写真的にせず、紙面の書体と同じ手触りで`;
+  }
+};
+
+// 帯2の丸バッジに何を入れるか。実績があれば実績、無ければ価格。信頼の切り口では実績が帯3の主役になるので、バッジは価格に回す
+const flyerBadgeText = (content: FlyerContent, angle: FlyerAngle): string => {
+  const { design, copy } = content;
+  if (!design.devices.includes('badge')) return '';
+  if (angle.id !== 'trust' && copy.bigNumber) return `${copy.bigNumber.label} ${copy.bigNumber.value}`;
+  if (copy.cta.price) return `${copy.cta.firstStep} ${copy.cta.price}`;
+  return '';
+};
+
+// 帯3（本文の帯）の構成と文言。切り口で主役が変わる
+const flyerBodyBand = (content: FlyerContent, angle: FlyerAngle): { layout: string; texts: string[] } => {
+  const { copy, design } = content;
+  // 帯の小見出し。帯見出しを部品として使う系統では主色の帯に白抜き、使わない系統では太字1行に留める
+  const heading = design.devices.includes('band_heading') ? '主色の細い帯に白抜きの帯見出し' : '小さな太字の見出し1行';
+  const cardTitles = copy.cards.map(c => c.title).join('　／　');
+  const cardsFull = copy.cards.map(c => `・${c.title}（アイコン：${c.icon}）：${c.body}`).join('\n');
+  switch (angle.id) {
+    case 'problem':
+      return {
+        layout: `${heading}「こんなことで困っていませんか」→ チェックマーク付きの3行を主役として大きく → 矢印1本 → その下に「できること」の題3つを小さく横一列に。`,
+        texts: [
+          `【帯3の小見出し】\nこんなことで困っていませんか`,
+          `【帯3の主役（チェック3行）】\n${flyerBullets(copy.problems)}`,
+          `【帯3の下段（できること・題だけ横一列）】\n${cardTitles}`,
+        ],
+      };
+    case 'result':
+      return {
+        layout: `${heading}「このサービスでできること」→ 3カード（アイコン＋題＋1行）を主役として、同じ大きさの箱で横に3つ。`,
+        texts: [
+          `【帯3の小見出し】\nこのサービスでできること`,
+          `【帯3の主役（3カード）】\n${cardsFull}`,
+        ],
+      };
+    case 'trust': {
+      const hasNumber = !!copy.bigNumber;
+      const hasLines = copy.trustLines.length > 0;
+      const layout = hasNumber
+        ? '左に実績数字を主役として大きく（数字は周りの文字の3倍。説明は小さく添える）、右にその根拠となる経歴・資格を2〜3行 → その下に「できること」の題3つを小さく横一列に。'
+        : '経歴・資格・経験を主役として、落ち着いた組みで2〜3行大きめに → その下に「できること」の題3つを小さく横一列に。';
+      const texts: string[] = [];
+      if (hasNumber) texts.push(`【帯3の主役（実績数字）】\n${copy.bigNumber!.value}\n（説明）${copy.bigNumber!.label}`);
+      if (hasLines) texts.push(`【帯3の${hasNumber ? '右側' : '主役'}（経歴・資格）】\n${flyerBullets(copy.trustLines)}`);
+      if (!hasNumber && !hasLines) texts.push(`【帯3の主役（できること）】\n${cardsFull}`);
+      else texts.push(`【帯3の下段（できること・題だけ横一列）】\n${cardTitles}`);
+      return { layout, texts };
+    }
+  }
 };
 
 /** 1サービス分のチラシプロンプトを組み立てる（ChatGPTにそのまま貼れる形）。切り口ごとに1本ずつ作る。 */
 export const buildFlyerPromptText = (
   content: FlyerContent,
   angle: FlyerAngle,
-  toneVersion: ThumbnailPromptVersion,
-  autoStyle?: string,
-  serviceUrl?: string
+  options: { matchThumbnail?: boolean; serviceUrl?: string } = {}
 ): string => {
-  const designSpec = resolveChatToneSpec(toneVersion, autoStyle);
-  const qrStep = flyerQrStep([{ label: angle.headline, url: serviceUrl ?? '' }], false);
+  const { analysis, design, copy } = content;
+  const family = FLYER_FAMILY_SPECS[analysis.family];
+  const qrStep = flyerQrStep([{ label: angle.headline, url: options.serviceUrl ?? '' }], false);
+  const badge = flyerBadgeText(content, angle);
+  const body = flyerBodyBand(content, angle);
+  const emphasis = angle.emphasis.length ? angle.emphasis.map(w => `「${w}」`).join('') : '';
 
-  // 任意の項目は中身があるときだけ紙面に載せる。A5は小さいので、空の枠を作らせない
-  const layout = ['見出しとサブコピー。紙の上3分の1を使い、いちばん目立たせる。'];
-  layout.push('「こんなことで困っていませんか」。チェックマークか吹き出しで並べる。');
-  layout.push('「このサービスでできること」。アイコン付きの箱で並べる。');
-  if (content.trust) layout.push('信頼の一行。作り手の実績として、落ち着いた見た目で1行だけ置く。');
-  if (content.forWhom.length) layout.push('「こんな方におすすめ」。短く、軽い見た目で。');
-  if (content.flow.length) layout.push('「ご依頼の流れ」。1→2→3と矢印でつなぐ。');
-  if (content.price) layout.push('価格。読み落とされない位置に、短く置く。');
-  layout.push('行動をうながす一言。最下部に帯を敷いて置き、その右にQR用の白い正方形の枠を空ける。');
-
-  const blocks = [
-    `【見出し（いちばん大きく）】\n${angle.headline}`,
-    `【サブコピー】\n${angle.subCopy}`,
-    `【こんなことで困っていませんか】\n${flyerBullets(content.problems)}`,
-    `【このサービスでできること】\n${flyerBullets(content.benefits)}`,
-  ];
-  if (content.trust) blocks.push(`【信頼の一行】\n${content.trust}`);
-  if (content.forWhom.length) blocks.push(`【こんな方におすすめ】\n${flyerBullets(content.forWhom)}`);
-  if (content.flow.length) blocks.push(`【ご依頼の流れ】\n${content.flow.map((v, i) => `${i + 1}. ${v}`).join('\n')}`);
-  if (content.price) blocks.push(`【価格】\n${content.price}`);
-  blocks.push(`【行動をうながす一言（最下部の帯）】\n${content.cta}`);
-
-  // 参照モードのときだけ、先にサムネイルを添付させる。他のトンマナは仕様だけで作らせる
-  const attachStep = toneVersion === 'my_style'
+  // 提供者本人が主役のときはアイコンの添付を先に頼む。配色をサムネイルに合わせるときは、サムネイルも添付させて色の指定を差し替える
+  const attachLines: string[] = [];
+  if (design.heroVisual === 'provider_portrait') {
+    attachLines.push('・出品者のアイコン画像（顔写真かイラスト）。紙面の主役の位置に、この人物を描きます。');
+  }
+  if (options.matchThumbnail) {
+    attachLines.push('・このサービスのサムネイル画像。配色と雰囲気はこのサムネイルに合わせます（紙で受け取った人が、あとでサービスページを開いたとき同じ出品者だと分かるように）。');
+  }
+  const attachStep = attachLines.length
     ? `
 ■ 先にやること
-このチャットに、このサービスのサムネイル画像を添付してから、この指示を送ってください。
-添付した画像の配色・書体の雰囲気・世界観を、このチラシでもそのまま使います。
-紙で受け取った人が、あとでサービスページを開いたときに同じ出品者だと分かるようにするためです。
-添付が無いときは、下のデザイン仕様だけで作ってかまいません。
+このチャットに次の画像を添付してから、この指示を送ってください。
+${attachLines.join('\n')}
+添付が無いときは、下の指定だけで作ってかまいません。
 `
     : '';
 
+  const colorLines = options.matchThumbnail
+    ? [
+        '・配色：添付したサムネイルの主色を紙面の主色に、サムネイルの差し色を紙面の差し色にする。紙面はその2色＋白だけで組む。最下部の帯は主色のベタ塗り。',
+        `・サムネイルが無いときの配色：主色は${design.dominantColor.name}（${design.dominantColor.hex}）、差し色は${design.accentColor.name}（${design.accentColor.hex}）。`,
+      ]
+    : [
+        `・主色：${design.dominantColor.name}（${design.dominantColor.hex}）。紙面の色はこの1色＋白＋差し色だけ。最下部の帯はこの主色のベタ塗り。`,
+        `・差し色：${design.accentColor.name}（${design.accentColor.hex}）。見出しの強調語と丸バッジにだけ使う。それ以外の場所に差し色を広げない。`,
+      ];
+
+  const deviceLines = design.devices.length
+    ? `・使う部品：\n${design.devices.map(dv => `  - ${FLYER_DEVICE_TEXT[dv]}`).join('\n')}`
+    : '・使う部品：無し（線・面・余白だけ）';
+  const avoidLine = design.avoid.length
+    ? `・使わない部品：${design.avoid.map(dv => FLYER_DEVICE_TEXT[dv].split('（')[0]).join('、')}`
+    : '';
+
+  const heroLayout = `主役ビジュアルを右に、見出しを左に。見出しは紙面でいちばん大きな文字${emphasis ? `で、${emphasis}だけ差し色` : ''}。サブコピーはその下に小さく。`
+    + (badge ? `主役ビジュアルの左下に重ねて丸バッジを1つ置き、「${badge}」を白抜きで入れる。` : '丸バッジは置かない。');
+
+  const textBlocks = [
+    `【対象者ラベル（最上部・ピル型）】\n${copy.audienceLabel}`,
+    `【見出し（いちばん大きく）】\n${angle.headline}${emphasis ? `\n（差し色にする語：${emphasis}）` : ''}`,
+    `【サブコピー】\n${angle.subCopy}`,
+    ...(badge ? [`【丸バッジ】\n${badge}`] : []),
+    ...body.texts,
+    ...(copy.reassurance ? [`【つなぎの1行（帯3と帯4のあいだ）】\n${copy.reassurance}`] : []),
+    `【締めの帯（最下部・主色ベタ）】\n${copy.cta.firstStep}${copy.cta.price ? `\n${copy.cta.price}` : ''}${copy.cta.note ? `\n（小さく）${copy.cta.note}` : ''}\n（QR枠の下に小さく）詳しくはこちら`,
+  ];
+
   return `ChatGPTの画像生成（GPT Image）で、紙に印刷して配るチラシを1枚作ります。A5（148×210mm）たての片面チラシです。
+
+■ 完成までの手順（2段階。どちらもこのチャットの中でやる）
+1. 画像生成でチラシ本体を1枚作る（右下にQR用の白い枠を空けておく）
+2. コード実行で本物のQRコードを作り、その白い枠に重ねて、完成した画像を1枚出力する（手順はいちばん下）
+QRが載っていない画像は完成ではありません。
 ${attachStep}
-■ デザイン仕様（この仕様どおりに作る）
-${designSpec}
+■ このチラシの方針（この方針どおりに作る）
+・系統：${family.label}。読む相手は「${analysis.audience}」。雰囲気は${design.moodWords.map(w => `「${w}」`).join('')}。
+・調子：かたさ ${analysis.formality}/5、あたたかさ ${analysis.warmth}/5、勢い ${analysis.energy}/5。
+${colorLines.join('\n')}
+・見出しの書体：${FLYER_HEADLINE_TYPE_TEXT[design.headlineType]}。本文は読みやすい太めのゴシック。書体は見出しと本文の2種だけ。
+・装飾：${FLYER_DECORATION_TEXT[design.decoration]}。
+・主役ビジュアル：${flyerHeroVisualText(design)}。${FLYER_HERO_CUT_TEXT[design.heroCut]}。
+${deviceLines}
+${avoidLine}
 
 ${flyerPrintRules(QR_SPOT_SINGLE, 'A5（148×210mm）')}
 
 ■ この1枚の主役
-${FLYER_ANGLE_SPECS[angle.id].hint}
+${FLYER_ANGLE_SPECS[angle.id].lead}。
 
-■ 紙面の構成（上から順に）
-${layout.map((v, i) => `${i + 1}. ${v}`).join('\n')}
+■ 紙面の構成（上から4つの帯。高さの比率はおおよそ 5：30：35：20。残りは余白）
+1. 対象者ラベル：左上に、小さなピル型（角の丸い横長の枠）で1行。主色の細い枠線に主色の文字。
+2. 見出しの帯：${heroLayout}
+3. 本文の帯：${body.layout}
+4. 締めの帯：主色のベタ塗り。左に「最初の一歩」を白抜きで大きく、その下に価格をいちばん大きな数字で、さらに小さく添え書き。右にQR用の白い正方形の枠と、その下に「詳しくはこちら」。
+帯3と帯4のあいだに、つなぎの1行を小さく1行だけ置く。
 
-■ 紙に入れる文字（この文言だけを正確に）
-${blocks.join('\n')}${qrStep}`;
+■ 紙に入れる文字（この文言だけを正確に。ここに無い文章を足さない）
+${textBlocks.join('\n')}${qrStep}`;
 };
 
 // 枠の数によって紙面の割り方を変える。全部同じグリッドにすると、2件はスカスカ、6件は窮屈になる。
