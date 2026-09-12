@@ -39,6 +39,7 @@ const MENU_TOURS: Record<MenuId, { sel: string; title: string; text: string }[]>
     { sel: '[data-tour="menu-flyer-plan"]', title: 'デザインの方針は、本文から AI が決めます', text: '誰向けか・主色1色・見出しの書体・主役のビジュアルを、サービスの内容に合わせて決めています。プロのチラシ20点から取り出した型に沿っています。気に入らなければ作り直せます。' },
     { sel: '[data-tour="menu-flyer-copy"]', title: '切り口ちがいの3案。1本ずつ ChatGPT に貼る', text: '困りごと・結果・信頼のどこを主役にするかが違います。デザインの方針は3案とも同じなので、並べて見比べられます。3枚出して、良かった1枚を刷ってください。' },
     { sel: '[data-tour="menu-flyer-qr"]', title: 'QRが読めなかったときの保険', text: 'ここでこのツールがQR画像を作ります。ChatGPT にチラシ画像と一緒にアップロードして重ねてもらうか、Canva で重ねてください。' },
+    { sel: '[data-tour="menu-flyer-print"]', title: '刷るところまで', text: 'プリンタが無くても、完成画像をセブン‐イレブンのネットプリントにアップロードすれば、予約番号で店頭のマルチコピー機から刷れます。用紙は A4 を選んでください。' },
   ],
 };
 
@@ -1763,10 +1764,47 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
                     </li>
                     <li>3案のうち1つをコピーして貼る。同じチャットで3案とも試すと、デザインのそろった3枚を見比べられます</li>
                     <li>画像が出たら、上の「2本目：QRを重ねる指示をコピー」を同じチャットに貼る。ChatGPT がコード実行で本物のQRを右下に重ねた完成画像（ファイル）を出し、読み取り結果も報告します。文字が崩れていたら「◯◯の文字が崩れているので直して」で描き直せます</li>
-                    <li>良かった1枚にお名前・連絡先を入れて完成。<span className="font-medium text-stone-700">A4に2枚並べて印刷し、半分に切るとA5が2枚</span>できます</li>
+                    <li>良かった1枚にお名前・連絡先を入れて完成。家のプリンタなら<span className="font-medium text-stone-700">A4に2枚並べて印刷し、半分に切るとA5が2枚</span>できます。プリンタが無ければ、下のコンビニ印刷へ</li>
                   </ol>
+
+                  {/* コンビニで刷る。作って終わりにならないよう、刷る手段までここで案内する（用紙にA5は無いので、その注意も添える） */}
+                  <div className="bg-white border border-stone-200 rounded-xl p-4 mb-4" data-tour="menu-flyer-print">
+                    <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+                      <p className="text-xs font-bold text-stone-800">プリンタが無いときは、セブン‐イレブンのネットプリントで刷れます</p>
+                      <div className="flex flex-wrap gap-2">
+                        <a
+                          href="https://www.printing.ne.jp/index_p.html"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(e) => { e.preventDefault(); window.open('https://www.printing.ne.jp/index_p.html', '_blank', 'noopener,noreferrer'); }}
+                          className="btn-secondary px-3 py-1.5 text-[11px]"
+                        >
+                          ネットプリントを開く
+                        </a>
+                        <a
+                          href="https://lite.printing.ne.jp/web"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(e) => { e.preventDefault(); window.open('https://lite.printing.ne.jp/web', '_blank', 'noopener,noreferrer'); }}
+                          className="btn-secondary px-3 py-1.5 text-[11px]"
+                        >
+                          登録なしで使う（かんたんnetprint）
+                        </a>
+                      </div>
+                    </div>
+                    <ol className="text-[11px] text-stone-600 list-decimal list-inside space-y-1 leading-relaxed">
+                      <li>完成した画像をアップロードし、用紙は「A4」、カラーを選ぶ</li>
+                      <li>予約番号（またはQR）を控える。通常版は30日、かんたん版は翌日まで有効</li>
+                      <li>店頭のマルチコピー機で予約番号を入れて印刷する（白黒は1枚20円から。カラーの料金は店頭の表示を確認）</li>
+                    </ol>
+                    <p className="text-[11px] text-stone-400 mt-2 leading-relaxed">
+                      ネットプリントの用紙に A5 はありません。A4 でそのまま刷ると A5 より一回り大きい1枚になります（手渡しには十分です）。
+                      A5 を2枚取りたいときは、Canva などで A4 横に2枚並べた画像を作ってからアップロードしてください。
+                    </p>
+                  </div>
+
                   <p className="text-[11px] text-stone-400 leading-relaxed">
-                    画像の縦横比は2:3で、A5（1:1.41）ちょうどにはなりません。A5の幅に合わせると下がはみ出るので、外周に空けた余白ごと切り落としてください。
+                    画像は 2:3 で出ることがあり、A5（1:1.41）ちょうどにはなりません。A5の幅に合わせると下がはみ出るので、外周に空けた余白ごと切り落としてください（QRを重ねた完成画像が A5 比率で出ていれば、そのままで大丈夫です）。
                     文字は画像として描かれるので、印刷前に誤字がないか必ず自分の目で確認してください。
                   </p>
                 </div>
