@@ -1445,7 +1445,7 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
                   <p className="text-[11px] text-stone-400 mb-5">
                     {slideChatMode === 'one_by_one'
                       ? '同じチャットに上から順に貼ります。1枚ずつ確認しながら進めたいときはこちら。'
-                      : 'ChatGPT の複数枚一括生成（Images 2.0 以降・有料プラン）向けに、全枚分を1本にまとめます。1回で作れる枚数には上限があるので、止まったら「続き」と送ってください。1枚ずつと同じ設計内容を使うので、作り直しは不要です。'}
+                      : 'ChatGPT の複数枚一括生成（Images 2.5／2.0・有料プラン・思考モードをオン）向けに、全枚分を1本にまとめます。1回で作れるのは最大8枚なので、止まったら「続き」と送ってください。1枚ずつと同じ設計内容を使うので、作り直しは不要です。'}
                   </p>
 
                   {/* トンマナ選択（サンプル画像ボタン。NotebookLMと同じ8種） */}
@@ -1510,7 +1510,7 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
                           <li>参考にしたい画像（既存サムネ等）があれば、先に添付するとより狙い通りの画風になります</li>
                           <li><span className="font-semibold">1枚目のプロンプトをコピーして送信</span> → 画風・配色・書体が決まります</li>
                           <li><span className="font-semibold">同じチャットのまま</span>、2枚目以降を順番に送信（画風は引き継ぎ、レイアウトはページごとに最適化されます）</li>
-                          <li>気になる箇所は「ここだけ直して」と同じチャットで微調整</li>
+                          <li>気になる箇所は「ここだけ直して」と同じチャットで微調整（Images 2.5 なら、画像の直したい場所にコメントを置いて指示すると狙いどおりに直りやすい）</li>
                           <li>各画像をダウンロードし、<span className="font-semibold">スキルマーケットのサービス画像に追加</span></li>
                         </ol>
                         <a
@@ -1563,11 +1563,11 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
                       <div className="bg-stone-50 border border-stone-200/80 rounded-2xl p-6 mb-6">
                         <h4 className="text-sm font-bold text-stone-900 mb-3">ChatGPTでまとめて1回で作る手順</h4>
                         <ol className="text-xs text-stone-600 space-y-2 list-decimal list-inside leading-relaxed mb-4">
-                          <li>「ChatGPT を開く」ボタンから新しいチャットを開く（画像生成／GPT Image 対応モデル。複数枚の一括生成は有料プランで使えます）</li>
+                          <li>「ChatGPT を開く」ボタンから新しいチャットを開き、<span className="font-semibold">思考モードをオン</span>にする（複数枚の一括生成は有料プランで、思考モードのときだけ使えます。1回に最大8枚）</li>
                           <li>参考にしたい画像（既存サムネ等）があれば、先に添付するとより狙い通りの画風になります</li>
                           <li><span className="font-semibold">「まとめてコピー」したプロンプトを1回送信</span> → 画像1から順に、全{slidePrompts.length}枚が独立した画像で出てきます</li>
                           <li>途中で止まったら「<span className="font-semibold">続き</span>」と送る。1枚にまとまってしまったら「<span className="font-semibold">独立した{slidePrompts.length}枚の画像として作り直して</span>」と送る</li>
-                          <li>気になる1枚は「画像3だけ、ここを直して」のように番号で指定して微調整</li>
+                          <li>気になる1枚は「画像3だけ、ここを直して」のように番号で指定して微調整（Images 2.5 なら、その画像の直したい場所にコメントを置いて指示できる）</li>
                           <li>各画像をダウンロードし、<span className="font-semibold">スキルマーケットのサービス画像に追加</span></li>
                         </ol>
                         <p className="text-[11px] text-stone-400 leading-relaxed mb-4">
