@@ -98,8 +98,6 @@ const parseServiceContent = (text: string) => {
   const subCategory = getValue('サブカテゴリ');
   const title = getValue('タイトル');
   const catchphrase = getValue('キャッチコピー');
-  // サムネイル画像に入れる唯一の文字。出品画面に貼る項目ではないので、貼るチェックリストと全文コピーには出さない
-  const thumbnailHeadline = getValue('サムネイル見出し');
 
   const policyMarker = '⚠️キャンセル時の注意事項';
   const skillsMarker = '🎯出品者スキル';
@@ -143,7 +141,7 @@ const parseServiceContent = (text: string) => {
   const priceParts = parsePriceBlock(priceSplit.priceRaw);
 
   return {
-    title, catchphrase, thumbnailHeadline, category, subCategory,
+    title, catchphrase, category, subCategory,
     detail, policy, skills, template,
     priceBefore: priceSplit.before,
     priceAfter: priceSplit.after,
@@ -156,7 +154,7 @@ const parseServiceContent = (text: string) => {
 
 // 手動編集されたセクションから出品ページ本文を組み立て直す（parseServiceContentと往復可能な形式）
 interface ContentParts {
-  category: string; subCategory: string; title: string; catchphrase: string; thumbnailHeadline: string;
+  category: string; subCategory: string; title: string; catchphrase: string;
   detail: string; policy: string; skills: string; template: string;
 }
 const reconstructContent = (parts: ContentParts): string => {
@@ -165,7 +163,6 @@ const reconstructContent = (parts: ContentParts): string => {
     parts.subCategory ? `サブカテゴリ：${parts.subCategory}` : '',
     parts.title ? `タイトル：${parts.title}` : '',
     parts.catchphrase ? `キャッチコピー：${parts.catchphrase}` : '',
-    parts.thumbnailHeadline ? `サムネイル見出し：${parts.thumbnailHeadline}` : '',
   ].filter(Boolean).join('\n');
 
   let out = headerLines;
@@ -221,8 +218,7 @@ const CopySection: React.FC<{
   content: string;
   onSave?: (newContent: string) => void;
   minRows?: number;
-  hint?: string;
-}> = ({ title, content, onSave, minRows = 3, hint }) => {
+}> = ({ title, content, onSave, minRows = 3 }) => {
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState(content);
 
@@ -241,7 +237,6 @@ const CopySection: React.FC<{
       <div className="flex justify-between items-center mb-3 gap-2">
         <div className="flex items-center gap-2 flex-wrap min-w-0">
           <h4 className="font-semibold text-stone-900 text-sm">{title}</h4>
-          {hint && <span className="text-[11px] text-stone-400">{hint}</span>}
         </div>
         <div className="flex items-center gap-2">
           {editing ? (
@@ -303,7 +298,7 @@ const PROMPT_STYLES: Array<{
   {
     id: 'benefit_banner',
     label: '訴求バナー（ベネフィット型）',
-    description: '買い手が得るものを一言で言い切る、販促バナー風。人物かサービス固有のモチーフを1つ、色は3色まで。文字は見出し1本だけなので、一覧で縮んでも読めます。',
+    description: '「現役◯◯が全力サポート！」のような、大見出し＋提供者キャラクター＋3つのベネフィットで構成する販促バナー風。サービスの内容・ターゲットに合わせて見出し・キャラ・配色を自動で調整し、インパクトと信頼感を両立します。',
     fullWidth: true,
     recommended: true,
   },
@@ -330,7 +325,7 @@ const PROMPT_STYLES: Array<{
   {
     id: 'youtube',
     label: 'YouTube風',
-    description: '人気YouTuberのサムネイル風。大きな顔や象徴物と、太い一言で目を引きます。色は3色まで、フチ取りは細く1重まで。',
+    description: '人気YouTuberのサムネイル風。インパクト重視で思わずクリックしたくなる印象。',
   },
   {
     id: 'puffy_3d',
@@ -505,8 +500,7 @@ const ServiceResult: React.FC<ServiceResultProps> = ({ idea, content, onBack, on
   }, [promptCtx]);
 
   const handleCopyAll = () => {
-    const withoutHeadline = rebuiltContent.replace(/^サムネイル見出し[：:].*\n?/m, '');
-    navigator.clipboard.writeText(decorateHeadings(withoutHeadline)).then(() => {
+    navigator.clipboard.writeText(decorateHeadings(rebuiltContent)).then(() => {
       setIsAllCopied(true);
       setTimeout(() => setIsAllCopied(false), 2000);
     });
@@ -526,7 +520,6 @@ const ServiceResult: React.FC<ServiceResultProps> = ({ idea, content, onBack, on
       subCategory: parsed.subCategory,
       title: parsed.title,
       catchphrase: parsed.catchphrase,
-      thumbnailHeadline: parsed.thumbnailHeadline,
       detail: parsed.detail,
       policy: parsed.policy,
       skills: parsed.skills,
@@ -646,13 +639,6 @@ const ServiceResult: React.FC<ServiceResultProps> = ({ idea, content, onBack, on
           </div>
           <CopySection title="タイトル" content={parsed.title} minRows={2} onSave={(v) => applySectionEdit({ title: v })} />
           <CopySection title="キャッチコピー" content={parsed.catchphrase} minRows={2} onSave={(v) => applySectionEdit({ catchphrase: v })} />
-          <CopySection
-            title="サムネイル見出し"
-            hint="サムネイル画像に入る唯一の文字。出品画面には貼りません"
-            content={parsed.thumbnailHeadline}
-            minRows={1}
-            onSave={(v) => applySectionEdit({ thumbnailHeadline: v })}
-          />
 
           {/* サービス詳細 - 価格モードUIを埋め込んだカスタムカード */}
           <div className="card p-5" data-tour="detail-card">
@@ -878,7 +864,7 @@ const ServiceResult: React.FC<ServiceResultProps> = ({ idea, content, onBack, on
           <SectionHead
             eyebrow="さいごに"
             title="サムネイル画像を用意する"
-            description="下のプロンプトをコピーして ChatGPT に貼ると、あなたのサービス内容で画像ができます。画像生成は ChatGPT（GPT Image）を使います。画像に入る文字は上の「サムネイル見出し」1本だけで、サービス名は入れません（一覧では画像の外に出ます）。カードの画像は仕上がりのサンプルです。"
+            description="下のプロンプトをコピーして ChatGPT に貼ると、あなたのサービス内容で画像ができます。画像生成は ChatGPT（GPT Image）を使います。カードの画像は仕上がりのサンプルです。"
             action={
               <a href="https://chatgpt.com/" target="_blank" rel="noopener noreferrer" className="btn-dark px-5 py-2 text-xs">ChatGPT を開く</a>
             }
