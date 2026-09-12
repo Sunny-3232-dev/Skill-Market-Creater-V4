@@ -105,6 +105,15 @@ export type FlyerHeroVisual =
 
 export type FlyerHeroCut = 'diagonal' | 'curve' | 'circle' | 'full' | 'wave';
 
+// 紙面の型。日本のチラシでよく使われる骨格を、プロの作例20点から5つに絞った（チラシ再設計_01_参考デザイン分析.md 9章）。
+// 型が見出しに使う切り口（FlyerAngleId）と帯の組み方を決める。段Aが本文に合う型を1つおすすめし、画面では5つとも選べる。
+export type FlyerTemplateId =
+  | 'classic'    // 定番（人物＋3カード）：ラベル／見出し＋主役右／3カード／CTA帯
+  | 'checklist'  // お悩みチェック：問いかけの見出し／チェック3項目を大きく→矢印→解決できること
+  | 'number'     // 実績ドン（数字主役）：見出しの下に実績数字を最大に／根拠の経歴（数字が無いと使えない）
+  | 'visual'     // 全面ビジュアル（表紙風）：上半分を主役の絵で敷き、見出しを白抜きで重ねる
+  | 'offer';     // オファー主役（価格ドン）：大きな丸バッジに初回価格／CTA帯を広く（価格が無いと使えない）
+
 // 紙面の部品。プロの作例で繰り返し使われていたもの。系統に合わせて使う／使わないを決める。
 export type FlyerDevice =
   | 'badge'          // 丸バッジ（価格・限定・実績を写真に重ねる）
@@ -137,6 +146,7 @@ export interface FlyerDesign {
   heroVisual: FlyerHeroVisual;
   heroSubject: string;    // 主役ビジュアルの具体（例「ノートPCに向かって微笑む提供者」）
   heroCut: FlyerHeroCut;
+  template: FlyerTemplateId;  // 段Aがおすすめする紙面の型（画面では5つとも選べる）
   devices: FlyerDevice[];
   avoid: FlyerDevice[];
   moodWords: string[];    // 雰囲気を表す語 2〜3

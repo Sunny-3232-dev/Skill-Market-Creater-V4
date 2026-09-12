@@ -1,7 +1,8 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
-import { generatePromotion, generateSurveyPatterns, getSlideDocPrompt, extractServiceTitle, generateAutoSlideStyle, generateSlideImageContents, buildSlideImagePromptText, buildSlideImageBatchPromptText, getFormBannerPrompt, generateFlyerContent, generateMultiFlyerContent, buildFlyerPromptText, buildMultiFlyerPromptText, FLYER_ANGLE_SPECS, FLYER_FAMILY_SPECS, FLYER_QR_URL_PLACEHOLDER, buildFlyerQrFollowupText } from '../services/geminiService';
+import { generatePromotion, generateSurveyPatterns, getSlideDocPrompt, extractServiceTitle, generateAutoSlideStyle, generateSlideImageContents, buildSlideImagePromptText, buildSlideImageBatchPromptText, getFormBannerPrompt, generateFlyerContent, generateMultiFlyerContent, buildFlyerPromptText, buildMultiFlyerPromptText, FLYER_FAMILY_SPECS, FLYER_TEMPLATES, FLYER_TEMPLATE_IDS, flyerTemplateAvailable, flyerAngleForTemplate, FLYER_QR_URL_PLACEHOLDER, buildFlyerQrFollowupText } from '../services/geminiService';
+import { FlyerTemplatePreview } from './FlyerTemplatePreview';
 import { extractWords } from '../utils/textProcessing';
-import { SkillIdea, SurveyPattern, SurveyQuestionDef, ThumbnailPromptVersion, SlideImagePrompt, FlyerContent, FlyerAngle, FlyerAngleId, FlyerHeadlineType, FlyerHeroVisual, FlyerHeroCut, FlyerDevice, MultiFlyerContent } from '../types';
+import { SkillIdea, SurveyPattern, SurveyQuestionDef, ThumbnailPromptVersion, SlideImagePrompt, FlyerContent, FlyerTemplateId, FlyerHeadlineType, FlyerHeroVisual, FlyerHeroCut, FlyerDevice, MultiFlyerContent } from '../types';
 import { MegaphoneIcon, ClipboardListIcon, PresentationIcon, FlyerIcon } from './icons';
 import { PromptPreview } from './promptPreviews';
 import LoadingOverlay from './LoadingOverlay';
@@ -37,7 +38,7 @@ const MENU_TOURS: Record<MenuId, { sel: string; title: string; text: string }[]>
   ],
   flyer: [
     { sel: '[data-tour="menu-flyer-plan"]', title: 'デザインの方針は、本文から AI が決めます', text: '誰向けか・主色1色・見出しの書体・主役のビジュアルを、サービスの内容に合わせて決めています。プロのチラシ20点から取り出した型に沿っています。気に入らなければ作り直せます。' },
-    { sel: '[data-tour="menu-flyer-copy"]', title: '切り口ちがいの3案。1本ずつ ChatGPT に貼る', text: '困りごと・結果・信頼のどこを主役にするかが違います。デザインの方針は3案とも同じなので、並べて見比べられます。3枚出して、良かった1枚を刷ってください。' },
+    { sel: '[data-tour="menu-flyer-copy"]', title: '紙面の型を選んで、ChatGPT に貼る', text: '定番・お悩みチェック・実績ドン・全面ビジュアル・オファー主役の5つ。図はこのサービスの色と見出しで描いた組み方のイメージです。AIのおすすめと定番の2枚を出して見比べるのが早いです。' },
     { sel: '[data-tour="menu-flyer-qr"]', title: 'QRが読めなかったときの保険', text: 'ここでこのツールがQR画像を作ります。ChatGPT にチラシ画像と一緒にアップロードして重ねてもらうか、Canva で重ねてください。' },
     { sel: '[data-tour="menu-flyer-print"]', title: '刷るところまで', text: 'プリンタが無くても、完成画像をセブン‐イレブンのネットプリントにアップロードすれば、予約番号で店頭のマルチコピー機から刷れます。チラシは B5 ちょうどの大きさで作ってあるので、用紙は B5 を選んでください。' },
   ],
@@ -364,7 +365,7 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
   const [multiFlyerIds, setMultiFlyerIds] = useState<string[]>(Array.isArray(init.multiFlyerIds) ? init.multiFlyerIds : []);
   const [multiFlyerContent, setMultiFlyerContent] = useState<MultiFlyerContent | null>(init.multiFlyerContent ?? null);
   const [isMultiFlyerLoading, setIsMultiFlyerLoading] = useState(false);
-  const [copiedAngleId, setCopiedAngleId] = useState<FlyerAngleId | null>(null);
+  const [copiedTemplateId, setCopiedTemplateId] = useState<FlyerTemplateId | null>(null);
   const [copiedQrFollowup, setCopiedQrFollowup] = useState(false);
   const [copiedMultiFlyer, setCopiedMultiFlyer] = useState(false);
 
@@ -781,7 +782,7 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
       }
       setFlyerContent(content);
       setFlyerMode('single');
-      setCopiedAngleId(null);
+      setCopiedTemplateId(null);
       setActiveMenu('flyer');
       setTimeout(scrollToResults, 100);
     } catch (error) {
@@ -832,15 +833,15 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
     }
   };
 
-  const handleCopyFlyerPrompt = (angle: FlyerAngle) => {
+  const handleCopyFlyerPrompt = (templateId: FlyerTemplateId) => {
     if (!flyerContent) return;
-    const text = buildFlyerPromptText(flyerContent, angle, {
+    const text = buildFlyerPromptText(flyerContent, templateId, {
       matchThumbnail: flyerMatchThumbnail,
       serviceUrl: selectedServiceUrl || undefined,
     });
     navigator.clipboard.writeText(text).then(() => {
-      setCopiedAngleId(angle.id);
-      setTimeout(() => setCopiedAngleId(prev => (prev === angle.id ? null : prev)), 2000);
+      setCopiedTemplateId(templateId);
+      setTimeout(() => setCopiedTemplateId(prev => (prev === templateId ? null : prev)), 2000);
     });
   };
 
@@ -960,8 +961,8 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
     {
       id: 'flyer' as MenuId,
       title: 'チラシを作る（検証中）',
-      description: 'オフ会で手渡す前提の、B5たて1枚のチラシ。本文からデザインの方針をAIが決め、切り口を変えた3案のプロンプトを用意します。コンビニのネットプリントでそのまま刷れます。',
-      highlight: 'B5たて・方針はAIが設計・3案',
+      description: 'オフ会で手渡す前提の、B5たて1枚のチラシ。本文からデザインの方針をAIが決め、日本のチラシでよく使う5つの型から選んでプロンプトにします。コンビニのネットプリントでそのまま刷れます。',
+      highlight: 'B5たて・方針はAIが設計・紙面の型5つ',
       icon: <FlyerIcon />,
       onRun: handleRunFlyer,
     },
@@ -1596,7 +1597,7 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
                   <h3 className="text-lg font-bold text-stone-900">チラシをつくる（検証中）</h3>
                   <p className="text-xs text-stone-500 mt-1">
                     オフ会で手渡す前提の、B5（182×257mm）1枚のチラシです。コンビニのネットプリントで刷れる大きさに合わせています。本文から<span className="font-medium text-stone-600">誰向けか・主色・書体・主役のビジュアル</span>を AI が決め、
-                    切り口を変えた<span className="font-medium text-stone-600">3案</span>を用意しました。ChatGPTの画像生成（GPT Image）に1本ずつ貼って、出てきた3枚から良かった1枚を刷ってください。
+                    日本のチラシでよく使う<span className="font-medium text-stone-600">5つの紙面の型</span>から選んで、ChatGPTの画像生成（GPT Image）に貼ります。2〜3枚出して、良かった1枚を刷ってください。
                     QRコードは、画像のあとに <span className="font-medium text-stone-600">ChatGPT がコード実行で本物を作って右下に重ねます</span>（プロンプトに手順入り）。
                   </p>
                 </div>
@@ -1659,7 +1660,7 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
 
                       {/* 3案で共通して使う中身。切り口が変わっても同じ */}
                       <div className="card p-5 mb-5">
-                        <p className="text-[10px] font-semibold text-stone-400 uppercase tracking-[0.2em] mb-3">3案 共通の中身</p>
+                        <p className="text-[10px] font-semibold text-stone-400 uppercase tracking-[0.2em] mb-3">どの型でも共通の中身</p>
                         <FlyerPreviewRow label="対象者ラベル">{flyerContent.copy.audienceLabel}</FlyerPreviewRow>
                         <FlyerPreviewRow label="お困りごと">{flyerContent.copy.problems.join(' ／ ')}</FlyerPreviewRow>
                         <FlyerPreviewRow label="できること">{flyerContent.copy.cards.map(c => `${c.title}（${c.body}）`).join(' ／ ')}</FlyerPreviewRow>
@@ -1703,25 +1704,47 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
                         </div>
                       </div>
 
-                      {/* 切り口ちがいの3案。見出しと「紙面の主役」が変わる */}
-                      <div data-tour="menu-flyer-copy" className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-5 items-stretch">
-                        {flyerContent.copy.angles.map((angle) => (
-                          <div key={angle.id} className="card p-5 flex flex-col">
-                            <span className="self-start text-[10px] font-semibold text-brand-600 bg-brand-50 px-2 py-0.5 rounded-full mb-2">
-                              {FLYER_ANGLE_SPECS[angle.id].label}
-                            </span>
-                            <p className="text-sm font-bold text-stone-900 leading-snug mb-1">{renderEmphasized(angle.headline, angle.emphasis, flyerContent.design.accentColor.hex)}</p>
-                            <p className="text-xs text-stone-500 leading-relaxed mb-3">{angle.subCopy}</p>
-                            <p className="text-[11px] text-stone-400 leading-relaxed mb-4 flex-grow">{FLYER_ANGLE_SPECS[angle.id].lead}</p>
-                            <button
-                              type="button"
-                              onClick={() => handleCopyFlyerPrompt(angle)}
-                              className="btn-dark w-full px-4 py-2.5 text-xs"
-                            >
-                              {copiedAngleId === angle.id ? 'コピーしました' : 'この案のプロンプトをコピー'}
-                            </button>
-                          </div>
-                        ))}
+                      {/* 紙面の型5つ。日本のチラシでよく使われる骨格を、生成済みの色と見出しで描いたワイヤーフレームつきで選ぶ。AIのおすすめに印 */}
+                      <div className="mb-3">
+                        <h4 className="text-base font-bold text-stone-900">紙面の型を選ぶ</h4>
+                        <p className="text-xs text-stone-500 mt-1">
+                          日本のチラシでよく使われる5つの型です。図はこのサービスの主色・差し色と見出しで描いた組み方のイメージで、実際の絵柄は ChatGPT が描きます。
+                          本文に合う型に<span className="font-medium text-stone-600">「AIのおすすめ」</span>を付けています。迷ったら、おすすめと定番の2枚を出して見比べてください。
+                        </p>
+                      </div>
+                      <div data-tour="menu-flyer-copy" className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4 mb-5 items-stretch">
+                        {FLYER_TEMPLATE_IDS.map((id) => {
+                          const tpl = FLYER_TEMPLATES[id];
+                          const available = flyerTemplateAvailable(id, flyerContent);
+                          const recommended = flyerContent.design.template === id;
+                          const angle = flyerAngleForTemplate(flyerContent, id);
+                          return (
+                            <div key={id} className={`card p-3 flex flex-col ${recommended ? 'border-brand-400 ring-2 ring-brand-100' : ''} ${available ? '' : 'opacity-60'}`}>
+                              <FlyerTemplatePreview content={flyerContent} template={id} className="w-full rounded-lg border border-stone-100 mb-2" />
+                              <div className="flex items-center gap-1.5 mb-1 min-h-[18px]">
+                                <span className="text-xs font-bold text-stone-900 leading-tight">{tpl.label}</span>
+                                {recommended && <span className="shrink-0 text-[10px] font-semibold text-brand-600 bg-brand-50 px-1.5 py-0.5 rounded-full">AIのおすすめ</span>}
+                              </div>
+                              <p className="text-[11px] text-stone-500 leading-relaxed mb-1">{tpl.lead}</p>
+                              <p className="text-[11px] text-stone-700 leading-snug mb-3 flex-grow">
+                                見出し：{renderEmphasized(angle.headline, angle.emphasis, flyerContent.design.accentColor.hex)}
+                              </p>
+                              {available ? (
+                                <button
+                                  type="button"
+                                  onClick={() => handleCopyFlyerPrompt(id)}
+                                  className="btn-dark w-full px-3 py-2 text-[11px]"
+                                >
+                                  {copiedTemplateId === id ? 'コピーしました' : 'この型のプロンプトをコピー'}
+                                </button>
+                              ) : (
+                                <p className="text-[10px] text-stone-400 leading-relaxed">
+                                  {tpl.requires === 'bigNumber' ? '本文に件数・人数・年数の数字が無いので、この型は使えません' : '本文に価格が無いので、この型は使えません'}
+                                </p>
+                              )}
+                            </div>
+                          );
+                        })}
                       </div>
 
                       <div className="flex flex-wrap items-center gap-2 mb-4">
@@ -1762,7 +1785,7 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
                         : 'この方針では主役は提供者本人ではないので、アイコンの添付は不要です。'}
                       「配色をサムネイルに合わせる」にチェックした場合は、サムネイル画像も添付します
                     </li>
-                    <li>3案のうち1つをコピーして貼る。同じチャットで3案とも試すと、デザインのそろった3枚を見比べられます</li>
+                    <li>紙面の型を1つ選んでプロンプトをコピーし、貼る。同じチャットで別の型も試すと、配色のそろった数枚を見比べられます</li>
                     <li>画像が出たら、上の「2本目：QRを重ねる指示をコピー」を同じチャットに貼る。ChatGPT がコード実行で本物のQRを右下に重ねた完成画像（ファイル）を出し、読み取り結果も報告します。文字が崩れていたら「◯◯の文字が崩れているので直して」で描き直せます</li>
                     <li>良かった1枚にお名前・連絡先を入れて完成。家のプリンタなら<span className="font-medium text-stone-700">B5用紙にそのまま印刷</span>（B5が無ければA4に印刷して余白を切る）。プリンタが無ければ、下のコンビニ印刷へ</li>
                   </ol>

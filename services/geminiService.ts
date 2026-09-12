@@ -1,6 +1,6 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
-import { UserInput, SkillIdea, SurveyPattern, ThumbnailPromptVersion, SlideImagePrompt, FlyerContent, FlyerAngle, FlyerAngleId, FlyerStyleFamily, FlyerHeadlineType, FlyerHeroVisual, FlyerHeroCut, FlyerDevice, FlyerColor, FlyerCard, FlyerDesign, MultiFlyerContent, ProfileFacts } from "../types";
+import { UserInput, SkillIdea, SurveyPattern, ThumbnailPromptVersion, SlideImagePrompt, FlyerContent, FlyerAngle, FlyerAngleId, FlyerStyleFamily, FlyerHeadlineType, FlyerHeroVisual, FlyerHeroCut, FlyerTemplateId, FlyerDevice, FlyerColor, FlyerCard, FlyerDesign, MultiFlyerContent, ProfileFacts } from "../types";
 
 // モデルIDはここだけで管理する（以前は12か所に直書きされていた）。
 // 文章モデルは検証用に ?model=xxx で差し替えられ、localStorage に残る。?model=default で元に戻す。
@@ -1607,6 +1607,7 @@ design：
 - heroVisual：provider_portrait／product／scene／illustration から1つ。sellingWhat が person のとき、また相手が不安や痛みを抱えて「人」で選ぶサービス（施術・相談・レッスン・添削）のときは provider_portrait にする。成果物そのものが売りのとき（作品・料理・デザイン）だけ product を選ぶ
 - heroSubject：主役ビジュアルの具体を1行、30文字以内（例「ノートPCに向かって微笑む提供者」「木の机に並んだ手づくりの器」）。provider_portrait のときは表情と仕草だけを書き、性別・年齢・髪型・服装など見た目は書かない（見た目は添付されたアイコンに従うため）
 - heroCut：diagonal／curve／circle／full／wave から1つ
+- template：紙面の型を1つ。classic（定番：見出し＋主役右＋3カード）／checklist（お悩みチェック：困りごと3つを大きく見せてから解決）／number（実績ドン：件数・人数・年数を紙面でいちばん大きく）／visual（全面ビジュアル：上半分を主役の絵で敷く。見た目が売りのとき）／offer（オファー主役：初回・体験の価格を主役に）。上から順に当てはめて、最初に当てはまったものを選ぶ：① 成果物や場面の見た目そのものが売り（作品・料理・写真・美容・空間）→ visual、② 本文に強い数字（人数・件数・年数）がある → number、③ 初回・体験・お試しの安い価格があって試しやすさが武器 → offer、④ 相手の困りごとが具体的に3つ言える → checklist、⑤ どれにも当てはまらない → classic（classic は消去法でだけ選ぶ）
 - devices：使う部品。badge／yellow_marker／three_cards／big_number／reassurance／band_heading から、系統に合うものだけ。three_cards と reassurance は原則入れる。big_number は bigNumber を出すときは入れる（無いときだけ外す）
 - avoid：使わない部品。devices と重複させない
 - moodWords：雰囲気を表す語を2〜3語（例「誠実」「静か」「あたたかい」）
@@ -1672,11 +1673,12 @@ ${body.slice(0, 4000)}
                 heroVisual: { type: Type.STRING, enum: FLYER_HERO_VISUALS },
                 heroSubject: { type: Type.STRING },
                 heroCut: { type: Type.STRING, enum: FLYER_HERO_CUTS },
+                template: { type: Type.STRING, enum: ['classic', 'checklist', 'number', 'visual', 'offer'] },
                 devices: { type: Type.ARRAY, items: { type: Type.STRING, enum: FLYER_DEVICES } },
                 avoid: { type: Type.ARRAY, items: { type: Type.STRING, enum: FLYER_DEVICES } },
                 moodWords: { type: Type.ARRAY, items: { type: Type.STRING } },
               },
-              required: ['dominantColor', 'accentColor', 'headlineType', 'decoration', 'heroVisual', 'heroSubject', 'heroCut', 'devices', 'avoid', 'moodWords'],
+              required: ['dominantColor', 'accentColor', 'headlineType', 'decoration', 'heroVisual', 'heroSubject', 'heroCut', 'template', 'devices', 'avoid', 'moodWords'],
             },
             copy: {
               type: Type.OBJECT,
@@ -1827,6 +1829,12 @@ export const normalizeFlyerResponse = (parsed: any): FlyerContent | null => {
       heroVisual: pick(d.heroVisual, FLYER_HERO_VISUALS, 'provider_portrait'),
       heroSubject: str(d.heroSubject),
       heroCut: pick(d.heroCut, FLYER_HERO_CUTS, 'circle'),
+      template: (() => {
+        const t = pick(d.template, ['classic', 'checklist', 'number', 'visual', 'offer'] as const, 'classic');
+        if (t === 'number' && !bigNumber) return 'classic';
+        if (t === 'offer' && !str(c.cta?.price)) return 'classic';
+        return t;
+      })(),
       devices,
       avoid,
       moodWords: list(d.moodWords).slice(0, 3),
@@ -1994,12 +2002,37 @@ QRにするURL：${url}
 // ===== 段B：段Aの判断を、GPT Image にそのまま貼れる文面に組み立てる =====
 // 印刷ルール・帯の比率・QR の扱いはここで固定する（崩れると刷り直しになるので AI に書かせない）。
 
-// 切り口ごとに「本文の帯（帯3）で何を主役にするか」を変える。3枚出して見比べたとき、見出しだけでなく紙の重心が変わる。
-export const FLYER_ANGLE_SPECS: Record<FlyerAngleId, { label: string; lead: string }> = {
-  problem: { label: '困りごとから', lead: '「これ、自分のことだ」と思ってもらう1枚。本文の帯は困りごと3つが主役' },
-  result:  { label: '結果から',     lead: '手に入るものを先に見せる1枚。本文の帯はできること3カードが主役' },
-  trust:   { label: '信頼から',     lead: '「この人なら任せられる」と思ってもらう1枚。本文の帯は実績と経歴が主役' },
+// ===== 紙面の型（テンプレート）=====
+// 日本のチラシでよく使われる骨格を、プロの作例20点から5つに絞った。型が「見出しに使う切り口」と「帯の組み方」を決める。
+// 段Aが本文に合う型を1つおすすめし、画面では5つとも選べる（数字が無い本文では number、価格が無い本文では offer は選べない）。
+export const FLYER_TEMPLATES: Record<FlyerTemplateId, {
+  label: string;
+  lead: string;        // この型が効く場面（画面のカードに出す）
+  angleId: FlyerAngleId;
+  requires?: 'bigNumber' | 'price';
+  bands: { label: number; hero: number; body: number; cta: number };  // 版面の高さに対する％。残りは帯間の余白
+  works: string;       // 参考にした作例
+}> = {
+  classic:   { label: '定番（人物＋3カード）', lead: '迷ったらこれ。誰が・何をしてくれるかを、上から順に読ませる', angleId: 'result', bands: { label: 5, hero: 30, body: 35, cta: 20 }, works: 'ダイエットサポーター・税理士・鍼灸院' },
+  checklist: { label: 'お悩みチェック', lead: '「これ、自分のことだ」で手を止めてもらう。困りごとが具体的に3つ言えるサービス向き', angleId: 'problem', bands: { label: 5, hero: 27, body: 38, cta: 20 }, works: '宅配弁当・整体院の折込' },
+  number:    { label: '実績ドン（数字主役）', lead: '件数・人数・年数を紙面でいちばん大きく。数字で信頼を先に取る', angleId: 'trust', requires: 'bigNumber', bands: { label: 5, hero: 33, body: 32, cta: 20 }, works: 'ダイエットサポーター・鍼灸院（年間施術数）' },
+  visual:    { label: '全面ビジュアル（表紙風）', lead: '上半分を主役の絵で敷き、見出しを白抜きで重ねる。見た目が売りのサービス向き', angleId: 'result', bands: { label: 0, hero: 45, body: 30, cta: 20 }, works: 'エステ・ペット葬・キッズ弁当' },
+  offer:     { label: 'オファー主役（価格ドン）', lead: '初回・体験の価格を主役に。安さや試しやすさが武器のとき', angleId: 'result', requires: 'price', bands: { label: 5, hero: 28, body: 28, cta: 27 }, works: '整体院の折込・エステ体験・重機レンタル' },
 };
+
+export const FLYER_TEMPLATE_IDS = Object.keys(FLYER_TEMPLATES) as FlyerTemplateId[];
+
+/** その本文でこの型が使えるか（実績数字・価格が無いと成立しない型がある） */
+export const flyerTemplateAvailable = (id: FlyerTemplateId, content: FlyerContent): boolean => {
+  const req = FLYER_TEMPLATES[id].requires;
+  if (req === 'bigNumber') return !!content.copy.bigNumber;
+  if (req === 'price') return !!content.copy.cta.price;
+  return true;
+};
+
+/** 型が見出しに使う切り口。段Aがその切り口を返していなければ先頭の案で代用する */
+export const flyerAngleForTemplate = (content: FlyerContent, id: FlyerTemplateId): FlyerAngle =>
+  content.copy.angles.find(a => a.id === FLYER_TEMPLATES[id].angleId) ?? content.copy.angles[0];
 
 const FLYER_HEADLINE_TYPE_TEXT: Record<FlyerHeadlineType, string> = {
   round_bold: '極太の丸ゴシック。角が丸く、やわらかい印象',
@@ -2048,68 +2081,95 @@ const flyerHeroVisualText = (design: FlyerDesign): string => {
   }
 };
 
-// 帯2の丸バッジに何を入れるか。実績があれば実績、無ければ価格。信頼の切り口では実績が帯3の主役になるので、バッジは価格に回す
-const flyerBadgeText = (content: FlyerContent, angle: FlyerAngle): string => {
-  const { design, copy } = content;
-  if (!design.devices.includes('badge')) return '';
-  if (angle.id !== 'trust' && copy.bigNumber) return `${copy.bigNumber.label} ${copy.bigNumber.value}`;
-  if (copy.cta.price) return `${copy.cta.firstStep} ${copy.cta.price}`;
-  return '';
-};
-
-// 帯3（本文の帯）の構成と文言。切り口で主役が変わる
-const flyerBodyBand = (content: FlyerContent, angle: FlyerAngle): { layout: string; texts: string[] } => {
+// 型ごとの帯の組み方と、紙に入れる文字ブロック。共通部（対象者ラベル・締めの帯・QR）は buildFlyerPromptText 側で足す
+const flyerTemplateComposition = (
+  content: FlyerContent,
+  id: FlyerTemplateId,
+  angle: FlyerAngle,
+): { hero: string; body: string; cta: string; sizeNote: string; texts: string[]; heroCutOverride?: FlyerHeroCut } => {
   const { copy, design } = content;
-  // 帯の小見出し。帯見出しを部品として使う系統では主色の帯に白抜き、使わない系統では太字1行に留める
-  const heading = design.devices.includes('band_heading') ? '主色の細い帯に白抜きの帯見出し' : '小さな太字の見出し1行';
+  const emphasis = angle.emphasis.length ? angle.emphasis.map(w => `「${w}」`).join('') : '';
+  const headlineRule = `見出しは紙面でいちばん大きな文字（下の「大きさの目安」の見出しの高さ）で、1行 6〜8 文字で折って最大3行${emphasis ? `。${emphasis}だけ差し色` : ''}。サブコピーはその下に小さく`;
+  const useBadge = design.devices.includes('badge');
   const cardTitles = copy.cards.map(c => c.title).join('　／　');
   const cardsFull = copy.cards.map(c => `・${c.title}（アイコン：${c.icon}）：${c.body}`).join('\n');
-  switch (angle.id) {
-    case 'problem':
+  const cardsTitleIcon = copy.cards.map(c => `・${c.title}（アイコン：${c.icon}）`).join('\n');
+  const heading = design.devices.includes('band_heading') ? '主色の細い帯に白抜きの帯見出し' : '小さな太字の見出し1行';
+  const ctaDefault = '主色のベタ塗り。左に「最初の一歩」を白抜きで大きく、その下に価格をいちばん大きな数字で、さらに小さく添え書き。右にQR用の白い正方形の枠と、その下に「詳しくはこちら」。';
+  const headlineBlock = `【見出し（いちばん大きく）】\n${angle.headline}${emphasis ? `\n（差し色にする語：${emphasis}）` : ''}`;
+  const subBlock = `【サブコピー】\n${angle.subCopy}`;
+
+  switch (id) {
+    case 'classic': {
+      const badge = useBadge ? (copy.bigNumber ? `${copy.bigNumber.label} ${copy.bigNumber.value}` : (copy.cta.price ? `${copy.cta.firstStep} ${copy.cta.price}` : '')) : '';
       return {
-        layout: `${heading}「こんなことで困っていませんか」→ チェックマーク付きの3行を主役として大きく → 矢印1本 → その下に「できること」の題3つを小さく横一列に。`,
-        texts: [
-          `【帯3の小見出し】\nこんなことで困っていませんか`,
-          `【帯3の主役（チェック3行）】\n${flyerBullets(copy.problems)}`,
-          `【帯3の下段（できること・題だけ横一列）】\n${cardTitles}`,
-        ],
+        hero: `主役ビジュアルを右に（版面の幅の4割まで）、見出しを左に。${headlineRule}。` + (badge ? `主役ビジュアルの左下に重ねて丸バッジを1つ置き、「${badge}」を白抜きで入れる。` : '丸バッジは置かない。'),
+        body: `${heading}「このサービスでできること」→ 3カード（アイコン＋題＋1行）を主役として、同じ大きさの箱で横に3つ。`,
+        cta: ctaDefault,
+        sizeNote: '',
+        texts: [headlineBlock, subBlock, ...(badge ? [`【丸バッジ】\n${badge}`] : []), `【帯3の小見出し】\nこのサービスでできること`, `【帯3の主役（3カード）】\n${cardsFull}`],
       };
-    case 'result':
-      return {
-        layout: `${heading}「このサービスでできること」→ 3カード（アイコン＋題＋1行）を主役として、同じ大きさの箱で横に3つ。`,
-        texts: [
-          `【帯3の小見出し】\nこのサービスでできること`,
-          `【帯3の主役（3カード）】\n${cardsFull}`,
-        ],
-      };
-    case 'trust': {
-      const hasNumber = !!copy.bigNumber;
-      const hasLines = copy.trustLines.length > 0;
-      const layout = hasNumber
-        ? '左に実績数字を主役として大きく（数字は周りの文字の3倍。説明は小さく添える）、右にその根拠となる経歴・資格を2〜3行 → その下に「できること」の題3つを小さく横一列に。'
-        : '経歴・資格・経験を主役として、落ち着いた組みで2〜3行大きめに → その下に「できること」の題3つを小さく横一列に。';
-      const texts: string[] = [];
-      if (hasNumber) texts.push(`【帯3の主役（実績数字）】\n${copy.bigNumber!.value}\n（説明）${copy.bigNumber!.label}`);
-      if (hasLines) texts.push(`【帯3の${hasNumber ? '右側' : '主役'}（経歴・資格）】\n${flyerBullets(copy.trustLines)}`);
-      if (!hasNumber && !hasLines) texts.push(`【帯3の主役（できること）】\n${cardsFull}`);
-      else texts.push(`【帯3の下段（できること・題だけ横一列）】\n${cardTitles}`);
-      return { layout, texts };
     }
+    case 'checklist':
+      return {
+        hero: `見出しは問いかけ。主役ビジュアルを右に（版面の幅の3割5分まで、少し小さめ）、見出しを左に。${headlineRule}。丸バッジは置かない。`,
+        body: `上段：${heading}「こんなことで困っていませんか」→ チェックマーク付きの3行を主役として大きく（1行ずつ薄い面に載せる）→ 下向きの矢印を1本 → 下段：${heading}「それ、解決できます」→ できることを題＋アイコンで横一列に3つ（小さめ）。`,
+        cta: ctaDefault,
+        sizeNote: '・困りごとの3行はこの型の主役。文字の高さ 3.3（約6mm・17pt）、チェックマークは文字と同じ高さ',
+        texts: [headlineBlock, subBlock, `【帯3上段の小見出し】\nこんなことで困っていませんか`, `【帯3の主役（チェック3行）】\n${flyerBullets(copy.problems)}`, `【帯3下段の小見出し】\nそれ、解決できます`, `【帯3下段（できること・題とアイコン）】\n${cardsTitleIcon}`],
+      };
+    case 'number': {
+      const n = copy.bigNumber!;
+      return {
+        hero: `左に見出し、その真下に実績数字を紙面でいちばん大きな数字として置く（説明は数字の下に小さく）。主役ビジュアルは右上に小さめ（版面の幅の3割）。${headlineRule.replace('見出しは紙面でいちばん大きな文字', '見出しは数字の次に大きな文字')}。丸バッジは置かない（数字が主役なので重ねない）。`,
+        body: `${heading}「なぜ任せられるのか」→ 経歴・資格を1行ずつ、チェックマーク付きで2〜3行（大きめ）→ その下に「できること」の題3つをアイコン付きで横一列に。`,
+        cta: ctaDefault,
+        sizeNote: '・実績数字はこの型の主役。数字の高さ 10（約18mm・52pt）。単位は数字の半分、説明は最小の文字',
+        texts: [headlineBlock, subBlock, `【見出しの下（実績数字）】\n${n.value}\n（説明）${n.label}`, `【帯3の小見出し】\nなぜ任せられるのか`, `【帯3の主役（経歴・資格）】\n${flyerBullets(copy.trustLines.length ? copy.trustLines : copy.cards.map(c => c.title))}`, `【帯3の下段（できること・題とアイコン）】\n${cardsTitleIcon}`],
+      };
+    }
+    case 'visual': {
+      const badge = useBadge ? (copy.cta.price ? `${copy.cta.firstStep} ${copy.cta.price}` : (copy.bigNumber ? `${copy.bigNumber.label} ${copy.bigNumber.value}` : '')) : '';
+      return {
+        hero: `上半分は主役ビジュアルを版面の幅いっぱいに敷く（雑誌の表紙のように）。対象者ラベルは左上に白地のピルで重ねる。見出しはビジュアルの下側に白抜きで重ね、文字の下だけ薄く暗くして読ませる。${headlineRule}。` + (badge ? `右下に丸バッジを重ね、「${badge}」を白抜きで入れる。` : '丸バッジは置かない。'),
+        body: `${heading}「このサービスでできること」→ 3カード（アイコン＋題＋1行）を同じ大きさの箱で横に3つ。`,
+        cta: ctaDefault,
+        sizeNote: '・上半分のビジュアルは版面の幅いっぱい。人物なら胸から上を大きく、成果物なら寄りで',
+        texts: [headlineBlock, subBlock, ...(badge ? [`【丸バッジ】\n${badge}`] : []), `【帯3の小見出し】\nこのサービスでできること`, `【帯3の主役（3カード）】\n${cardsFull}`],
+        heroCutOverride: 'full',
+      };
+    }
+    case 'offer':
+      return {
+        hero: `見出しを左に。右に大きな丸バッジ（直径は紙の幅の24%・約44mm）を置き、上段に「${copy.cta.firstStep}」、下段に「${copy.cta.price}」を白抜きで大きく入れる。主役ビジュアルはバッジの後ろ・右下に小さめ（版面の幅の3割）。${headlineRule}。`,
+        body: `${heading}「このサービスでできること」→ できることを題＋アイコンで横一列に3つ → その下に不安払拭の1行を少し大きめに。`,
+        cta: `主色のベタ塗りで、他の型より高く取る。左に「${copy.cta.firstStep}」を白抜きで、その下に価格「${copy.cta.price}」を紙面でいちばん大きな数字で（高さ 10・約18mm・52pt）、さらに小さく添え書き。右にQR用の白い正方形の枠と、その下に「詳しくはこちら」。`,
+        sizeNote: '・価格はこの型の主役。丸バッジの中の価格は高さ 6（約11mm）、締めの帯の価格は高さ 10（約18mm・52pt）',
+        texts: [headlineBlock, subBlock, `【丸バッジ（上段／下段）】\n${copy.cta.firstStep}\n${copy.cta.price}`, `【帯3の小見出し】\nこのサービスでできること`, `【帯3（できること・題とアイコン）】\n${cardsTitleIcon}`],
+      };
   }
 };
 
-/** 1サービス分のチラシプロンプトを組み立てる（ChatGPTにそのまま貼れる形）。切り口ごとに1本ずつ作る。 */
+/** 1サービス分のチラシプロンプトを組み立てる（ChatGPTにそのまま貼れる形）。紙面の型ごとに1本ずつ作る。 */
 export const buildFlyerPromptText = (
   content: FlyerContent,
-  angle: FlyerAngle,
+  templateId: FlyerTemplateId,
   options: { matchThumbnail?: boolean; serviceUrl?: string } = {}
 ): string => {
   const { analysis, design, copy } = content;
   const family = FLYER_FAMILY_SPECS[analysis.family];
+  const tpl = FLYER_TEMPLATES[templateId];
+  const angle = flyerAngleForTemplate(content, templateId);
+  const comp = flyerTemplateComposition(content, templateId, angle);
   const qrStep = flyerQrStep([{ label: angle.headline, url: options.serviceUrl ?? '' }], false);
-  const badge = flyerBadgeText(content, angle);
-  const body = flyerBodyBand(content, angle);
-  const emphasis = angle.emphasis.length ? angle.emphasis.map(w => `「${w}」`).join('') : '';
+  const heroCut = comp.heroCutOverride ?? design.heroCut;
+
+  // 版面の高さ（用紙 − 上下の余白）を型の％で割って mm にする
+  const contentH = FLYER_PAPER.heightMm - FLYER_PAPER.marginMm * 2;
+  const mm = (pct: number) => Math.round(contentH * pct / 100);
+  const b = tpl.bands;
+  const bandRatio = b.label > 0 ? `${b.label}：${b.hero}：${b.body}：${b.cta}` : `（ラベルは上半分に重ねる）${b.hero}：${b.body}：${b.cta}`;
+  const bandMm = (b.label > 0 ? `帯1 約${mm(b.label)}mm／` : '') + `帯2 約${mm(b.hero)}mm／帯3 約${mm(b.body)}mm／帯4 約${mm(b.cta)}mm`;
 
   // 提供者本人が主役のときはアイコンの添付を先に頼む。配色をサムネイルに合わせるときは、サムネイルも添付させて色の指定を差し替える
   const attachLines: string[] = [];
@@ -2145,15 +2205,13 @@ ${attachLines.join('\n')}
     ? `・使わない部品：${design.avoid.map(dv => FLYER_DEVICE_TEXT[dv].split('（')[0]).join('、')}`
     : '';
 
-  const heroLayout = `主役ビジュアルを右に（版面の幅の4割まで）、見出しを左に。見出しは紙面でいちばん大きな文字（下の「大きさの目安」の見出しの高さ）で、1行 6〜8 文字で折って最大3行${emphasis ? `。${emphasis}だけ差し色` : ''}。サブコピーはその下に小さく。`
-    + (badge ? `主役ビジュアルの左下に重ねて丸バッジを1つ置き、「${badge}」を白抜きで入れる。` : '丸バッジは置かない。');
+  const labelLine = b.label > 0
+    ? '1. 対象者ラベル：左上に、小さなピル型（角の丸い横長の枠、高さは紙の幅の5%）で1行。主色の細い枠線に主色の文字。'
+    : '1. 対象者ラベル：上半分のビジュアルの左上に、白地のピル型（角の丸い横長の枠、高さは紙の幅の5%）で1行重ねる。文字は主色。';
 
   const textBlocks = [
     `【対象者ラベル（最上部・ピル型）】\n${copy.audienceLabel}`,
-    `【見出し（いちばん大きく）】\n${angle.headline}${emphasis ? `\n（差し色にする語：${emphasis}）` : ''}`,
-    `【サブコピー】\n${angle.subCopy}`,
-    ...(badge ? [`【丸バッジ】\n${badge}`] : []),
-    ...body.texts,
+    ...comp.texts,
     ...(copy.reassurance ? [`【つなぎの1行（帯3と帯4のあいだ）】\n${copy.reassurance}`] : []),
     `【締めの帯（最下部・主色ベタ）】\n${copy.cta.firstStep}${copy.cta.price ? `\n${copy.cta.price}` : ''}${copy.cta.note ? `\n（小さく）${copy.cta.note}` : ''}\n（QR枠の下に小さく）詳しくはこちら`,
   ];
@@ -2171,21 +2229,21 @@ ${attachStep}
 ${colorLines.join('\n')}
 ・見出しの書体：${FLYER_HEADLINE_TYPE_TEXT[design.headlineType]}。本文は読みやすい太めのゴシック。書体は見出しと本文の2種だけ。
 ・装飾：${FLYER_DECORATION_TEXT[design.decoration]}。
-・主役ビジュアル：${flyerHeroVisualText(design)}。${FLYER_HERO_CUT_TEXT[design.heroCut]}。
+・主役ビジュアル：${flyerHeroVisualText(design)}。${FLYER_HERO_CUT_TEXT[heroCut]}。
 ${deviceLines}
 ${avoidLine}
 
 ${flyerPrintRules(QR_SPOT_SINGLE, FLYER_PAPER.label)}
 
-■ この1枚の主役
-${FLYER_ANGLE_SPECS[angle.id].lead}。
+■ 紙面の型：${tpl.label}
+${tpl.lead}。
 
-■ 紙面の構成（上から4つの帯。高さの比率はおおよそ 5：30：35：20。残りは帯と帯のあいだの余白）
-${FLYER_PAPER.name}（${FLYER_PAPER.widthMm}×${FLYER_PAPER.heightMm}mm）で刷ったときの高さの目安：帯1 約${FLYER_PAPER.bands.label}mm／帯2 約${FLYER_PAPER.bands.hero}mm／帯3 約${FLYER_PAPER.bands.body}mm／帯4 約${FLYER_PAPER.bands.cta}mm。外周の余白 ${FLYER_PAPER.marginMm}mm。
-1. 対象者ラベル：左上に、小さなピル型（角の丸い横長の枠、高さは紙の幅の5%）で1行。主色の細い枠線に主色の文字。
-2. 見出しの帯：${heroLayout}
-3. 本文の帯：${body.layout}
-4. 締めの帯：主色のベタ塗り。左に「最初の一歩」を白抜きで大きく、その下に価格をいちばん大きな数字で、さらに小さく添え書き。右にQR用の白い正方形の枠と、その下に「詳しくはこちら」。
+■ 紙面の構成（上から4つの帯。高さの比率はおおよそ ${bandRatio}。残りは帯と帯のあいだの余白）
+${FLYER_PAPER.name}（${FLYER_PAPER.widthMm}×${FLYER_PAPER.heightMm}mm）で刷ったときの高さの目安：${bandMm}。外周の余白 ${FLYER_PAPER.marginMm}mm。
+${labelLine}
+2. 見出しの帯：${comp.hero}
+3. 本文の帯：${comp.body}
+4. 締めの帯：${comp.cta}
 帯3と帯4のあいだに、つなぎの1行を小さく1行だけ置く。
 
 ■ 大きさの目安（紙の幅を 100 としたときの文字の高さ。${FLYER_PAPER.name}での実寸）
@@ -2196,7 +2254,7 @@ ${FLYER_PAPER.name}（${FLYER_PAPER.widthMm}×${FLYER_PAPER.heightMm}mm）で刷
 ・カードの本文・添え書き・つなぎの1行：2.1（約4mm・${FLYER_PAPER.minFontPt}pt）。これが最小。これより小さい文字を1つも置かない
 ・3カード：同じ幅の箱を横に3つ（1つ約49mm）。アイコンは箱の幅の3割（約14mm）。本文は1行 12 字で2行まで
 ・丸バッジ：直径は紙の幅の14%（約26mm）
-・QRの白枠：一辺は紙の幅の20%（約${FLYER_PAPER.qrMm}mm）。帯4の中に収め、下に「詳しくはこちら」
+・QRの白枠：一辺は紙の幅の20%（約${FLYER_PAPER.qrMm}mm）。帯4の中に収め、下に「詳しくはこちら」${comp.sizeNote ? `\n${comp.sizeNote}` : ''}
 
 ■ 紙に入れる文字（この文言だけを正確に。ここに無い文章を足さない）
 ${textBlocks.join('\n')}${qrStep}`;
