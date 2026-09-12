@@ -1493,7 +1493,23 @@ export const getFormBannerPrompt = (formTitle: string): string => `ChatGPTの画
 
 // ===== チラシ（紙に印刷して配って認知を広げる）用 =====
 // 2段構え。段A（この関数）は Gemini に「デザインの判断」と「紙に描き込む文言」を一度に決めさせる。
-// 段B（buildFlyerPromptText）は、A5 の物理ルール・帯の比率・QR の扱いを固定で差し込み、GPT Image 用の本文に組み立てる。
+// 段B（buildFlyerPromptText）は、B5 の物理ルール・帯の比率・QR の扱いを固定で差し込み、GPT Image 用の本文に組み立てる。
+
+// 1枚もののチラシの用紙。B5（JIS）にした理由：セブン‐イレブンのネットプリントで刷れる用紙（A3/A4/B4/B5）のうち手渡しに向く最小で、
+// A5 と同じ 1:√2 系なので帯の比率はそのまま使える。GPT Image の出力（1024×1536・2:3）は上下 45px ずつ切ると B5 比率になる。
+// 数字の根拠は チラシ再設計_01_参考デザイン分析.md の 8 章（1024px = 182mm → 1mm = 5.63px、1pt ≈ 2px、143dpi）。
+export const FLYER_PAPER = {
+  name: 'B5',
+  widthMm: 182,
+  heightMm: 257,
+  label: 'B5（182×257mm）',
+  marginMm: 12,          // 外周余白（幅の 6.6%）。マルチコピー機の印刷不可領域 4〜5mm と「用紙に合わせる」縮小を吸収
+  minFontPt: 11,         // これより小さい文字は 143dpi で崩れる（3.9mm ≈ 22px）
+  headlinePt: 36,        // 見出し（幅の 7%・約13mm）。1行 6〜8 字で最大3行
+  bigNumberPt: 44,       // 価格・実績数字（幅の 8%・約15mm）
+  qrMm: 36,              // QR の白枠（幅の 1/5）
+  bands: { label: 12, hero: 70, body: 82, cta: 47 } as const,  // 帯の高さ（mm）。比率 5:30:35:20、残り 23mm が帯間の余白
+} as const;
 // 判断の物差しはプロのチラシ20点の分析（チラシ再設計_01_参考デザイン分析.md）。プリセットのトンマナから選ばせるのをやめ、
 // 「業種と感情から主色1色を決める」「個人サービスは人を主役にする」「CTAは最初の一歩」をサービスごとにAIに判断させる。
 
@@ -1525,7 +1541,7 @@ const FLYER_HERO_VISUALS: FlyerHeroVisual[] = ['provider_portrait', 'product', '
 const FLYER_HERO_CUTS: FlyerHeroCut[] = ['diagonal', 'curve', 'circle', 'full', 'wave'];
 const FLYER_DEVICES: FlyerDevice[] = ['badge', 'yellow_marker', 'three_cards', 'big_number', 'reassurance', 'band_heading'];
 
-/** サービス本文から、A5たて片面チラシの「デザイン方針」と「紙に描き込む文言」を一度に作る。 */
+/** サービス本文から、B5たて片面チラシの「デザイン方針」と「紙に描き込む文言」を一度に作る。 */
 export const generateFlyerContent = async (serviceBody: string): Promise<FlyerContent | null> => {
   const body = serviceBody?.trim();
   if (!body) return null;
@@ -1540,7 +1556,7 @@ export const generateFlyerContent = async (serviceBody: string): Promise<FlyerCo
 
   const prompt = `
 あなたは紙のチラシを専門にするアートディレクター兼コピーライターです。
-以下のサービス本文をもとに、A5（148×210mm）たて片面チラシの「デザイン方針」と「紙に描き込む文言」を決めてください。
+以下のサービス本文をもとに、B5（182×257mm）たて片面チラシの「デザイン方針」と「紙に描き込む文言」を決めてください。
 出力はあとで画像生成AIへの指示に組み立てられます。あなたの判断がそのまま紙になります。
 
 【配る場面】
@@ -1568,7 +1584,7 @@ ${familyTable}
 
 【文言のルール】
 - 本文に書かれている情報だけを使う。創作・誇張はしない。数字・資格・年数は本文にあるものだけ。
-- A5は小さい。下の文字数を必ず守り、短く言い切る。
+- B5 は手に取って読む小さな紙。下の文字数を必ず守り、短く言い切る。
 - 読んだ人が自分のことだと感じる言い回しにする。体言止めばかりにしない。
 - 「〜かもしれません」「〜だと思います」のように自信の無い言い回しは使わない。
 - マークダウン記法（#、* など）と絵文字は使わない。
@@ -1921,7 +1937,7 @@ const flyerPrintRules = (qrSpot: string, paper: string) => `■ 紙に印刷し�
 ・出力は1枚の画像。たて長で作る。プレゼン資料や複数ページにはしない。
 ・仕上がりは${paper}。手に取って読む小さめの紙なので、文字は大きく太めにする。細い線・薄いグレーの文字・小さすぎる注釈は使わない。
 ・載せるのは下で指定した文言だけ。余白を惜しまず、要素の間をしっかり空ける。詰め込むと印刷でつぶれて読めない。
-・紙の外周1割ほどは余白として空け、文字や主要な絵を端ギリギリに置かない（印刷のときに切れるため）。
+・紙の外周は幅の 6〜7%（${paper === FLYER_PAPER.label ? `${FLYER_PAPER.marginMm}mm` : '1割'}ほど）を余白として空け、文字や主要な絵を端ギリギリに置かない（印刷のときに切れるため）。
 ・視線が上から下へ素直に流れる構成にする。要素を斜めに散らしたり、読む順番が分からない配置にしない。
 ・QRコードは、この指示の最後にある手順で、画像を作ったあとにコード実行で本物を生成して重ねる（画像生成で描いたQRは読み取れないため）。画像生成の段階では QR を描かず、${qrSpot}
 ・URL・メールアドレス・電話番号・氏名は書かない（配る本人があとで入れる）。
@@ -1930,7 +1946,7 @@ const flyerPrintRules = (qrSpot: string, paper: string) => `■ 紙に印刷し�
 ・絵も、主役ビジュアルと3カードのアイコン以外は足さない。挿絵・写真風の人物・葉や花などの飾りは、上の「装飾」の指定を超えて置かない。
 ・マークダウン記号（#、* など）は画像に出さない。`;
 
-const QR_SPOT_SINGLE = '右下へ、一辺が紙の幅の5分の1ほどの「白い正方形の枠」を空け、そのすぐ下に小さく「詳しくはこちら」と入れる。あとの手順で本物のQRコードを重ねる場所。';
+const QR_SPOT_SINGLE = `右下へ、一辺が紙の幅の5分の1（${FLYER_PAPER.name}で約${FLYER_PAPER.qrMm}mm）の「白い正方形の枠」を空け、そのすぐ下に小さく「詳しくはこちら」と入れる。あとの手順で本物のQRコードを重ねる場所。`;
 const QR_SPOT_MULTI = '各サービスの枠の右端に、枠の高さの8割を一辺とする「白い正方形」を空ける。あとの手順で本物のQRコードを重ねる場所。';
 
 // URL が未登録のときに、プロンプトの中で「ここに貼る」と示す空欄。画面側でも同じ文言を探して注意を出す
@@ -1953,7 +1969,8 @@ const flyerQrStep = (targets: { label: string; url: string }[], multi: boolean):
 ■ QRコードの入れ方（ここまでやって完成。QRの無い画像で終わらせない）
 1. まず上の仕様で画像を1枚作る。白い正方形の枠は空けたままにする。
 2. 次に Python（コード実行）で、下のURLのQRコードを作る。誤り訂正レベルはM、周囲に4モジュール分の白い余白を付ける。
-3. 作ったQRを、${where}大きさに縮小して重ね、完成した画像を1枚出力する。QRの余白は消さない。
+3. 作ったQRを、${where}大きさに縮小して重ね、完成した画像を1枚出力する。QRの余白は消さない。${multi ? '' : `
+4. 仕上げに、画像の上下を同じだけ切って ${FLYER_PAPER.name} の比率（幅${FLYER_PAPER.widthMm}：高さ${FLYER_PAPER.heightMm}）にそろえる（元が 1024×1536 なら上下 45px ずつ切って 1024×1446 にする）。左右は切らない。`}
 ・QRは必ずコードで生成すること。画像生成で描いたQRは読み取れない。
 ・生成した画像をコードから読めない場合は、その旨を短く伝えること。こちらが画像をアップロードしたら、同じ手順でQRを重ねる。
 ・下のURLが空欄のままなら、先に「QRにするURLを教えてください」と聞き、URLをもらってから手順2に進む。
@@ -2128,7 +2145,7 @@ ${attachLines.join('\n')}
     ? `・使わない部品：${design.avoid.map(dv => FLYER_DEVICE_TEXT[dv].split('（')[0]).join('、')}`
     : '';
 
-  const heroLayout = `主役ビジュアルを右に、見出しを左に。見出しは紙面でいちばん大きな文字${emphasis ? `で、${emphasis}だけ差し色` : ''}。サブコピーはその下に小さく。`
+  const heroLayout = `主役ビジュアルを右に（版面の幅の4割まで）、見出しを左に。見出しは紙面でいちばん大きな文字（下の「大きさの目安」の見出しの高さ）で、1行 6〜8 文字で折って最大3行${emphasis ? `。${emphasis}だけ差し色` : ''}。サブコピーはその下に小さく。`
     + (badge ? `主役ビジュアルの左下に重ねて丸バッジを1つ置き、「${badge}」を白抜きで入れる。` : '丸バッジは置かない。');
 
   const textBlocks = [
@@ -2141,7 +2158,7 @@ ${attachLines.join('\n')}
     `【締めの帯（最下部・主色ベタ）】\n${copy.cta.firstStep}${copy.cta.price ? `\n${copy.cta.price}` : ''}${copy.cta.note ? `\n（小さく）${copy.cta.note}` : ''}\n（QR枠の下に小さく）詳しくはこちら`,
   ];
 
-  return `ChatGPTの画像生成（GPT Image）で、紙に印刷して配るチラシを1枚作ります。A5（148×210mm）たての片面チラシです。
+  return `ChatGPTの画像生成（GPT Image）で、紙に印刷して配るチラシを1枚作ります。${FLYER_PAPER.label}たての片面チラシです。
 
 ■ 完成までの手順（2段階。どちらもこのチャットの中でやる）
 1. 画像生成でチラシ本体を1枚作る（右下にQR用の白い枠を空けておく）
@@ -2158,17 +2175,28 @@ ${colorLines.join('\n')}
 ${deviceLines}
 ${avoidLine}
 
-${flyerPrintRules(QR_SPOT_SINGLE, 'A5（148×210mm）')}
+${flyerPrintRules(QR_SPOT_SINGLE, FLYER_PAPER.label)}
 
 ■ この1枚の主役
 ${FLYER_ANGLE_SPECS[angle.id].lead}。
 
-■ 紙面の構成（上から4つの帯。高さの比率はおおよそ 5：30：35：20。残りは余白）
-1. 対象者ラベル：左上に、小さなピル型（角の丸い横長の枠）で1行。主色の細い枠線に主色の文字。
+■ 紙面の構成（上から4つの帯。高さの比率はおおよそ 5：30：35：20。残りは帯と帯のあいだの余白）
+${FLYER_PAPER.name}（${FLYER_PAPER.widthMm}×${FLYER_PAPER.heightMm}mm）で刷ったときの高さの目安：帯1 約${FLYER_PAPER.bands.label}mm／帯2 約${FLYER_PAPER.bands.hero}mm／帯3 約${FLYER_PAPER.bands.body}mm／帯4 約${FLYER_PAPER.bands.cta}mm。外周の余白 ${FLYER_PAPER.marginMm}mm。
+1. 対象者ラベル：左上に、小さなピル型（角の丸い横長の枠、高さは紙の幅の5%）で1行。主色の細い枠線に主色の文字。
 2. 見出しの帯：${heroLayout}
 3. 本文の帯：${body.layout}
 4. 締めの帯：主色のベタ塗り。左に「最初の一歩」を白抜きで大きく、その下に価格をいちばん大きな数字で、さらに小さく添え書き。右にQR用の白い正方形の枠と、その下に「詳しくはこちら」。
 帯3と帯4のあいだに、つなぎの1行を小さく1行だけ置く。
+
+■ 大きさの目安（紙の幅を 100 としたときの文字の高さ。${FLYER_PAPER.name}での実寸）
+・見出し：7（約13mm・${FLYER_PAPER.headlinePt}pt）。3行に折っても帯2に収まる
+・価格・実績数字：8（約15mm・${FLYER_PAPER.bigNumberPt}pt）。周りの文字の3倍
+・サブコピー・最初の一歩・困りごとの3行：3（約5.5mm・16pt）
+・カードの題・小見出し：2.7（約5mm・14pt）
+・カードの本文・添え書き・つなぎの1行：2.1（約4mm・${FLYER_PAPER.minFontPt}pt）。これが最小。これより小さい文字を1つも置かない
+・3カード：同じ幅の箱を横に3つ（1つ約49mm）。アイコンは箱の幅の3割（約14mm）。本文は1行 12 字で2行まで
+・丸バッジ：直径は紙の幅の14%（約26mm）
+・QRの白枠：一辺は紙の幅の20%（約${FLYER_PAPER.qrMm}mm）。帯4の中に収め、下に「詳しくはこちら」
 
 ■ 紙に入れる文字（この文言だけを正確に。ここに無い文章を足さない）
 ${textBlocks.join('\n')}${qrStep}`;

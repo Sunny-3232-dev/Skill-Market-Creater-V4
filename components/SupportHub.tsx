@@ -39,7 +39,7 @@ const MENU_TOURS: Record<MenuId, { sel: string; title: string; text: string }[]>
     { sel: '[data-tour="menu-flyer-plan"]', title: 'デザインの方針は、本文から AI が決めます', text: '誰向けか・主色1色・見出しの書体・主役のビジュアルを、サービスの内容に合わせて決めています。プロのチラシ20点から取り出した型に沿っています。気に入らなければ作り直せます。' },
     { sel: '[data-tour="menu-flyer-copy"]', title: '切り口ちがいの3案。1本ずつ ChatGPT に貼る', text: '困りごと・結果・信頼のどこを主役にするかが違います。デザインの方針は3案とも同じなので、並べて見比べられます。3枚出して、良かった1枚を刷ってください。' },
     { sel: '[data-tour="menu-flyer-qr"]', title: 'QRが読めなかったときの保険', text: 'ここでこのツールがQR画像を作ります。ChatGPT にチラシ画像と一緒にアップロードして重ねてもらうか、Canva で重ねてください。' },
-    { sel: '[data-tour="menu-flyer-print"]', title: '刷るところまで', text: 'プリンタが無くても、完成画像をセブン‐イレブンのネットプリントにアップロードすれば、予約番号で店頭のマルチコピー機から刷れます。用紙は A4 を選んでください。' },
+    { sel: '[data-tour="menu-flyer-print"]', title: '刷るところまで', text: 'プリンタが無くても、完成画像をセブン‐イレブンのネットプリントにアップロードすれば、予約番号で店頭のマルチコピー機から刷れます。チラシは B5 ちょうどの大きさで作ってあるので、用紙は B5 を選んでください。' },
   ],
 };
 
@@ -960,8 +960,8 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
     {
       id: 'flyer' as MenuId,
       title: 'チラシを作る（検証中）',
-      description: 'オフ会で手渡す前提の、A5たて1枚のチラシ。本文からデザインの方針をAIが決め、切り口を変えた3案のプロンプトを用意します。',
-      highlight: 'A5たて・方針はAIが設計・3案',
+      description: 'オフ会で手渡す前提の、B5たて1枚のチラシ。本文からデザインの方針をAIが決め、切り口を変えた3案のプロンプトを用意します。コンビニのネットプリントでそのまま刷れます。',
+      highlight: 'B5たて・方針はAIが設計・3案',
       icon: <FlyerIcon />,
       onRun: handleRunFlyer,
     },
@@ -1595,7 +1595,7 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
                 <div className="mb-5">
                   <h3 className="text-lg font-bold text-stone-900">チラシをつくる（検証中）</h3>
                   <p className="text-xs text-stone-500 mt-1">
-                    オフ会で手渡す前提の、A5（148×210mm）1枚のチラシです。本文から<span className="font-medium text-stone-600">誰向けか・主色・書体・主役のビジュアル</span>を AI が決め、
+                    オフ会で手渡す前提の、B5（182×257mm）1枚のチラシです。コンビニのネットプリントで刷れる大きさに合わせています。本文から<span className="font-medium text-stone-600">誰向けか・主色・書体・主役のビジュアル</span>を AI が決め、
                     切り口を変えた<span className="font-medium text-stone-600">3案</span>を用意しました。ChatGPTの画像生成（GPT Image）に1本ずつ貼って、出てきた3枚から良かった1枚を刷ってください。
                     QRコードは、画像のあとに <span className="font-medium text-stone-600">ChatGPT がコード実行で本物を作って右下に重ねます</span>（プロンプトに手順入り）。
                   </p>
@@ -1764,10 +1764,10 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
                     </li>
                     <li>3案のうち1つをコピーして貼る。同じチャットで3案とも試すと、デザインのそろった3枚を見比べられます</li>
                     <li>画像が出たら、上の「2本目：QRを重ねる指示をコピー」を同じチャットに貼る。ChatGPT がコード実行で本物のQRを右下に重ねた完成画像（ファイル）を出し、読み取り結果も報告します。文字が崩れていたら「◯◯の文字が崩れているので直して」で描き直せます</li>
-                    <li>良かった1枚にお名前・連絡先を入れて完成。家のプリンタなら<span className="font-medium text-stone-700">A4に2枚並べて印刷し、半分に切るとA5が2枚</span>できます。プリンタが無ければ、下のコンビニ印刷へ</li>
+                    <li>良かった1枚にお名前・連絡先を入れて完成。家のプリンタなら<span className="font-medium text-stone-700">B5用紙にそのまま印刷</span>（B5が無ければA4に印刷して余白を切る）。プリンタが無ければ、下のコンビニ印刷へ</li>
                   </ol>
 
-                  {/* コンビニで刷る。作って終わりにならないよう、刷る手段までここで案内する（用紙にA5は無いので、その注意も添える） */}
+                  {/* コンビニで刷る。作って終わりにならないよう、刷る手段までここで案内する。用紙は B5（ネットプリントで選べる最小の普通紙）に合わせて作っている */}
                   <div className="bg-white border border-stone-200 rounded-xl p-4 mb-4" data-tour="menu-flyer-print">
                     <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
                       <p className="text-xs font-bold text-stone-800">プリンタが無いときは、セブン‐イレブンのネットプリントで刷れます</p>
@@ -1793,18 +1793,17 @@ const SupportHub: React.FC<SupportHubProps> = ({ ensureKeySet, onHandleApiError,
                       </div>
                     </div>
                     <ol className="text-[11px] text-stone-600 list-decimal list-inside space-y-1 leading-relaxed">
-                      <li>完成した画像をアップロードし、用紙は「A4」、カラーを選ぶ</li>
+                      <li>完成した画像をアップロードし、用紙は<span className="font-medium text-stone-700">「B5」</span>、カラーを選ぶ（チラシはB5ちょうどの大きさで作ってあります）</li>
                       <li>予約番号（またはQR）を控える。通常版は30日、かんたん版は翌日まで有効</li>
                       <li>店頭のマルチコピー機で予約番号を入れて印刷する（白黒は1枚20円から。カラーの料金は店頭の表示を確認）</li>
                     </ol>
                     <p className="text-[11px] text-stone-400 mt-2 leading-relaxed">
-                      ネットプリントの用紙に A5 はありません。A4 でそのまま刷ると A5 より一回り大きい1枚になります（手渡しには十分です）。
-                      A5 を2枚取りたいときは、Canva などで A4 横に2枚並べた画像を作ってからアップロードしてください。
+                      枚数が多いときは B4 を選ぶと B5 が2枚分（半分に切る）になり、1枚あたりの料金を抑えられます。その場合は先に B4 横に2枚並べた画像を用意してください。
                     </p>
                   </div>
 
                   <p className="text-[11px] text-stone-400 leading-relaxed">
-                    画像は 2:3 で出ることがあり、A5（1:1.41）ちょうどにはなりません。A5の幅に合わせると下がはみ出るので、外周に空けた余白ごと切り落としてください（QRを重ねた完成画像が A5 比率で出ていれば、そのままで大丈夫です）。
+                    QRを重ねる手順の最後で、画像の上下を切って B5 の比率（182:257）にそろえるよう指示しています。そろえずに 2:3 のまま出てきた場合は、幅を B5 に合わせ、上下にはみ出た余白を切り落としてください。
                     文字は画像として描かれるので、印刷前に誤字がないか必ず自分の目で確認してください。
                   </p>
                 </div>
