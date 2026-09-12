@@ -294,6 +294,7 @@ const PROMPT_STYLES: Array<{
   note?: string;
   fullWidth?: boolean;
   recommended?: boolean; // 迷ったときの第一候補として先頭に置き、バッジを付ける
+  featured?: boolean;    // 折りたたまずに、推奨と同列で先頭に出す
 }> = [
   {
     id: 'benefit_banner',
@@ -301,6 +302,14 @@ const PROMPT_STYLES: Array<{
     description: '「現役◯◯が全力サポート！」のような、大見出し＋提供者キャラクター＋3つのベネフィットで構成する販促バナー風。サービスの内容・ターゲットに合わせて見出し・キャラ・配色を自動で調整し、インパクトと信頼感を両立します。',
     fullWidth: true,
     recommended: true,
+  },
+  {
+    id: 'my_style',
+    label: 'マイスタイル',
+    description: '参考にしたいサムネイル画像を ChatGPT に一緒に添付すると、そのデザインを踏襲した新しいサムネイルを生成できます。アイコンや文章は新しいサービス内容に自動で差し替えられます。',
+    note: 'コピー後、ChatGPT を開いて参考画像と一緒に貼り付けてください。',
+    fullWidth: true,
+    featured: true,
   },
   {
     id: 'standard',
@@ -331,13 +340,6 @@ const PROMPT_STYLES: Array<{
     id: 'puffy_3d',
     label: 'ぷっくり3D',
     description: '粘土のようにぷっくり膨らんだ3D調。パステルカラーでやわらかく、思わず目を引く可愛い印象。',
-  },
-  {
-    id: 'my_style',
-    label: 'マイスタイル',
-    description: '参考にしたいサムネイル画像を ChatGPT に一緒に添付すると、そのデザインを踏襲した新しいサムネイルを生成できます。アイコンや文章は新しいサービス内容に自動で差し替えられます。',
-    note: 'コピー後、ChatGPT を開いて参考画像と一緒に貼り付けてください。',
-    fullWidth: true,
   },
 ];
 
@@ -409,10 +411,12 @@ const ServiceResult: React.FC<ServiceResultProps> = ({ idea, content, onBack, on
       setPastedLabels(prev => new Set(prev).add(label));
     });
   };
-  // 画像プロンプトは「迷ったらこれ」だけ開いておき、残りは求められたときに出す
+  // 画像プロンプトは「迷ったらこれ」とマイスタイルだけ開いておき、残りは求められたときに出す
   const [showAllStyles, setShowAllStyles] = useState(false);
   const recommendedStyle = PROMPT_STYLES.find(st => st.recommended) ?? PROMPT_STYLES[0];
-  const otherStyles = PROMPT_STYLES.filter(st => st.id !== recommendedStyle.id);
+  // 先頭に出すのは「迷ったらこれ」と、同列扱いの featured（マイスタイル）。残りは折りたたむ
+  const featuredStyles = PROMPT_STYLES.filter(st => st.recommended || st.featured);
+  const otherStyles = PROMPT_STYLES.filter(st => !st.recommended && !st.featured);
   const [showBackConfirm, setShowBackConfirm] = useState(false);
 
   // AI編集チャットが書き換える下書き本文。保存するまでは idea.generatedContent に反映されない
@@ -870,16 +874,18 @@ const ServiceResult: React.FC<ServiceResultProps> = ({ idea, content, onBack, on
             }
           />
           <div className="space-y-4">
-            <div data-tour="prompt-recommended">
-            <PromptCard
-              style={recommendedStyle}
-              prompt={prompts[recommendedStyle.id]}
-              copied={copiedVersion === recommendedStyle.id}
-              expanded={expandedPrompt === recommendedStyle.id}
-              onCopy={() => handleCopyPrompt(recommendedStyle.id)}
-              onToggle={() => setExpandedPrompt(expandedPrompt === recommendedStyle.id ? null : recommendedStyle.id)}
-            />
-            </div>
+            {featuredStyles.map(style => (
+              <div key={style.id} data-tour={style.id === recommendedStyle.id ? 'prompt-recommended' : undefined}>
+                <PromptCard
+                  style={style}
+                  prompt={prompts[style.id]}
+                  copied={copiedVersion === style.id}
+                  expanded={expandedPrompt === style.id}
+                  onCopy={() => handleCopyPrompt(style.id)}
+                  onToggle={() => setExpandedPrompt(expandedPrompt === style.id ? null : style.id)}
+                />
+              </div>
+            ))}
             <button
               type="button"
               onClick={() => setShowAllStyles(v => !v)}
